@@ -1,0 +1,30 @@
+Note : This for the final product deliverable to the client, but now we are in development phase, we do not need to do everything mentioned below, only ncessary  things for the intiial local testing Prototype1 (docs\Prototype v1 — Features, User Flows & Database Schema.md). such as we will avoid doccker entirely for now.
+
+Component	Technology
+Android application	React Native + Expo
+Programming language	TypeScript
+Backend	Node.js
+Database	PostgreSQL
+Background jobs	Redis
+Video processing	FFmpeg
+Media storage	Existing Hostinger VPS
+HTTPS and routing	Caddy
+Admin dashboard	React
+Deployment	Docker Compose
+
+
+Hosting and domain are already available.
+
+The application will use the existing Hostinger VPS, with dedicated application services, database credentials, media storage, and deployment configuration.
+
+How the system works
+The Android app communicates with the Node.js backend using HTTPS.
+PostgreSQL stores user accounts, creator profiles, posts, courses, quizzes, research references, and interactions.
+Uploaded videos, images, and files are stored on the VPS.
+Redis and FFmpeg handle video processing in the background.
+The backend manages authentication, content, search, learning progress, and permissions.
+An admin dashboard manages users, reported content, and moderation.
+
+Initial Reels will support videos up to 60 seconds, with controlled upload sizes and optimized playback.
+
+The architecture will support a future iOS application using the same backend.
