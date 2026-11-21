@@ -10,7 +10,7 @@
     "test": "vitest run",
     "db:migrate": "node-pg-migrate up --envPath .env -m migrations",
     "db:migrate:down": "node-pg-migrate down --envPath .env -m migrations",
-    "db:types": "kysely-codegen --env-file .env --out-file src/db/types.ts",
+    "db:types": "kysely-codegen --env-file .env",
     "db:seed": "tsx --env-file-if-exists=.env src/scripts/seed.ts"
   },
   "dependencies": {

@@ -1,0 +1,5 @@
+{
+  "outFile": "src/db/types.ts",
+  "excludePattern": "pgmigrations",
+  "typeMapping": { "int8": "number" }
+}
