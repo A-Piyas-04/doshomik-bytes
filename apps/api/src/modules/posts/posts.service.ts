@@ -29,7 +29,14 @@ export function selectPosts(viewerId: number) {
       userSummary('u').as('author'),
       ...MEDIA_COLUMNS,
       eb
-        .exists(eb.selectFrom('post_likes as l').whereRef('l.post_id', '=', 'p.id').where('l.user_id', '=', viewerId).select(sql.lit(1).as('one')))
+        .exists(
+          eb
+            .selectFrom('post_likes as l')
+            .whereRef('l.post_id', '=', 'p.id')
+            .where('l.user_id', '=', viewerId)
+            .where('l.is_active', '=', true)
+            .select(sql.lit(1).as('one')),
+        )
         .$castTo<boolean>()
         .as('liked_by_me'),
       eb
@@ -178,30 +185,43 @@ export async function visiblePost(viewerId: number, postPublicId: string) {
   return found(post, 'Post');
 }
 
-/** Likes are counted and notified by the worker, through the outbox. */
+/**
+ * A like is one row per user and post, toggled with `is_active`: unliking keeps the row, and
+ * liking again flips it back. An event is written only when the state really changes, and only
+ * the first like ever notifies the author. Counting and notifying happen in the worker.
+ */
 export async function likePost(userId: number, postPublicId: string): Promise<void> {
   const post = await visiblePost(userId, postPublicId);
   await db.transaction().execute(async (trx) => {
-    const created = await trx
+    const changed = await trx
       .insertInto('post_likes')
       .values({ user_id: userId, post_id: post.id })
-      .onConflict((oc) => oc.doNothing())
-      .returning('post_id')
+      .onConflict((oc) =>
+        oc
+          .columns(['user_id', 'post_id'])
+          .doUpdateSet({ is_active: true, updated_at: sql`now()` })
+          .where('post_likes.is_active', '=', false),
+      )
+      // xmax is 0 only for a freshly inserted row, so this tells a first like from a re-like.
+      .returning(sql<boolean>`(xmax = 0)`.as('first_like'))
       .executeTakeFirst();
-    if (created) await emit(trx, 'post.liked', post.id, { user_id: userId });
+    // No row back: the like was already active, so nothing changed.
+    if (changed) await emit(trx, 'post.liked', post.id, { user_id: userId, first_like: changed.first_like });
   });
 }
 
 export async function unlikePost(userId: number, postPublicId: string): Promise<void> {
   const post = await visiblePost(userId, postPublicId);
   await db.transaction().execute(async (trx) => {
-    const removed = await trx
-      .deleteFrom('post_likes')
+    const undone = await trx
+      .updateTable('post_likes')
+      .set({ is_active: false, updated_at: sql`now()` })
       .where('user_id', '=', userId)
       .where('post_id', '=', post.id)
+      .where('is_active', '=', true)
       .returning('post_id')
       .executeTakeFirst();
-    if (removed) await emit(trx, 'post.unliked', post.id, {});
+    if (undone) await emit(trx, 'post.unliked', post.id, {});
   });
 }
 

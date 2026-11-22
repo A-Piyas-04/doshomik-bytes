@@ -89,8 +89,14 @@ export const moderationRoutes: FastifyPluginAsyncZod = async (app) => {
           await trx.updateTable('posts').set({ status: 'removed', updated_at: new Date() }).where('id', '=', report.target_id).execute();
           await emitSearchSync(trx, 'post', report.target_id);
         } else {
-          await trx.updateTable('comments').set({ deleted_at: new Date() }).where('id', '=', report.target_id).execute();
-          await emit(trx, 'comment.deleted', report.target_id, {});
+          // Only a live comment emits the event, so the worker takes it off the count exactly once.
+          const removed = await trx
+            .updateTable('comments')
+            .set({ deleted_at: new Date() })
+            .where('id', '=', report.target_id)
+            .where('deleted_at', 'is', null)
+            .executeTakeFirst();
+          if (removed.numUpdatedRows > 0n) await emit(trx, 'comment.deleted', report.target_id, {});
         }
       }
       if (action === 'suspend_user') {

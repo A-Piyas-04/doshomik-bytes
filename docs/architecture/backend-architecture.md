@@ -231,11 +231,12 @@ A change and its event are committed together ([`lib/outbox.ts`](../../apps/api/
 
 | Event | Written by | Worker does |
 | --- | --- | --- |
-| `follow.created` | follow a user | `follow` or `follow_request` notification + push |
-| `post.liked` | like | Recounts counters; `like` notification |
-| `post.unliked` | unlike | Recounts counters |
-| `comment.created` | comment / reply | Recounts counters; `reply` to the parent's author, `comment` to the post's author |
-| `comment.deleted` | delete comment, moderation | Recounts counters |
+| `follow.created` | the **first** follow or request ever between two users | `follow` or `follow_request` notification + push |
+| `follow.changed` | an accepted follow starts (follow, accept, going public) or ends (unfollow, block) | `users.follower_count` / `following_count` ±1 |
+| `post.liked` | a like becomes active (`first_like` is false for a re-like) | `like_count` +1; `like` notification only for a first like |
+| `post.unliked` | an active like is undone | `like_count` −1 |
+| `comment.created` | comment / reply | `comment_count` +1 for post comments; `reply` to the parent's author, `comment` to the post's author |
+| `comment.deleted` | a live comment is deleted (author or moderation) | `comment_count` −1 |
 | `media.ready` | media worker | Publishes posts waiting on this asset (`post_ready` notification), or sets the avatar and deletes older avatar files |
 | `email.verify` | sign-up, resend | Creates a 24 h code (hash stored) and emails the link |
 | `email.password_reset` | reset request | Creates a 1 h code and emails the link |
@@ -243,9 +244,10 @@ A change and its event are committed together ([`lib/outbox.ts`](../../apps/api/
 
 **Delivery guarantees**
 
-- An event's database work and its `processed_at` mark commit in **one transaction**. Notifications and counters are therefore applied exactly once.
+- The worker first **claims** an event (`processed_at` set only if still NULL), then does its database work, in **one transaction**. Notifications and counters are therefore applied exactly once, even if a second worker picked up the same event.
 - Push and email run **after** that commit, best effort: a failure is logged, not retried.
-- Counters are **recounted**, never incremented, so handling an event twice can't make them drift.
+- Counters move by **±1** per event (O(1), not a recount). The hourly repair job recounts them to fix drift from paths that write no event, such as account purges.
+- Likes and follows are **toggle rows** ([database §2](database-architecture.md#2-conventions)), so an event is written only when the state really changes, and only the first like or follow ever notifies.
 - A failing event is retried on later batches. After 10 attempts it stays unprocessed for inspection.
 
 ## 7. Background worker

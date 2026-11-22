@@ -14,7 +14,8 @@ export const SEARCH_SUGGEST_MIN_CHARS = 2;
 
 export const USER_ROLES = ['user', 'moderator', 'admin'] as const;
 export const USER_STATUSES = ['active', 'suspended', 'deleted'] as const;
-export const FOLLOW_STATUSES = ['accepted', 'pending'] as const;
+/** 'inactive': unfollowed, withdrawn or declined. The row stays so a re-follow doesn't notify again; the API reports it as 'none'. */
+export const FOLLOW_STATUSES = ['accepted', 'pending', 'inactive'] as const;
 export const PLATFORMS = ['android', 'ios', 'web'] as const;
 
 export const POST_TYPES = ['text', 'image', 'reel'] as const;

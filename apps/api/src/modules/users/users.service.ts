@@ -47,12 +47,14 @@ export async function updateProfile(
       .execute();
     // Going public lets everyone in: waiting follow requests are accepted.
     if (changes.is_private === false) {
-      await trx
+      const accepted = await trx
         .updateTable('follows')
-        .set({ status: 'accepted' })
+        .set({ status: 'accepted', updated_at: sql`now()` })
         .where('following_id', '=', userId)
         .where('status', '=', 'pending')
+        .returning('follower_id')
         .execute();
+      for (const { follower_id } of accepted) await emit(trx, 'follow.changed', userId, { follower_id, delta: 1 });
     }
     await emitSearchSync(trx, 'user', userId);
   });
@@ -109,22 +111,14 @@ export async function getProfile(viewerId: number, userPublicId: string) {
         .where('posts.deleted_at', 'is', null)
         .select(({ fn }) => fn.countAll<number>().as('n'))
         .as('posts_count'),
-      eb
-        .selectFrom('follows')
-        .whereRef('follows.following_id', '=', 'u.id')
-        .where('follows.status', '=', 'accepted')
-        .select(({ fn }) => fn.countAll<number>().as('n'))
-        .as('followers_count'),
-      eb
-        .selectFrom('follows')
-        .whereRef('follows.follower_id', '=', 'u.id')
-        .where('follows.status', '=', 'accepted')
-        .select(({ fn }) => fn.countAll<number>().as('n'))
-        .as('following_count'),
+      // Stored counts, kept by the worker from follow.changed events (seconds behind at most).
+      'u.follower_count as followers_count',
+      'u.following_count',
       eb
         .selectFrom('follows')
         .whereRef('follows.following_id', '=', 'u.id')
         .where('follows.follower_id', '=', viewerId)
+        .where('follows.status', '!=', 'inactive')
         .select('follows.status')
         .as('follow_status'),
     ])
@@ -133,7 +127,10 @@ export async function getProfile(viewerId: number, userPublicId: string) {
   return { ...row, follow_status: (row.follow_status ?? 'none') as FollowStatus | 'none' };
 }
 
-/** People to follow on an empty Home: the most-followed active users the viewer has no follow with. */
+/**
+ * People to follow on an empty Home: the most-followed active users the viewer has no follow or
+ * request with. Reads users_suggest_idx in order, so no user's followers are counted here.
+ */
 export function suggestUsers(viewerId: number, limit: number) {
   return db
     .selectFrom('users as u')
@@ -146,24 +143,13 @@ export function suggestUsers(viewerId: number, limit: number) {
           selectFrom('follows')
             .whereRef('follows.following_id', '=', 'u.id')
             .where('follows.follower_id', '=', viewerId)
+            .where('follows.status', '!=', 'inactive')
             .select(sql.lit(1).as('one')),
         ),
       ),
     )
-    .select((eb) => [
-      'u.public_id as id',
-      'u.username',
-      'u.display_name',
-      'u.avatar_url',
-      'u.is_private',
-      eb
-        .selectFrom('follows')
-        .whereRef('follows.following_id', '=', 'u.id')
-        .where('follows.status', '=', 'accepted')
-        .select(({ fn }) => fn.countAll<number>().as('n'))
-        .as('followers_count'),
-    ])
-    .orderBy('followers_count', 'desc')
+    .select(['u.public_id as id', 'u.username', 'u.display_name', 'u.avatar_url', 'u.is_private', 'u.follower_count as followers_count'])
+    .orderBy('u.follower_count', 'desc')
     .orderBy('u.id', 'desc')
     .limit(limit)
     .execute();
@@ -195,18 +181,28 @@ export async function follow(followerId: number, userPublicId: string): Promise<
   );
   if (target.id === followerId) throw badRequest('You cannot follow yourself', 'SELF_FOLLOW');
 
+  // A follow is one row per pair. Unfollowing sets it 'inactive' and following again reactivates
+  // it, so only the first follow ever notifies: follow → unfollow → follow can't spam alerts.
   return db.transaction().execute(async (trx) => {
     const status: FollowStatus = target.is_private ? 'pending' : 'accepted';
-    const created = await trx
+    const changed = await trx
       .insertInto('follows')
       .values({ follower_id: followerId, following_id: target.id, status })
-      .onConflict((oc) => oc.doNothing())
-      .returning('status')
+      .onConflict((oc) =>
+        oc
+          .columns(['follower_id', 'following_id'])
+          .doUpdateSet({ status, updated_at: sql`now()` })
+          .where('follows.status', '=', 'inactive'),
+      )
+      // xmax is 0 only for a freshly inserted row: a first follow, not a reactivated one.
+      .returning(sql<boolean>`(xmax = 0)`.as('first_follow'))
       .executeTakeFirst();
-    if (created) {
-      await emit(trx, 'follow.created', target.id, { follower_id: followerId });
+    if (changed) {
+      if (changed.first_follow) await emit(trx, 'follow.created', target.id, { follower_id: followerId });
+      if (status === 'accepted') await emit(trx, 'follow.changed', target.id, { follower_id: followerId, delta: 1 });
       return { status };
     }
+    // Already following, or already requested.
     const existing = await trx
       .selectFrom('follows')
       .select('status')
@@ -217,15 +213,37 @@ export async function follow(followerId: number, userPublicId: string): Promise<
   });
 }
 
-/** Unfollows, or withdraws a pending request. */
-export async function unfollow(followerId: number, userPublicId: string): Promise<void> {
-  await db
-    .deleteFrom('follows')
+/**
+ * Ends a follow or a pending request, keeping the row as 'inactive'. Ending an accepted follow
+ * moves the stored counts. Does nothing if there is no live follow.
+ */
+async function endFollow(trx: Db, followerId: number, followingId: number): Promise<void> {
+  const current = await trx
+    .selectFrom('follows')
+    .select('status')
     .where('follower_id', '=', followerId)
-    .where('following_id', '=', idOfUser(userPublicId))
+    .where('following_id', '=', followingId)
+    .where('status', '!=', 'inactive')
+    .forUpdate()
+    .executeTakeFirst();
+  if (!current) return;
+  await trx
+    .updateTable('follows')
+    .set({ status: 'inactive', updated_at: sql`now()` })
+    .where('follower_id', '=', followerId)
+    .where('following_id', '=', followingId)
     .execute();
+  if (current.status === 'accepted') await emit(trx, 'follow.changed', followingId, { follower_id: followerId, delta: -1 });
 }
 
+/** Unfollows, or withdraws a pending request. */
+export async function unfollow(followerId: number, userPublicId: string): Promise<void> {
+  const target = await idOfUser(userPublicId).executeTakeFirst();
+  if (!target) return;
+  await db.transaction().execute((trx) => endFollow(trx, followerId, target.id));
+}
+
+/** Waiting requests, newest first by when they were (re)sent. */
 export function listFollowRequests(userId: number, page: PageQuery) {
   const query = db
     .selectFrom('follows as f')
@@ -233,14 +251,30 @@ export function listFollowRequests(userId: number, page: PageQuery) {
     .where('f.following_id', '=', userId)
     .where('f.status', '=', 'pending')
     .where(isActiveUser('u'))
-    .select(['u.public_id as id', 'u.username', 'u.display_name', 'u.avatar_url', 'f.created_at as requested_at']);
-  return fetchPage(query, { createdAt: 'f.created_at', id: 'f.follower_id' }, page);
+    .select(['u.public_id as id', 'u.username', 'u.display_name', 'u.avatar_url', 'f.updated_at as requested_at']);
+  return fetchPage(query, { createdAt: 'f.updated_at', id: 'f.follower_id' }, page);
 }
 
 export async function acceptFollowRequest(userId: number, requesterPublicId: string): Promise<void> {
+  await db.transaction().execute(async (trx) => {
+    const accepted = await trx
+      .updateTable('follows')
+      .set({ status: 'accepted', updated_at: sql`now()` })
+      .where('following_id', '=', userId)
+      .where('follower_id', '=', idOfUser(requesterPublicId))
+      .where('status', '=', 'pending')
+      .returning('follower_id')
+      .executeTakeFirst();
+    if (!accepted) throw notFound('Follow request');
+    await emit(trx, 'follow.changed', userId, { follower_id: accepted.follower_id, delta: 1 });
+  });
+}
+
+/** The row stays as 'inactive', so a repeated request from the same person doesn't notify again. */
+export async function declineFollowRequest(userId: number, requesterPublicId: string): Promise<void> {
   const result = await db
     .updateTable('follows')
-    .set({ status: 'accepted' })
+    .set({ status: 'inactive', updated_at: sql`now()` })
     .where('following_id', '=', userId)
     .where('follower_id', '=', idOfUser(requesterPublicId))
     .where('status', '=', 'pending')
@@ -248,17 +282,7 @@ export async function acceptFollowRequest(userId: number, requesterPublicId: str
   if (result.numUpdatedRows === 0n) throw notFound('Follow request');
 }
 
-export async function declineFollowRequest(userId: number, requesterPublicId: string): Promise<void> {
-  const result = await db
-    .deleteFrom('follows')
-    .where('following_id', '=', userId)
-    .where('follower_id', '=', idOfUser(requesterPublicId))
-    .where('status', '=', 'pending')
-    .executeTakeFirst();
-  if (result.numDeletedRows === 0n) throw notFound('Follow request');
-}
-
-/** Blocks a user: hides each from the other everywhere, and removes follows in both directions. */
+/** Blocks a user: hides each from the other everywhere, and ends follows in both directions. */
 export async function block(blockerId: number, userPublicId: string): Promise<void> {
   const target = found(
     await db.selectFrom('users').select('id').where('public_id', '=', userPublicId).where('status', '=', 'active').executeTakeFirst(),
@@ -268,15 +292,9 @@ export async function block(blockerId: number, userPublicId: string): Promise<vo
 
   await db.transaction().execute(async (trx) => {
     await trx.insertInto('blocks').values({ blocker_id: blockerId, blocked_id: target.id }).onConflict((oc) => oc.doNothing()).execute();
-    await trx
-      .deleteFrom('follows')
-      .where((eb) =>
-        eb.or([
-          eb.and([eb('follower_id', '=', blockerId), eb('following_id', '=', target.id)]),
-          eb.and([eb('follower_id', '=', target.id), eb('following_id', '=', blockerId)]),
-        ]),
-      )
-      .execute();
+    // Kept as 'inactive' rather than deleted, so block → unblock → follow can't re-notify either.
+    await endFollow(trx, blockerId, target.id);
+    await endFollow(trx, target.id, blockerId);
   });
 }
 
@@ -312,9 +330,20 @@ export async function setInterests(userId: number, fieldSlugs: string[]) {
     const unknown = fieldSlugs.filter((s) => !fields.some((f) => f.slug === s));
     if (unknown.length) throw badRequest(`Unknown fields: ${unknown.join(', ')}`, 'UNKNOWN_FIELD');
 
-    await trx.deleteFrom('user_fields').where('user_id', '=', userId).execute();
-    if (fields.length) {
-      await trx.insertInto('user_fields').values(fields.map((f) => ({ user_id: userId, field_id: f.id }))).execute();
+    // Only the difference is written: fields dropped from the list are removed, new ones added,
+    // and the ones that stay are left alone (previously every save deleted and re-inserted all).
+    const keep = fields.map((f) => f.id);
+    await trx
+      .deleteFrom('user_fields')
+      .where('user_id', '=', userId)
+      .$if(keep.length > 0, (qb) => qb.where('field_id', 'not in', keep))
+      .execute();
+    if (keep.length) {
+      await trx
+        .insertInto('user_fields')
+        .values(keep.map((field_id) => ({ user_id: userId, field_id })))
+        .onConflict((oc) => oc.doNothing())
+        .execute();
     }
   });
   return getInterests(userId);

@@ -5,10 +5,16 @@ import type { Db } from '../db';
  * transaction as the change, so an event exists exactly when the change committed.
  */
 export interface OutboxEvents {
-  /** entity: the followed user */
+  /** entity: the followed user. Only the first follow (or request) ever between the two: it notifies. */
   'follow.created': { follower_id: number };
-  /** entity: post */
-  'post.liked': { user_id: number };
+  /** entity: the followed user. An accepted follow began (+1) or ended (-1): moves both stored counts. */
+  'follow.changed': { follower_id: number; delta: 1 | -1 };
+  /**
+   * entity: post. Written only when a like actually becomes active. `first_like` is false for a
+   * re-like, which counts but doesn't notify. Events from before migration 004 lack it: treat as true.
+   */
+  'post.liked': { user_id: number; first_like?: boolean };
+  /** entity: post. Written only when an active like is undone. */
   'post.unliked': Record<string, never>;
   /** entity: comment */
   'comment.created': Record<string, never>;
@@ -29,6 +35,7 @@ export type OutboxEventType = keyof OutboxEvents;
 
 const ENTITY_TYPES: Record<Exclude<OutboxEventType, 'search.sync'>, string> = {
   'follow.created': 'user',
+  'follow.changed': 'user',
   'post.liked': 'post',
   'post.unliked': 'post',
   'comment.created': 'comment',

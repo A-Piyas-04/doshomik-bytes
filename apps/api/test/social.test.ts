@@ -44,6 +44,25 @@ describe('following', () => {
     expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).status).toBe(200);
     expect((await call(ctx.app, ali, 'GET', '/v1/feed')).body.items).toHaveLength(1);
   });
+
+  it('toggles a follow without re-notifying, and keeps stored counts right', async () => {
+    const ali = await createUser(ctx.app, 'ali');
+    const bina = await createUser(ctx.app, 'bina');
+
+    await call(ctx.app, ali, 'PUT', `/v1/users/${bina.id}/follow`);
+    expect((await call(ctx.app, ali, 'DELETE', `/v1/users/${bina.id}/follow`)).status).toBe(204);
+    expect((await call(ctx.app, ali, 'GET', `/v1/users/${bina.id}`)).body).toMatchObject({ follow_status: 'none' });
+    expect((await call(ctx.app, ali, 'PUT', `/v1/users/${bina.id}/follow`)).body).toEqual({ status: 'accepted' });
+
+    await runWorker();
+    expect(await notificationTypes(bina)).toEqual(['follow']);
+    expect((await call(ctx.app, ali, 'GET', `/v1/users/${bina.id}`)).body).toMatchObject({ followers_count: 1, follow_status: 'accepted' });
+    expect((await call(ctx.app, bina, 'GET', `/v1/users/${ali.id}`)).body).toMatchObject({ following_count: 1 });
+
+    await call(ctx.app, ali, 'DELETE', `/v1/users/${bina.id}/follow`);
+    await runWorker();
+    expect((await call(ctx.app, ali, 'GET', `/v1/users/${bina.id}`)).body).toMatchObject({ followers_count: 0 });
+  });
 });
 
 describe('likes and comments', () => {
@@ -66,6 +85,26 @@ describe('likes and comments', () => {
     expect(await notificationTypes(bina)).toEqual(['comment', 'comment', 'like']);
     expect(await notificationTypes(ali)).toEqual(['reply']);
     expect(sent.pushes.filter((p) => p.tokens.includes('fcm-token-bina'))).toHaveLength(3);
+  });
+
+  it('toggles a like on one row: like → unlike → like counts once and notifies once', async () => {
+    const ali = await createUser(ctx.app, 'ali');
+    const bina = await createUser(ctx.app, 'bina');
+    const post = await textPost(bina, 'Toggle me');
+
+    await call(ctx.app, ali, 'PUT', `/v1/posts/${post.id}/like`);
+    await call(ctx.app, ali, 'PUT', `/v1/posts/${post.id}/like`); // already liked: no change
+    await call(ctx.app, ali, 'DELETE', `/v1/posts/${post.id}/like`);
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).body).toMatchObject({ liked_by_me: false });
+    await call(ctx.app, ali, 'PUT', `/v1/posts/${post.id}/like`);
+    await runWorker();
+
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).body).toMatchObject({ like_count: 1, liked_by_me: true });
+    expect(await notificationTypes(bina)).toEqual(['like']);
+
+    await call(ctx.app, ali, 'DELETE', `/v1/posts/${post.id}/like`);
+    await runWorker();
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).body).toMatchObject({ like_count: 0, liked_by_me: false });
   });
 
   it('keeps a deleted comment as a placeholder so its replies survive', async () => {

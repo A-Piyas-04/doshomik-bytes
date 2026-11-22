@@ -110,6 +110,7 @@ export interface Follows {
   follower_id: number;
   following_id: number;
   status: Generated<string>;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface LearnItems {
@@ -207,7 +208,9 @@ export interface Papers {
 
 export interface PostLikes {
   created_at: Generated<Timestamp>;
+  is_active: Generated<boolean>;
   post_id: number;
+  updated_at: Generated<Timestamp>;
   user_id: number;
 }
 
@@ -335,6 +338,8 @@ export interface Users {
   display_name: string | null;
   email: string;
   email_verified_at: Timestamp | null;
+  follower_count: Generated<number>;
+  following_count: Generated<number>;
   id: Generated<number>;
   is_private: Generated<boolean>;
   password_hash: string | null;

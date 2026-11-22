@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doshomik Schema Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* Hash-routed views. Data is transcribed from apps/api/migrations/*.sql (after migration 004). */
+:root{
+  --bg:#f4f1ea; --surface:#fffefa; --surface-2:#ece9de;
+  --ink:#19212b; --ink-2:#4b5663; --muted:#79838f;
+  --line:#ded8c9; --line-strong:#c6beaa;
+  --accent:#17587f; --accent-soft:rgba(23,88,127,.10);
+  --key:#a1561b; --key-soft:rgba(161,86,27,.12);
+  --cascade:#99392b; --cascade-soft:rgba(153,57,43,.10);
+  --setnull:#8a6a14; --setnull-soft:rgba(138,106,20,.12);
+  --restrict:#5b6672; --restrict-soft:rgba(91,102,114,.12);
+  --ok:#2c6b4f; --ok-soft:rgba(44,107,79,.12);
+  --shadow:0 1px 2px rgba(25,33,43,.06), 0 8px 24px -16px rgba(25,33,43,.3);
+  --font-display:"IBM Plex Serif",Georgia,serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#101620; --surface:#161e28; --surface-2:#1d2631;
+    --ink:#e7ecf1; --ink-2:#aeb9c4; --muted:#7e8a97;
+    --line:#293341; --line-strong:#3a4756;
+    --accent:#72b4de; --accent-soft:rgba(114,180,222,.14);
+    --key:#d79a5f; --key-soft:rgba(215,154,95,.16);
+    --cascade:#e08b79; --cascade-soft:rgba(224,139,121,.14);
+    --setnull:#d6bb6c; --setnull-soft:rgba(214,187,108,.14);
+    --restrict:#9aa6b2; --restrict-soft:rgba(154,166,178,.14);
+    --ok:#73c69b; --ok-soft:rgba(115,198,155,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101620; --surface:#161e28; --surface-2:#1d2631;
+  --ink:#e7ecf1; --ink-2:#aeb9c4; --muted:#7e8a97;
+  --line:#293341; --line-strong:#3a4756;
+  --accent:#72b4de; --accent-soft:rgba(114,180,222,.14);
+  --key:#d79a5f; --key-soft:rgba(215,154,95,.16);
+  --cascade:#e08b79; --cascade-soft:rgba(224,139,121,.14);
+  --setnull:#d6bb6c; --setnull-soft:rgba(214,187,108,.14);
+  --restrict:#9aa6b2; --restrict-soft:rgba(154,166,178,.14);
+  --ok:#73c69b; --ok-soft:rgba(115,198,155,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+code,.mono{font-family:var(--font-mono);font-size:.86em;font-variant-ligatures:none}
+code{background:var(--surface-2);padding:1px 5px;border-radius:4px;color:var(--ink)}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;text-wrap:balance;margin:0}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+button{font:inherit;color:inherit}
+
+/* ---------- header ---------- */
+.topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar-inner{max-width:1240px;margin:0 auto;padding:14px 20px 0}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:2px}
+.topbar h1{font-size:21px;letter-spacing:-.01em}
+.topbar h1 span{color:var(--muted);font-weight:500}
+nav.tabs{display:flex;gap:2px;max-width:1240px;margin:0 auto;padding:10px 14px 0;overflow-x:auto;scrollbar-width:thin}
+nav.tabs a{font-size:13.5px;font-weight:500;color:var(--ink-2);text-decoration:none;padding:7px 12px;border-radius:7px 7px 0 0;border:1px solid transparent;border-bottom:none;white-space:nowrap}
+nav.tabs a:hover{background:var(--accent-soft);color:var(--accent)}
+nav.tabs a[aria-current="page"]{background:var(--surface);color:var(--ink);border-color:var(--line)}
+main{max-width:1240px;margin:0 auto;padding:26px 20px 72px}
+.view[hidden]{display:none}
+
+/* ---------- shared blocks ---------- */
+.lede{max-width:70ch;color:var(--ink-2);margin:0 0 22px;font-size:15.5px}
+.section{margin:0 0 38px}
+.section > h2{font-size:18px;margin:0 0 6px;display:flex;align-items:baseline;gap:10px}
+.section > h2 .num{font-family:var(--font-mono);font-size:11px;color:var(--accent);border:1px solid var(--line-strong);border-radius:4px;padding:1px 6px}
+.hint{color:var(--muted);font-size:13.8px;margin:0 0 14px;max-width:76ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.pad{padding:16px 18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 30px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 15px}
+.tile .v{font-family:var(--font-mono);font-size:24px;font-weight:600;letter-spacing:-.02em;display:block}
+.tile .k{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.tile .s{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.grid3 .card{padding:16px 18px}
+.grid3 h3{font-size:15px;margin-bottom:6px}
+.grid3 p{margin:0;font-size:13.8px;color:var(--ink-2)}
+
+table.grid{width:100%;border-collapse:collapse;font-size:13.8px}
+table.grid th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;padding:10px 14px;border-bottom:1px solid var(--line-strong);white-space:nowrap;background:var(--surface)}
+table.grid td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+table.grid tbody tr:last-child td{border-bottom:none}
+table.grid tbody tr:hover td{background:color-mix(in srgb,var(--surface-2) 45%,transparent)}
+table.grid .mono{font-size:12.6px}
+table.grid tr.group td{background:var(--surface-2);font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:7px 14px}
+.scroller{overflow-x:auto;border-radius:10px}
+.scroller > table{min-width:620px}
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 8px 8px 0;font-size:13.8px;color:var(--ink-2);margin:14px 0 0}
+.note strong{color:var(--ink)}
+.note.ok{border-color:var(--ok);background:var(--ok-soft)}
+
+/* pills */
+.pill{display:inline-block;font-family:var(--font-mono);font-size:10.8px;letter-spacing:.02em;border:1px solid var(--line-strong);border-radius:999px;padding:1px 8px;color:var(--ink-2);white-space:nowrap;line-height:1.6}
+.r-cascade{color:var(--cascade);border-color:var(--cascade);background:var(--cascade-soft)}
+.r-setnull{color:var(--setnull);border-color:var(--setnull);background:var(--setnull-soft)}
+.r-restrict{color:var(--restrict);border-color:var(--restrict);background:var(--restrict-soft)}
+.p-new{color:var(--ok);border-color:var(--ok);background:var(--ok-soft)}
+.p-accent{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.p-key{color:var(--key);border-color:var(--key);background:var(--key-soft)}
+.k{font-family:var(--font-mono);font-size:10.5px;border-radius:4px;padding:1px 5px;border:1px solid;white-space:nowrap}
+.k-pk{color:var(--key);border-color:var(--key);background:var(--key-soft)}
+.k-fk{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.k-u{color:var(--ink-2);border-color:var(--line-strong)}
+.keycell{display:flex;gap:4px;flex-wrap:wrap}
+.jump{background:none;border:none;padding:0;font-family:var(--font-mono);font-size:12.6px;color:var(--accent);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+.jump:hover{text-decoration-style:solid}
+ul.plain{margin:0;padding-left:18px;font-size:13.8px;color:var(--ink-2)}
+ul.plain li{margin-bottom:7px}
+ul.plain li:last-child{margin-bottom:0}
+.legend{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted);margin:0 0 14px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+/* ---------- relationship map ---------- */
+.lanes{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.lane{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 12px 10px;box-shadow:var(--shadow)}
+.lane h3{font-family:var(--font-body);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 2px 8px;display:flex;justify-content:space-between}
+.node{display:flex;width:100%;justify-content:space-between;align-items:center;gap:8px;text-align:left;background:var(--surface-2);border:1px solid transparent;border-radius:7px;padding:6px 9px;margin-bottom:6px;cursor:pointer;font-family:var(--font-mono);font-size:12.6px;color:var(--ink);transition:opacity .15s,background .15s,border-color .15s}
+.node:last-child{margin-bottom:0}
+.node:hover{border-color:var(--accent)}
+.node .deg{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.lanes.focusing .node{opacity:.32}
+.lanes.focusing .node.is-focus,.lanes.focusing .node.is-parent,.lanes.focusing .node.is-child{opacity:1}
+.node.is-focus{background:var(--accent);color:#fff;border-color:var(--accent)}
+.node.is-focus .deg{color:inherit;opacity:.85}
+:root:not([data-theme="light"]) .node.is-focus{color:#0d131b}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .node.is-focus{color:#fff}}
+.node.is-parent{border-color:var(--accent);background:var(--accent-soft)}
+.node.is-child{border-color:var(--key);background:var(--key-soft)}
+.node .tag{font-family:var(--font-body);font-size:10.5px;font-weight:600;letter-spacing:.03em}
+.node.is-parent .tag{color:var(--accent)}
+.node.is-child .tag{color:var(--key)}
+
+.focus-panel{margin-top:16px}
+.focus-panel .empty{color:var(--muted);font-size:13.8px}
+.relcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.relbox{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.relbox > header{padding:11px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.relbox > header h4{margin:0;font-size:13.5px;font-weight:600}
+.relbox > header small{color:var(--muted);font-size:12px}
+.relbox.out > header{border-top:3px solid var(--accent)}
+.relbox.in > header{border-top:3px solid var(--key)}
+.rel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:9px 15px;border-bottom:1px solid var(--line);align-items:center}
+.rel:last-child{border-bottom:none}
+.rel .path{font-family:var(--font-mono);font-size:12.4px;color:var(--ink-2);min-width:0;overflow-wrap:anywhere}
+.rel .path .arrow{color:var(--muted);padding:0 4px}
+.rel .why{grid-column:1 / -1;font-size:12.5px;color:var(--muted)}
+.relgroup{padding:6px 15px;background:var(--surface-2);font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.relbox .none{padding:12px 15px;color:var(--muted);font-size:13.5px}
+
+.filterbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.filterbar input{font:inherit;font-size:13.5px;padding:7px 10px;border-radius:7px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);min-width:220px;flex:1 1 220px;max-width:340px}
+.chipbtn{font-family:var(--font-mono);font-size:11.5px;padding:4px 10px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.chipbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+/* ---------- table explorer ---------- */
+.explorer{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;align-items:start}
+.sidebar{position:sticky;top:122px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.searchwrap{padding:11px;border-bottom:1px solid var(--line)}
+.searchwrap input{width:100%;font:inherit;font-size:13.5px;padding:7px 9px;border-radius:7px;border:1px solid var(--line-strong);background:var(--bg);color:var(--ink)}
+.searchwrap .count{font-size:11.5px;color:var(--muted);margin-top:6px;font-family:var(--font-mono)}
+.tablelist{max-height:calc(100vh - 230px);overflow-y:auto;padding:6px}
+.domain-h{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:10px 8px 4px;display:flex;justify-content:space-between}
+.tablelist button{display:block;width:100%;text-align:left;background:none;border:none;border-radius:6px;font-family:var(--font-mono);font-size:12.6px;color:var(--ink-2);padding:5px 8px;cursor:pointer}
+.tablelist button:hover{background:var(--accent-soft);color:var(--accent)}
+.tablelist button[aria-current="true"]{background:var(--accent);color:#fff;font-weight:500}
+:root:not([data-theme="light"]) .tablelist button[aria-current="true"]{color:#0d131b}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .tablelist button[aria-current="true"]{color:#fff}}
+.tablelist .hitcol{display:block;font-family:var(--font-body);font-size:11px;opacity:.75}
+.detail{min-width:0;scroll-margin-top:122px}
+.detail-head{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:20px}
+.detail-head h2{font-family:var(--font-mono);font-size:20px;font-weight:600}
+.detail-head p{margin:6px 0 0;color:var(--ink-2);font-size:14px;max-width:72ch}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.sub{margin:0 0 24px}
+.sub > h3{font-family:var(--font-body);font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600;margin:0 0 9px}
+
+/* ---------- flows & changes ---------- */
+.flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:var(--font-mono);font-size:12px;color:var(--ink-2)}
+.flow b{font-weight:500;background:var(--surface-2);border-radius:5px;padding:2px 7px;color:var(--ink)}
+.flow s{text-decoration:none;color:var(--muted)}
+.change{padding:16px 18px;margin-bottom:12px}
+.change h3{font-family:var(--font-body);font-size:15px;font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.change .ba{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:10px}
+.change .ba > div{border-radius:8px;padding:10px 13px;font-size:13.6px;color:var(--ink-2)}
+.change .before{background:var(--cascade-soft)}
+.change .after{background:var(--ok-soft)}
+.change .ba b{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.change .before b{color:var(--cascade)}
+.change .after b{color:var(--ok)}
+.change .where{margin-top:10px;font-size:12.5px;color:var(--muted)}
+
+footer.foot{max-width:1240px;margin:0 auto;padding:0 20px 48px;color:var(--muted);font-size:12.5px}
+footer.foot p{margin:4px 0}
+
+@media (max-width:900px){
+  .explorer{grid-template-columns:1fr}
+  .sidebar{position:static}
+  .tablelist{max-height:260px}
+}
+@media (max-width:560px){
+  main{padding:18px 16px 56px}
+  .topbar-inner{padding:12px 16px 0}
+  .topbar h1{font-size:18px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">Prototype 2 backend · after migration 004 · 23 Nov 2026</span>
+    <h1>Doshomik database <span>· <span id="h-tables">30</span> tables on PostgreSQL</span></h1>
+  </div>
+  <nav class="tabs" id="nav">
+    <a href="#overview">Overview</a>
+    <a href="#map">Relationship map</a>
+    <a href="#tables">Tables</a>
+    <a href="#indexes">Indexes</a>
+    <a href="#rules">Rules &amp; deletes</a>
+    <a href="#lifecycle">Lifecycle</a>
+    <a href="#changes">Efficiency changes</a>
+    <a href="#migrations">Migrations</a>
+    <a href="#roadmap">Known gaps</a>
+  </nav>
+</header>
+
+<main>
+
+<!-- ============ OVERVIEW ============ -->
+<section class="view" id="view-overview">
+  <p class="lede">One Postgres database runs the whole backend: no Redis, no Elasticsearch, no separate queue. Use <strong>Relationship map</strong> to see how tables connect, and <strong>Tables</strong> for each table's columns, keys and indexes.</p>
+
+  <div class="tiles">
+    <div class="tile"><span class="v" id="t-tables">30</span><span class="k">tables</span><div class="s">in 8 domains</div></div>
+    <div class="tile"><span class="v" id="t-fks">—</span><span class="k">foreign keys</span><div class="s" id="t-fks-sub"></div></div>
+    <div class="tile"><span class="v">5</span><span class="k">migrations</span><div class="s">plain SQL, one transaction each</div></div>
+    <div class="tile"><span class="v">16+</span><span class="k">PostgreSQL</span><div class="s">works on 13+</div></div>
+    <div class="tile"><span class="v">5000<small style="font-size:12px"> ms</small></span><span class="k">statement timeout</span><div class="s"><code>DB_STATEMENT_TIMEOUT_MS</code></div></div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">1</span> Postgres also does the work of three services</h2>
+    <div class="grid3">
+      <div class="card"><h3>Job queue</h3><p><code>outbox_events</code>, written in the same transaction as the change, plus <code>media_assets</code> rows at <code>processing</code>.</p></div>
+      <div class="card"><h3>Search engine</h3><p><code>tsvector</code> GIN indexes for full text; trigram indexes for fuzzy usernames and topic names.</p></div>
+      <div class="card"><h3>Audit store</h3><p><code>audit_log</code> keeps every admin and security action, with actor, changes and IP.</p></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">2</span> The eight domains</h2>
+    <p class="hint">Click a table to open it.</p>
+    <div class="grid3" id="domain-cards"></div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">3</span> Conventions that explain most of the schema</h2>
+    <div class="scroller card"><table class="grid" id="conv-table"></table></div>
+  </div>
+</section>
+
+<!-- ============ MAP ============ -->
+<section class="view" id="view-map">
+  <div class="section">
+    <h2><span class="num">4</span> Relationship map</h2>
+    <p class="hint">Tables grouped by domain. <strong>Click a table</strong> to highlight what it points to and what points at it; everything else fades. The numbers are <span class="mono">↗ out · ↙ in</span> foreign keys.</p>
+    <div class="legend">
+      <span><span class="pill p-accent">references</span> this table holds the FK</span>
+      <span><span class="pill p-key">referenced by</span> the other table holds the FK</span>
+    </div>
+    <div class="lanes" id="lanes"></div>
+    <div class="focus-panel" id="focus-panel"></div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">4.1</span> Every foreign key</h2>
+    <p class="hint">Grouped by the table being referenced, so the hubs stand out. The delete rule says what happens to the child row when the parent row is deleted.</p>
+    <div class="legend">
+      <span><span class="pill r-cascade">cascade</span> child row is deleted too</span>
+      <span><span class="pill r-setnull">set null</span> child row kept, link forgotten</span>
+      <span><span class="pill r-restrict">restrict</span> delete refused while referenced (<code>409 IN_USE</code>)</span>
+    </div>
+    <div class="filterbar">
+      <input id="fk-q" type="search" placeholder="Filter by table or column…" autocomplete="off" spellcheck="false">
+      <button class="chipbtn" data-rule="all" aria-pressed="true">all</button>
+      <button class="chipbtn" data-rule="cascade" aria-pressed="false">cascade</button>
+      <button class="chipbtn" data-rule="setnull" aria-pressed="false">set null</button>
+      <button class="chipbtn" data-rule="restrict" aria-pressed="false">restrict</button>
+    </div>
+    <div class="scroller card"><table class="grid" id="fk-table"></table></div>
+    <div class="note">Three columns hold an id with <strong>no foreign key</strong>, on purpose, because the row must outlive its target: <code>reports.target_id</code>, <code>outbox_events.entity_id</code> and <code>audit_log.entity_id</code>.</div>
+  </div>
+</section>
+
+<!-- ============ TABLES ============ -->
+<section class="view" id="view-tables">
+  <div class="explorer">
+    <aside class="sidebar">
+      <div class="searchwrap">
+        <label class="eyebrow" for="q" style="margin-bottom:5px">Find a table or column</label>
+        <input id="q" type="search" placeholder="user_id, is_active, position…" autocomplete="off" spellcheck="false">
+        <div class="count" id="q-count"></div>
+      </div>
+      <div class="tablelist" id="tablelist"></div>
+    </aside>
+    <div class="detail" id="detail"></div>
+  </div>
+</section>
+
+<!-- ============ INDEXES ============ -->
+<section class="view" id="view-indexes">
+  <div class="section">
+    <h2><span class="num">5</span> Indexes beyond primary keys and unique constraints</h2>
+    <p class="hint">Partial indexes carry their <code>WHERE</code> clause, which keeps the feed and queue indexes small. A query only uses a partial or expression index when its condition matches the index's.</p>
+    <div class="scroller card"><table class="grid" id="index-table"></table></div>
+    <div class="note">The full-text expressions in <code>src/db/search.ts</code> must match the index expressions <strong>exactly</strong>, or Postgres quietly stops using the indexes.</div>
+  </div>
+</section>
+
+<!-- ============ RULES ============ -->
+<section class="view" id="view-rules">
+  <div class="section">
+    <h2><span class="num">6</span> What happens when a user row is deleted</h2>
+    <p class="hint">Computed from the foreign keys. The purge job deletes the user row 30 days after an account deletion request.</p>
+    <div class="grid3" id="cascade-grid"></div>
+  </div>
+  <div class="section">
+    <h2><span class="num">6.1</span> CHECK constraints worth knowing</h2>
+    <div class="scroller card"><table class="grid" id="checks-table"></table></div>
+  </div>
+  <div class="section">
+    <h2><span class="num">6.2</span> Constraint errors become API errors</h2>
+    <div class="scroller card"><table class="grid" id="errors-table"></table></div>
+    <div class="note">Mapped in <code>src/lib/error-handler.ts</code>.</div>
+  </div>
+</section>
+
+<!-- ============ LIFECYCLE ============ -->
+<section class="view" id="view-lifecycle">
+  <div class="section">
+    <h2><span class="num">7</span> Status flows</h2>
+    <p class="hint">The state machines you meet in most queries.</p>
+    <div class="grid3" id="flows"></div>
+  </div>
+  <div class="section">
+    <h2><span class="num">7.1</span> Retention</h2>
+    <p class="hint">The worker's hourly maintenance pass (<code>src/worker/maintenance.ts</code>) enforces these. Every job is safe to run more than once.</p>
+    <div class="scroller card"><table class="grid" id="retention-table"></table></div>
+  </div>
+</section>
+
+<!-- ============ CHANGES ============ -->
+<section class="view" id="view-changes">
+  <div class="section">
+    <h2><span class="num">8</span> Efficiency changes in migration 004</h2>
+    <p class="hint">File <code>1795305600004_toggles-and-stored-counts.sql</code>, plus the matching API and worker code. Decisions are recorded in <code>docs/prototype-2-implementation-notes.md</code> §2.6.</p>
+    <div id="changes"></div>
+  </div>
+  <div class="section">
+    <h2><span class="num">8.1</span> Looked at and left as they are</h2>
+    <div class="scroller card"><table class="grid" id="kept-table"></table></div>
+  </div>
+</section>
+
+<!-- ============ MIGRATIONS ============ -->
+<section class="view" id="view-migrations">
+  <div class="section">
+    <h2><span class="num">9</span> Migrations</h2>
+    <p class="hint">node-pg-migrate, plain SQL, each file in its own transaction, applied in this order.</p>
+    <div class="scroller card"><table class="grid" id="migration-table"></table></div>
+    <div class="note"><strong>Never edit a migration that has been applied</strong>: add a new one (checklist in the <code>doshomik-migration</code> project skill). After a schema change, run <code>pnpm db:types</code> and update the enum lists in <code>packages/shared</code> if a CHECK changed.</div>
+  </div>
+</section>
+
+<!-- ============ ROADMAP ============ -->
+<section class="view" id="view-roadmap">
+  <div class="section">
+    <h2><span class="num">10</span> Known gaps and planned changes</h2>
+    <p class="hint">Nothing here is broken today. Each row is a change deferred until something gets big or busy. Details are in the implementation notes, §3–4.</p>
+    <div class="scroller card"><table class="grid" id="gap-table"></table></div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <p>Source of truth: the SQL files in <code>apps/api/migrations/</code>. Generated types: <code>apps/api/src/db/types.ts</code>.</p>
+  <p>Related: <code>docs/architecture/database-architecture.md</code> · <code>docs/architecture/backend-architecture.md</code> · <code>docs/prototype-2-implementation-notes.md</code></p>
+</footer>
+
+<script>
+/* ============================================================
+   Schema data, transcribed from apps/api/migrations/*.sql.
+   k: 'pk' | 'fk' | 'u', combined with '+', e.g. 'pk+fk'.
+   fks[].d: 'cascade' | 'setnull' | 'restrict' (NO ACTION, the default).
+   isNew: added in migration 004.
+   ============================================================ */
+const DOMAINS = [
+  {id:'auth',    name:'Accounts & auth',  desc:'Accounts, signed-in devices, outside sign-in links and one-time email codes.'},
+  {id:'social',  name:'Social & safety',  desc:'The follow graph, two-way blocks and the moderation queue.'},
+  {id:'feed',    name:'Posts & activity', desc:'Posts, likes, saves, comments on posts and papers, and the notification inbox.'},
+  {id:'media',   name:'Media',            desc:'Every upload, whatever uses it. Storage keys only, never URLs.'},
+  {id:'learn',   name:'Learn',            desc:'Topics, learn items, and courses built from them, with progress.'},
+  {id:'practice',name:'Practice',         desc:'Questions by topic, quizzes built from them, and every attempt.'},
+  {id:'research',name:'Research',         desc:'Fields, structured papers, prerequisites, roadmaps and the reading tracker.'},
+  {id:'system',  name:'System',           desc:'The outbox the worker reads and the audit trail. Both outlive what they point at.'}
+];
+
+const PUB = [
+  {n:'status',t:'text',note:'draft · published · archived'},
+  {n:'published_at',t:'timestamptz',note:'Set when it first goes live'},
+  {n:'created_by',t:'bigint',k:'fk',note:'Staff author'},
+  {n:'updated_by',t:'bigint',k:'fk',note:'Last staff editor'},
+  {n:'updated_at',t:'timestamptz'}
+];
+const PUBFK = [{c:'created_by',to:'users',d:'setnull'},{c:'updated_by',to:'users',d:'setnull'}];
+
+const TABLES = [
+/* ---------- auth ---------- */
+{
+  name:'users', domain:'auth', purpose:'One row per account. The hub of the schema.',
+  badges:['public_id','soft delete','stored counts'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk',note:'Joins only; never sent to clients'},
+    {n:'public_id',t:'uuid',k:'u',note:'Exposed as <code>id</code> in the API'},
+    {n:'username',t:'text',k:'u',note:'Also unique on <code>lower(username)</code>; trigram indexed'},
+    {n:'email',t:'text',k:'u',note:'Also unique on <code>lower(email)</code>'},
+    {n:'password_hash',t:'text',note:'Argon2id. NULL for Google-only accounts'},
+    {n:'display_name',t:'text'},{n:'bio',t:'text'},
+    {n:'avatar_url',t:'text',note:'Set by the worker when an avatar upload is ready'},
+    {n:'role',t:'text',note:'user · moderator · admin'},
+    {n:'status',t:'text',note:'active · suspended · deleted'},
+    {n:'is_private',t:'boolean',note:'Followers need an accepted request'},
+    {n:'follower_count',t:'integer',isNew:true,note:'Stored. Moved ±1 by the worker on <code>follow.changed</code>; repaired hourly'},
+    {n:'following_count',t:'integer',isNew:true,note:'Stored, same as <code>follower_count</code>'},
+    {n:'email_verified_at',t:'timestamptz'},
+    {n:'totp_secret',t:'text',note:'AES-256-GCM encrypted by the API'},
+    {n:'totp_enabled_at',t:'timestamptz',note:'Two-factor sign-in; required for staff routes'},
+    {n:'created_at',t:'timestamptz'},{n:'updated_at',t:'timestamptz'},
+    {n:'deleted_at',t:'timestamptz',note:'Starts the 30-day purge clock'}
+  ],
+  fks:[],
+  notes:['Profiles read the stored counts instead of running <code>COUNT(*)</code> on <code>follows</code>.',
+         '"People to follow" reads <code>users_suggest_idx</code> in order, instead of counting every user\'s followers and sorting.']
+},
+{
+  name:'sessions', domain:'auth', purpose:'One row per signed-in device, with a sliding 30-day expiry.',
+  badges:['public_id'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},
+    {n:'public_id',t:'uuid',k:'u',note:'The <code>sid</code> claim in access tokens'},
+    {n:'user_id',t:'bigint',k:'fk'},
+    {n:'refresh_token_hash',t:'text',k:'u',note:'SHA-256 of the secret; replaced on every refresh'},
+    {n:'platform',t:'text',note:'android · ios · web'},
+    {n:'app_version',t:'text'},{n:'push_token',t:'text',note:'FCM token for this device'},
+    {n:'created_at',t:'timestamptz'},{n:'last_used_at',t:'timestamptz'},
+    {n:'expires_at',t:'timestamptz'},{n:'revoked_at',t:'timestamptz'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'}],
+  notes:['Only the token hash is stored, so a leaked row cannot be replayed.']
+},
+{
+  name:'auth_identities', domain:'auth', purpose:'Links an account to Google or Apple sign-in.',
+  badges:['composite PK'],
+  columns:[
+    {n:'provider',t:'text',k:'pk',note:'google · apple'},
+    {n:'provider_subject',t:'text',k:'pk',note:'The provider\'s stable user id'},
+    {n:'user_id',t:'bigint',k:'fk'},
+    {n:'created_at',t:'timestamptz'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'}],
+  notes:[]
+},
+{
+  name:'auth_tokens', domain:'auth', purpose:'One-time codes emailed for verification and password reset.',
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'user_id',t:'bigint',k:'fk'},
+    {n:'purpose',t:'text',note:'verify_email (24 h) · reset_password (1 h)'},
+    {n:'token_hash',t:'text',k:'u',note:'The plain code exists only in the email'},
+    {n:'expires_at',t:'timestamptz'},{n:'used_at',t:'timestamptz'},{n:'created_at',t:'timestamptz'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'}],
+  notes:['Deleted 7 days after expiry or use.']
+},
+/* ---------- social ---------- */
+{
+  name:'follows', domain:'social', purpose:'The follow graph: one row per pair, toggled by status.',
+  badges:['composite PK','toggle row'],
+  columns:[
+    {n:'follower_id',t:'bigint',k:'pk+fk'},
+    {n:'following_id',t:'bigint',k:'pk+fk'},
+    {n:'status',t:'text',note:'accepted · pending · <strong>inactive</strong> (new: unfollowed, withdrawn or declined)'},
+    {n:'created_at',t:'timestamptz',note:'First follow ever'},
+    {n:'updated_at',t:'timestamptz',isNew:true,note:'When the current status began; requests are listed by it'}
+  ],
+  fks:[{c:'follower_id',to:'users',d:'cascade'},{c:'following_id',to:'users',d:'cascade'}],
+  checks:['<code>follower_id &lt;&gt; following_id</code>: no following yourself'],
+  notes:['Unfollow, withdraw, decline and block set <code>inactive</code> instead of deleting. Following again reactivates the row, and <strong>only the first follow ever notifies</strong>.',
+         'Every privacy check already tests <code>status = \'accepted\'</code>, so <code>inactive</code> needs no extra filter there.']
+},
+{
+  name:'blocks', domain:'social', purpose:'A block, applied both ways by every visibility check.',
+  badges:['composite PK'],
+  columns:[
+    {n:'blocker_id',t:'bigint',k:'pk+fk'},{n:'blocked_id',t:'bigint',k:'pk+fk'},{n:'created_at',t:'timestamptz'}
+  ],
+  fks:[{c:'blocker_id',to:'users',d:'cascade'},{c:'blocked_id',to:'users',d:'cascade'}],
+  checks:['<code>blocker_id &lt;&gt; blocked_id</code>: no blocking yourself'],
+  notes:['Blocking ends follows in both directions (sets them <code>inactive</code>).']
+},
+{
+  name:'reports', domain:'social', purpose:'The moderation queue: what was reported, by whom, and the outcome.',
+  badges:['polymorphic target'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'reporter_id',t:'bigint',k:'fk'},
+    {n:'target_type',t:'text',note:'user · post · comment'},
+    {n:'target_id',t:'bigint',note:'<strong>No FK</strong>, on purpose: the report outlives its target'},
+    {n:'reason',t:'text',note:'spam · harassment · nudity · violence · misinformation · other'},
+    {n:'details',t:'text'},
+    {n:'status',t:'text',note:'open · actioned · dismissed'},
+    {n:'reviewed_by',t:'bigint',k:'fk'},{n:'reviewed_at',t:'timestamptz'},{n:'created_at',t:'timestamptz'}
+  ],
+  fks:[{c:'reporter_id',to:'users',d:'setnull'},{c:'reviewed_by',to:'users',d:'setnull'}],
+  notes:[]
+},
+/* ---------- feed ---------- */
+{
+  name:'posts', domain:'feed', purpose:'A text post, an image post or a reel. Visible once its media is ready.',
+  badges:['public_id','soft delete','stored counts','tsvector'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'user_id',t:'bigint',k:'fk'},
+    {n:'type',t:'text',note:'text · image · reel'},
+    {n:'caption',t:'text',note:'Required for text posts; full-text indexed'},
+    {n:'media_id',t:'bigint',k:'fk',note:'Required unless <code>type = \'text\'</code>'},
+    {n:'status',t:'text',note:'processing · published · removed (by a moderator)'},
+    {n:'like_count',t:'integer',note:'Stored. Moved ±1 per like event by the worker (was: full recount)'},
+    {n:'comment_count',t:'integer',note:'Stored, same as <code>like_count</code>'},
+    {n:'created_at',t:'timestamptz'},{n:'updated_at',t:'timestamptz'},
+    {n:'deleted_at',t:'timestamptz',note:'Hidden at once; purged after 30 days'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'media_id',to:'media_assets',d:'restrict'}],
+  checks:['<code>type = \'text\' OR media_id IS NOT NULL</code>'],
+  notes:['Feeds are keyset-paginated on <code>(created_at, id)</code>, which the two partial indexes cover.']
+},
+{
+  name:'post_likes', domain:'feed', purpose:'One row per user and post, toggled on and off with is_active.',
+  badges:['composite PK','toggle row'],
+  columns:[
+    {n:'user_id',t:'bigint',k:'pk+fk'},{n:'post_id',t:'bigint',k:'pk+fk'},
+    {n:'is_active',t:'boolean',isNew:true,note:'false after an unlike; a re-like sets it back'},
+    {n:'created_at',t:'timestamptz',note:'First like ever'},
+    {n:'updated_at',t:'timestamptz',isNew:true,note:'Last toggle'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'post_id',to:'posts',d:'cascade'}],
+  notes:['Like = upsert that reactivates the row; unlike = <code>is_active = false</code>. An event is written only when the state really changes, and <strong>only the first like ever notifies</strong>.',
+         '<code>is_active</code> and <code>updated_at</code> are in no index, so a toggle is a HOT update with no index writes. Delete + insert wrote two index entries every time.']
+},
+{
+  name:'saved_posts', domain:'feed', purpose:'A private bookmark list per user.',
+  badges:['composite PK'],
+  columns:[{n:'user_id',t:'bigint',k:'pk+fk'},{n:'post_id',t:'bigint',k:'pk+fk'},{n:'created_at',t:'timestamptz',note:'Saved list is ordered by this'}],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'post_id',to:'posts',d:'cascade'}],
+  notes:['Deliberately not a toggle row: unsave/re-save has no side effects, and a re-save must move the post to the top, which rewrites the indexed <code>created_at</code> anyway.']
+},
+{
+  name:'comments', domain:'feed', purpose:'A comment on exactly one post or one paper; replies nest through parent_id.',
+  badges:['public_id','soft delete','self-reference'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'user_id',t:'bigint',k:'fk',note:'Nullable: set null on purge so threads survive'},
+    {n:'post_id',t:'bigint',k:'fk',note:'Set for post comments'},
+    {n:'paper_id',t:'bigint',k:'fk',note:'Set for paper discussion'},
+    {n:'parent_id',t:'bigint',k:'fk',note:'The comment this replies to'},
+    {n:'body',t:'text'},
+    {n:'created_at',t:'timestamptz'},
+    {n:'deleted_at',t:'timestamptz',note:'Leaves a <code>[deleted]</code> placeholder'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'setnull'},{c:'post_id',to:'posts',d:'cascade'},{c:'paper_id',to:'papers',d:'cascade'},{c:'parent_id',to:'comments',d:'cascade'}],
+  checks:['<code>(post_id IS NULL) &lt;&gt; (paper_id IS NULL)</code>: exactly one target'],
+  notes:['The one table shared by the social side and the research side.']
+},
+{
+  name:'notifications', domain:'feed', purpose:'The inbox: who receives it, who caused it, and what it points at.',
+  badges:['public_id'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'user_id',t:'bigint',k:'fk',note:'Recipient'},
+    {n:'actor_id',t:'bigint',k:'fk',note:'Who caused it'},
+    {n:'type',t:'text',note:'follow · follow_request · like · comment · reply · post_ready'},
+    {n:'post_id',t:'bigint',k:'fk',note:'Optional'},
+    {n:'comment_id',t:'bigint',k:'fk',note:'Optional'},
+    {n:'is_read',t:'boolean',note:'Unread rows have their own partial index (new)'},
+    {n:'created_at',t:'timestamptz'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'actor_id',to:'users',d:'cascade'},{c:'post_id',to:'posts',d:'cascade'},{c:'comment_id',to:'comments',d:'cascade'}],
+  notes:['Written only by the worker. Re-likes and re-follows no longer add rows here.']
+},
+/* ---------- media ---------- */
+{
+  name:'media_assets', domain:'media', purpose:'Every uploaded image or video: posts, avatars, learn items and paper figures.',
+  badges:['public_id','work queue'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'owner_id',t:'bigint',k:'fk'},
+    {n:'kind',t:'text',note:'image · video'},
+    {n:'purpose',t:'text',note:'post · avatar · learn · paper_figure'},
+    {n:'status',t:'text',note:'uploading → processing → ready, or failed'},
+    {n:'provider',t:'text',note:'self (FFmpeg worker) · legacy (Prototype 1 files)'},
+    {n:'provider_asset_id',t:'text'},
+    {n:'raw_key',t:'text',note:'Original upload; deleted after processing'},
+    {n:'playback_key',t:'text',note:'HLS playlist (video) or WebP base key (image)'},
+    {n:'thumbnail_key',t:'text'},
+    {n:'mime_type',t:'text'},{n:'size_bytes',t:'bigint'},
+    {n:'width',t:'integer'},{n:'height',t:'integer'},
+    {n:'duration_ms',t:'integer',note:'Measured by the worker, never taken from the client'},
+    {n:'error',t:'text'},
+    {n:'created_at',t:'timestamptz'},{n:'updated_at',t:'timestamptz'}
+  ],
+  fks:[{c:'owner_id',to:'users',d:'setnull'}],
+  notes:['Rows at <code>uploading</code>/<code>processing</code> are the media queue.','The 90-second reel limit is checked in the worker against <code>duration_ms</code>.']
+},
+/* ---------- learn ---------- */
+{
+  name:'topics', domain:'learn', purpose:'A named concept, shared by learn items, questions, quizzes and paper prerequisites.',
+  badges:['slug','pg_trgm'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},
+    {n:'name',t:'text',k:'u',note:'Trigram indexed for fuzzy search'},
+    {n:'slug',t:'text',k:'u',note:'Names the topic in URLs'},
+    {n:'summary',t:'text',note:'Shown in "Learn first" when a topic has no items yet'}
+  ],
+  fks:[], notes:[]
+},
+{
+  name:'learn_items', domain:'learn', purpose:'One piece of learning content: a video, an image or text.',
+  badges:['public_id','publishing','tsvector'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'topic_id',t:'bigint',k:'fk'},
+    {n:'title',t:'text',note:'Full-text indexed with <code>body</code>'},
+    {n:'kind',t:'text',note:'video · image · text'},
+    {n:'body',t:'text'},{n:'duration_seconds',t:'smallint'},
+    {n:'media_url',t:'text',note:'An outside link…'},
+    {n:'media_id',t:'bigint',k:'fk',note:'…or uploaded media'},
+    {n:'created_at',t:'timestamptz'},
+    ...PUB
+  ],
+  fks:[{c:'topic_id',to:'topics',d:'setnull'},{c:'media_id',to:'media_assets',d:'restrict'},...PUBFK],
+  checks:['<code>kind = \'text\' OR media_url IS NOT NULL OR media_id IS NOT NULL</code>'],
+  notes:[]
+},
+{
+  name:'courses', domain:'learn', purpose:'An ordered set of learn items, or a link to a free outside course.',
+  badges:['public_id','publishing','tsvector'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'title',t:'text'},{n:'description',t:'text',note:'Full-text indexed with <code>title</code>'},
+    {n:'thumbnail_url',t:'text'},
+    {n:'external_url',t:'text',note:'Set for an outside course, which has no items'},
+    {n:'created_at',t:'timestamptz'},
+    ...PUB
+  ],
+  fks:[...PUBFK], notes:[]
+},
+{
+  name:'course_items', domain:'learn', purpose:'The ordered steps of a course.',
+  badges:['deferrable PK','ordered'],
+  columns:[
+    {n:'course_id',t:'bigint',k:'pk+fk'},
+    {n:'position',t:'smallint',k:'pk',note:'<code>DEFERRABLE INITIALLY DEFERRED</code>'},
+    {n:'item_id',t:'bigint',k:'fk',note:'Unique within a course'}
+  ],
+  fks:[{c:'course_id',to:'courses',d:'cascade'},{c:'item_id',to:'learn_items',d:'cascade'}],
+  notes:['The deferrable key lets a whole course be reordered in one transaction.']
+},
+{
+  name:'course_progress', domain:'learn', purpose:'How far a user has gone in a course.',
+  badges:['composite PK','upsert'],
+  columns:[
+    {n:'user_id',t:'bigint',k:'pk+fk'},{n:'course_id',t:'bigint',k:'pk+fk'},
+    {n:'last_position',t:'smallint'},{n:'completed_at',t:'timestamptz',note:'First completion is kept'},
+    {n:'updated_at',t:'timestamptz'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'course_id',to:'courses',d:'cascade'}],
+  notes:['Already written with one upsert per save, never delete + insert.']
+},
+/* ---------- practice ---------- */
+{
+  name:'questions', domain:'practice', purpose:'A multiple-choice or short-answer question in a topic.',
+  badges:['public_id','publishing'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'topic_id',t:'bigint',k:'fk'},
+    {n:'kind',t:'text',note:'mcq · short'},
+    {n:'prompt',t:'text'},
+    {n:'options',t:'text[]',note:'At least 2 for an MCQ'},
+    {n:'answer',t:'text'},{n:'explanation',t:'text'},
+    ...PUB
+  ],
+  fks:[{c:'topic_id',to:'topics',d:'cascade'},...PUBFK],
+  checks:['<code>kind = \'short\' OR cardinality(options) &gt;= 2</code>'],
+  notes:['No <code>created_at</code> (inherited from Prototype 1).']
+},
+{
+  name:'question_attempts', domain:'practice', purpose:'Every answer a user submits. Powers history, accuracy and streaks.',
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},
+    {n:'user_id',t:'bigint',k:'fk'},{n:'question_id',t:'bigint',k:'fk'},
+    {n:'answer',t:'text'},{n:'is_correct',t:'boolean'},
+    {n:'created_at',t:'timestamptz',note:'Streak days use <code>APP_TIMEZONE</code>'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'question_id',to:'questions',d:'cascade'}],
+  notes:['Append-only history on purpose: each attempt is its own row.']
+},
+{
+  name:'quizzes', domain:'practice', purpose:'A named set of questions.',
+  badges:['public_id'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'title',t:'text'},{n:'topic_id',t:'bigint',k:'fk'},
+    {n:'status',t:'text',note:'draft · published · archived'},
+    {n:'created_by',t:'bigint',k:'fk'},
+    {n:'created_at',t:'timestamptz'},{n:'updated_at',t:'timestamptz'}
+  ],
+  fks:[{c:'topic_id',to:'topics',d:'setnull'},{c:'created_by',to:'users',d:'setnull'}],
+  notes:['No <code>published_at</code> or <code>updated_by</code>, unlike other team content.']
+},
+{
+  name:'quiz_questions', domain:'practice', purpose:'The ordered questions of a quiz.',
+  badges:['deferrable PK','ordered'],
+  columns:[
+    {n:'quiz_id',t:'bigint',k:'pk+fk'},
+    {n:'position',t:'smallint',k:'pk',note:'<code>DEFERRABLE INITIALLY DEFERRED</code>'},
+    {n:'question_id',t:'bigint',k:'fk',note:'Unique within a quiz'}
+  ],
+  fks:[{c:'quiz_id',to:'quizzes',d:'cascade'},{c:'question_id',to:'questions',d:'cascade'}],
+  notes:[]
+},
+/* ---------- research ---------- */
+{
+  name:'fields', domain:'research', purpose:'A research field: holds papers, one roadmap, and user interests.',
+  badges:['slug'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'name',t:'text',k:'u'},
+    {n:'slug',t:'text',k:'u',note:'Names the field in URLs'},
+    {n:'description',t:'text'}
+  ],
+  fks:[], notes:['A field with papers cannot be deleted (<code>papers.field_id</code> restricts).']
+},
+{
+  name:'papers', domain:'research', purpose:'A paper broken into what the app teaches: questions, method, results, limits.',
+  badges:['public_id','publishing','tsvector'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'field_id',t:'bigint',k:'fk'},
+    {n:'title',t:'text',note:'Full-text indexed with <code>main_idea</code>'},
+    {n:'authors',t:'text'},{n:'year',t:'smallint'},{n:'paper_url',t:'text'},
+    {n:'research_questions',t:'text[]'},{n:'main_idea',t:'text'},{n:'data_source',t:'text'},
+    {n:'method_steps',t:'text[]',note:'In order'},
+    {n:'results',t:'text'},
+    {n:'figures',t:'jsonb',note:'<code>[{url, caption}]</code>'},
+    {n:'limitations',t:'text'},{n:'evaluation',t:'text'},
+    {n:'created_at',t:'timestamptz'},
+    ...PUB
+  ],
+  fks:[{c:'field_id',to:'fields',d:'restrict'},...PUBFK],
+  notes:[]
+},
+{
+  name:'paper_prerequisites', domain:'research', purpose:'The "Learn first" topics of a paper, in order.',
+  badges:['composite PK','ordered'],
+  columns:[
+    {n:'paper_id',t:'bigint',k:'pk+fk'},{n:'topic_id',t:'bigint',k:'pk+fk'},
+    {n:'position',t:'smallint',note:'Display order'}
+  ],
+  fks:[{c:'paper_id',to:'papers',d:'cascade'},{c:'topic_id',to:'topics',d:'cascade'}],
+  notes:[]
+},
+{
+  name:'roadmap_steps', domain:'research', purpose:'One starting roadmap per field: which papers, in which order, and why.',
+  badges:['deferrable PK','ordered'],
+  columns:[
+    {n:'field_id',t:'bigint',k:'pk+fk'},
+    {n:'position',t:'smallint',k:'pk',note:'<code>DEFERRABLE INITIALLY DEFERRED</code>'},
+    {n:'paper_id',t:'bigint',k:'fk',note:'Unique within a field'},
+    {n:'note',t:'text',note:'Why this step comes here'}
+  ],
+  fks:[{c:'field_id',to:'fields',d:'cascade'},{c:'paper_id',to:'papers',d:'cascade'}],
+  notes:[]
+},
+{
+  name:'user_papers', domain:'research', purpose:'The reading tracker: one row per user and paper.',
+  badges:['composite PK','upsert'],
+  columns:[
+    {n:'user_id',t:'bigint',k:'pk+fk'},{n:'paper_id',t:'bigint',k:'pk+fk'},
+    {n:'status',t:'text',note:'saved · reading · completed'},
+    {n:'updated_at',t:'timestamptz'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'paper_id',to:'papers',d:'cascade'}],
+  notes:['Status changes are already one upsert on the same row.']
+},
+{
+  name:'user_fields', domain:'research', purpose:'The interests a user picked at onboarding.',
+  badges:['composite PK'],
+  columns:[{n:'user_id',t:'bigint',k:'pk+fk'},{n:'field_id',t:'bigint',k:'pk+fk'}],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'field_id',to:'fields',d:'cascade'}],
+  notes:['Saving interests now writes only the difference; before, every save deleted and re-inserted all rows.']
+},
+/* ---------- system ---------- */
+{
+  name:'outbox_events', domain:'system', purpose:'Work for the worker, written in the same transaction as the change.',
+  badges:['work queue','no FK'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},
+    {n:'event_type',t:'text',note:'e.g. post.liked, follow.changed (new)'},
+    {n:'entity_type',t:'text'},
+    {n:'entity_id',t:'bigint',note:'<strong>No FK</strong>: the event outlives its target'},
+    {n:'payload',t:'jsonb'},
+    {n:'attempts',t:'integer',note:'At 10 the row stays as a dead letter'},
+    {n:'created_at',t:'timestamptz'},
+    {n:'processed_at',t:'timestamptz',note:'NULL = pending. The worker claims an event by setting it only if still NULL'}
+  ],
+  fks:[],
+  notes:['Each event is claimed and applied in one transaction, so it takes effect exactly once. That is what makes ±1 counter updates safe.']
+},
+{
+  name:'audit_log', domain:'system', purpose:'Every admin and security action.',
+  badges:['no FK'],
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},
+    {n:'actor_id',t:'bigint',k:'fk',note:'Set null when the actor is purged'},
+    {n:'action',t:'text',note:'e.g. paper.publish, user.suspend, user.purge'},
+    {n:'entity_type',t:'text'},
+    {n:'entity_id',t:'bigint',note:'<strong>No FK</strong>: entries outlive what they describe'},
+    {n:'changes',t:'jsonb'},{n:'ip',t:'inet'},{n:'created_at',t:'timestamptz'}
+  ],
+  fks:[{c:'actor_id',to:'users',d:'setnull'}],
+  notes:[]
+}
+];
+
+const INDEXES = [
+  {t:['posts'],purpose:'Profile pages and home feed (keyset)',idx:"posts_user_feed_idx (user_id, created_at DESC, id DESC) WHERE deleted_at IS NULL AND status = 'published'"},
+  {t:['posts'],purpose:"A user's posts, any status (also serves the user cascade)",idx:'posts (user_id, created_at DESC)'},
+  {t:['posts'],purpose:'Reels list',idx:"posts_reels_idx (created_at DESC, id DESC) WHERE type = 'reel' AND status = 'published' AND deleted_at IS NULL"},
+  {t:['posts'],purpose:'Posts waiting on a media asset',idx:'posts (media_id)'},
+  {t:['users'],purpose:'People to follow, most-followed first',idx:"users_suggest_idx (follower_count DESC, id DESC) WHERE status = 'active'",isNew:true},
+  {t:['users'],purpose:'Case-insensitive login',idx:'unique lower(email) · unique lower(username)'},
+  {t:['follows'],purpose:'Who follows me (and the user cascade)',idx:'follows (following_id)'},
+  {t:['follows'],purpose:'Pending follow requests, newest (re)sent first',idx:"follows_pending_idx (following_id, updated_at DESC) WHERE status = 'pending'",isNew:true},
+  {t:['blocks'],purpose:'Block checks from the blocked side',idx:'blocks (blocked_id)'},
+  {t:['post_likes'],purpose:'Likes per post (repair job, post cascade). is_active is left out on purpose',idx:'post_likes (post_id)'},
+  {t:['comments'],purpose:'Comments per post and paper; reply threads',idx:'comments (post_id, created_at) · comments (paper_id, created_at) · comments (parent_id)'},
+  {t:['notifications'],purpose:'Notifications inbox',idx:'notifications (user_id, created_at DESC)'},
+  {t:['notifications'],purpose:'Unread badge',idx:'notifications_unread_idx (user_id) WHERE NOT is_read',isNew:true},
+  {t:['saved_posts'],purpose:'Saved posts, newest first',idx:'saved_posts (user_id, created_at DESC)'},
+  {t:['question_attempts'],purpose:'Practice history and stats',idx:'question_attempts (user_id, created_at DESC)'},
+  {t:['sessions'],purpose:'Live sessions',idx:'sessions (user_id) WHERE revoked_at IS NULL'},
+  {t:['auth_identities','auth_tokens'],purpose:'Lookups and cascades by user',idx:'auth_identities (user_id) · auth_tokens (user_id)'},
+  {t:['media_assets'],purpose:'Media queue; a user\'s uploads',idx:"media_assets (status) WHERE status IN ('uploading','processing') · media_assets (owner_id)"},
+  {t:['papers','learn_items','questions'],purpose:'Content by field or topic',idx:'papers (field_id) · learn_items (topic_id) · questions (topic_id)'},
+  {t:['outbox_events'],purpose:'Outbox queue',idx:'outbox_pending_idx (id) WHERE processed_at IS NULL'},
+  {t:['reports'],purpose:'Moderation queue; lookups by target',idx:'reports (status, created_at) · reports (target_type, target_id)'},
+  {t:['audit_log'],purpose:'Audit lookups',idx:'audit_log (entity_type, entity_id) · audit_log (actor_id, created_at DESC)'},
+  {t:['users','topics'],purpose:'Fuzzy search',idx:'GIN trigram on users.username and topics.name'},
+  {t:['posts','learn_items','courses','papers'],purpose:'Full-text search',idx:"GIN to_tsvector('english', …) on posts.caption, learn_items (title + body), courses (title + description), papers (title + main_idea)"}
+];
+
+const CONVENTIONS = [
+  ['Internal keys','<code>id bigint GENERATED ALWAYS AS IDENTITY</code>. For joins only; <strong>never sent to clients</strong>.'],
+  ['Public keys','<code>public_id uuid UNIQUE</code> on every row a client can name.'],
+  ['Slugs','<code>topics.slug</code> and <code>fields.slug</code> name those rows in URLs.'],
+  ['Enums','<code>text</code> with <code>CHECK (… IN (…))</code>. The same lists live in <code>packages/shared</code>; change both together.'],
+  ['Timestamps','<code>timestamptz</code>. <code>updated_at</code> is set by the application, not triggers.'],
+  ['Soft delete','<code>deleted_at</code> on <code>users</code>, <code>posts</code> and <code>comments</code>: hidden at once, purged later.'],
+  ['Toggle rows <span class="pill p-new">new</span>','Relationships that trigger side effects keep one row per pair and flip a state instead of delete + insert: <code>post_likes.is_active</code>, <code>follows.status = \'inactive\'</code>. Only the first activation ever notifies.'],
+  ['Stored counters','<code>posts.like_count</code>, <code>comment_count</code>, <code>users.follower_count</code>, <code>following_count</code>. Moved ±1 by the worker, exactly once per event; repaired hourly.'],
+  ['Publishing workflow','Team content moves <code>draft → published → archived</code>.'],
+  ['Storage keys, not URLs','<code>media_assets</code> stores keys; URLs are built at read time.'],
+  ['Ordered children','<code>position</code> in a <code>DEFERRABLE</code> primary key, so a list can be reordered in one transaction.'],
+  ['Polymorphic references','<code>reports.target_id</code>, <code>outbox_events.entity_id</code>, <code>audit_log.entity_id</code>: no FK on purpose.']
+];
+
+const CHECKS = [
+  ['posts','Post media','<code>type = \'text\' OR media_id IS NOT NULL</code>'],
+  ['comments','Comment target','<code>(post_id IS NULL) &lt;&gt; (paper_id IS NULL)</code>'],
+  ['questions','MCQ options','<code>kind = \'short\' OR cardinality(options) &gt;= 2</code>'],
+  ['learn_items','Learn item media','<code>kind = \'text\' OR media_url IS NOT NULL OR media_id IS NOT NULL</code>'],
+  ['follows','Follow status','<code>status IN (\'accepted\', \'pending\', \'inactive\')</code>; no self-follow'],
+  ['blocks','No self-block','<code>blocker_id &lt;&gt; blocked_id</code>']
+];
+
+const ERRORS = [
+  ['Unique violation','<code>409 ALREADY_EXISTS</code>'],
+  ['Foreign key still referenced (restrict)','<code>409 IN_USE</code>'],
+  ['Missing foreign key target','<code>400 INVALID_REFERENCE</code>'],
+  ['CHECK, NOT NULL or bad format','<code>400 INVALID_DATA</code>']
+];
+
+const RETENTION = [
+  ['Deleted accounts','Hidden at once. After 30 days: comments become <code>[deleted]</code>, the user row is deleted (cascading), their media is removed, and a <code>user.purge</code> audit entry is written.'],
+  ['Deleted posts','Hidden at once; row and media deleted after 30 days.'],
+  ['Stored counters','Post and follow counts recounted wherever they drifted (mainly after purges).'],
+  ['Inactive likes and follows','Kept: they are what stops re-notification. They go when the user or post is purged.'],
+  ['Abandoned uploads','<code>uploading</code>/<code>failed</code> assets older than 1 day that nothing uses.'],
+  ['Sessions','Expired or revoked more than 30 days ago.'],
+  ['Email codes','Expired or used more than 7 days ago.'],
+  ['Outbox events','Processed more than 30 days ago. Events with 10 failed attempts stay as dead letters.'],
+  ['Raw uploads','Deleted as soon as processing ends (they hold GPS and camera metadata).']
+];
+
+const FLOWS = [
+  {title:'Like', steps:['active','inactive','active'], note:'One row for ever. Only the first activation notifies; each real change moves <code>like_count</code> by one.'},
+  {title:'Follow', steps:['pending / accepted','inactive','pending / accepted'], note:'<code>pending</code> for private accounts until accepted. Unfollow, withdraw, decline and block all go to <code>inactive</code>.'},
+  {title:'Media asset', steps:['uploading','processing','ready'], alt:'failed', note:'The worker measures duration and builds variants.'},
+  {title:'Post', steps:['processing','published','removed'], note:'<code>removed</code> is a moderator action, separate from <code>deleted_at</code>.'},
+  {title:'Team content', steps:['draft','published','archived'], note:'Papers, courses, learn items, questions and quizzes.'}
+];
+
+const CHANGES = [
+  {title:'Likes are toggle rows', tag:'post_likes',
+   before:'Unlike deleted the row; a re-like inserted a new one and sent the author a new notification and push every time. Like → unlike → like could spam.',
+   after:'One row per user and post with <code>is_active</code>. Unlike sets it false, re-like sets it true. Only the first like ever notifies. The toggle is a HOT update (no index writes).',
+   where:'posts.service.ts likePost / unlikePost · worker post.liked'},
+  {title:'Follows are toggle rows', tag:'follows',
+   before:'Unfollow, withdraw, decline and block deleted the row, so following again re-sent the follow / request notification.',
+   after:'Status <code>inactive</code> keeps the row; following again reactivates it. Only the first follow ever notifies. Requests are listed by <code>updated_at</code>, the time they were (re)sent.',
+   where:'users.service.ts follow / unfollow / accept / decline / block'},
+  {title:'Counters move by one instead of recounting', tag:'posts',
+   before:'Every like, unlike, comment or comment delete made the worker <code>COUNT(*)</code> all likes <em>and</em> all comments of the post: O(n) per event on a busy post.',
+   after:'The worker adds or subtracts 1. It claims each event (<code>processed_at IS NULL</code>) in the same transaction, so a delta is applied exactly once. The hourly repair still catches drift.',
+   where:'worker/outbox.ts · moderation only emits comment.deleted for a live comment'},
+  {title:'Stored follower and following counts', tag:'users',
+   before:'Every profile view ran two <code>COUNT(*)</code> over <code>follows</code>. "People to follow" counted followers for <em>every</em> active user, then sorted them.',
+   after:'<code>users.follower_count</code> / <code>following_count</code>, moved by <code>follow.changed</code> events. Suggestions read <code>users_suggest_idx</code> in order and stop after the limit.',
+   where:'migration 004 · users.service.ts getProfile / suggestUsers · worker follow.changed'},
+  {title:'Interests write only the difference', tag:'user_fields',
+   before:'Saving interests deleted every row and inserted them all again, even when nothing changed.',
+   after:'Removed fields are deleted, new ones inserted; unchanged rows are left alone.',
+   where:'users.service.ts setInterests'},
+  {title:'Index for the unread badge', tag:'notifications',
+   before:'The unread count scanned all of a user\'s notifications through <code>(user_id, created_at)</code>.',
+   after:'<code>notifications_unread_idx (user_id) WHERE NOT is_read</code>: only unread rows.',
+   where:'migration 004 · notifications.service.ts countUnread'},
+  {title:'Redundant reels index dropped', tag:'posts',
+   before:'The Prototype 1 index <code>posts (created_at DESC) WHERE type = \'reel\'</code> sat beside <code>posts_reels_idx</code>, which covers the same order with the filters the query uses.',
+   after:'Dropped: one less index to write on every reel insert.',
+   where:'migration 004'}
+];
+
+const KEPT = [
+  ['saved_posts','Not toggled: unsaving has no side effects, and a re-save must move the post to the top of the list, which rewrites the indexed <code>created_at</code> anyway.'],
+  ['user_papers, course_progress','Already one upsert on the same row.'],
+  ['blocks','Rare, with no side effects. Delete + insert is fine.'],
+  ['question_attempts','Append-only by design: each attempt is history.'],
+  ['posts_count on profiles','Still <code>COUNT(*)</code>, served by the partial feed index. Store it if profiles get hot.']
+];
+
+const MIGRATIONS = [
+  ['1795305600000_prototype-v1-schema.sql','The Prototype 1 schema: 16 tables, <code>pg_trgm</code>, search indexes.'],
+  ['1795305600001_prototype-2.sql','The Prototype 2 appendix SQL (14 new tables): public ids, slugs, user status and privacy, media, publishing, auth, safety, outbox, audit.'],
+  ['1795305600002_prototype-2-backfill.sql','Slugs <code>NOT NULL</code>; post media into <code>media_assets</code>; drops <code>posts.media_url</code>; relaxes the learn item media check.'],
+  ['1795305600003_sessions-public-id-and-2fa.sql','<code>sessions.public_id</code>, two-factor columns, and indexes for feed, reels, saves and follow requests.'],
+  ['1795305600004_toggles-and-stored-counts.sql <span class="pill p-new">new</span>','Toggle rows for likes and follows, stored follow counts, the unread and suggestion indexes, and drops the redundant reels index. See <a href="#changes">Efficiency changes</a>.']
+];
+
+const GAPS = [
+  ['Random UUIDv4 public ids','Switch to <code>uuidv7()</code> on PostgreSQL 18 for better index locality.','waiting on PG 18'],
+  ['One worker only (advisory lock)','Lease columns plus <code>FOR UPDATE SKIP LOCKED</code>. The claim step already makes a second worker harmless.','when throughput needs it'],
+  ['Counter repair scans every row hourly','Run it daily, or only for posts and users touched by purges.','at hundreds of thousands of posts'],
+  ['Practice stats aggregate all attempts','A per-user, per-topic stats table updated by the worker.','when users have thousands of attempts'],
+  ['Random practice questions use <code>ORDER BY random()</code>','Sample by id range or <code>TABLESAMPLE</code>.','at tens of thousands of questions'],
+  ['Search runs on Postgres','Elasticsearch indexer reading the existing <code>search.sync</code> events.','later'],
+  ['No user locale','<code>users.locale</code> for Bangla push and email.','later'],
+  ['One DB role with full rights','DML-only app role, DDL migration role, PgBouncer, PITR backups.','before production'],
+  ['Large tables','Partition <code>notifications</code> and <code>question_attempts</code>; read replica.','at millions of rows']
+];
+
+/* ============================================================ */
+const RULE = {cascade:'cascade', setnull:'set null', restrict:'restrict'};
+const RULE_WHY = {
+  cascade:'deleted with the parent',
+  setnull:'kept; link set to NULL',
+  restrict:'parent cannot be deleted while this exists'
+};
+const rulePill = d => `<span class="pill r-${d}">${RULE[d]}</span>`;
+const esc = s => String(s).replace(/&(?![a-z#]+;)/g,'&amp;').replace(/</g,'&lt;');
+const byName = Object.fromEntries(TABLES.map(t=>[t.name,t]));
+const domainOf = n => DOMAINS.find(d=>d.id===byName[n].domain);
+
+// All FKs as edges: from (child table, column) to parent table.
+const EDGES = [];
+TABLES.forEach(t=>(t.fks||[]).forEach(f=>EDGES.push({from:t.name, col:f.c, to:f.to, d:f.d})));
+const outOf = n => EDGES.filter(e=>e.from===n);
+const into  = n => EDGES.filter(e=>e.to===n);
+
+const fill = (id, html) => { document.getElementById(id).innerHTML = html; };
+const jump = n => `<button class="jump" data-goto="${n}">${n}</button>`;
+
+/* ---------- overview ---------- */
+document.getElementById('t-tables').textContent = TABLES.length;
+document.getElementById('h-tables').textContent = TABLES.length;
+document.getElementById('t-fks').textContent = EDGES.length;
+const ruleCounts = ['cascade','setnull','restrict'].map(r=>`${EDGES.filter(e=>e.d===r).length} ${RULE[r]}`).join(' · ');
+document.getElementById('t-fks-sub').textContent = ruleCounts;
+
+fill('domain-cards', DOMAINS.map(d=>{
+  const list = TABLES.filter(t=>t.domain===d.id);
+  return `<div class="card"><h3>${d.name} <span style="color:var(--muted);font-family:var(--font-mono);font-size:12px">${list.length}</span></h3>
+    <p style="margin-bottom:10px">${d.desc}</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px 10px">${list.map(t=>jump(t.name)).join('')}</div></div>`;
+}).join(''));
+
+fill('conv-table','<thead><tr><th style="width:200px">Convention</th><th>Detail</th></tr></thead><tbody>'+
+  CONVENTIONS.map(([a,b])=>`<tr><td><strong>${a}</strong></td><td>${b}</td></tr>`).join('')+'</tbody>');
+
+/* ---------- relationship map ---------- */
+let focus = null;
+function renderLanes(){
+  const parents = focus ? new Set(outOf(focus).map(e=>e.to)) : new Set();
+  const kids = focus ? new Set(into(focus).map(e=>e.from)) : new Set();
+  const lanes = document.getElementById('lanes');
+  lanes.classList.toggle('focusing', !!focus);
+  lanes.innerHTML = DOMAINS.map(d=>{
+    const list = TABLES.filter(t=>t.domain===d.id);
+    return `<div class="lane"><h3><span>${d.name}</span><span>${list.length}</span></h3>${list.map(t=>{
+      let cls='', tag='';
+      if(t.name===focus) cls='is-focus';
+      else if(parents.has(t.name) && kids.has(t.name)) { cls='is-parent'; tag='both ways'; }
+      else if(parents.has(t.name)) { cls='is-parent'; tag='references'; }
+      else if(kids.has(t.name)) { cls='is-child'; tag='referenced by'; }
+      const deg = `↗${outOf(t.name).length} · ↙${into(t.name).length}`;
+      return `<button class="node ${cls}" data-focus="${t.name}" aria-pressed="${t.name===focus}"><span>${t.name}</span>`+
+             `<span class="${tag?'tag':'deg'}">${tag||deg}</span></button>`;
+    }).join('')}</div>`;
+  }).join('');
+
+  const panel = document.getElementById('focus-panel');
+  if(!focus){ panel.innerHTML = '<p class="empty">Pick a table above to see its relationships here.</p>'; return; }
+  panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <h3 style="font-family:var(--font-mono);font-size:17px">${focus}</h3>
+      <span><button class="jump" data-goto="${focus}">open columns →</button> &nbsp; <button class="jump" data-focus="">clear</button></span>
+    </div>${relBoxes(focus)}`;
+}
+
+/** Two clean lists: the FKs this table holds, and the FKs other tables hold to it (grouped by domain). */
+function relBoxes(n){
+  const out = outOf(n), inc = into(n);
+  const row = (path, d) => `<div class="rel"><div class="path">${path}</div>${rulePill(d)}<div class="why">${RULE_WHY[d]}</div></div>`;
+  const outHtml = out.length
+    ? out.map(e=>row(`<span>${n}.${e.col}</span><span class="arrow">→</span>${jump(e.to)}`, e.d)).join('')
+    : '<div class="none">Holds no foreign keys.</div>';
+  let inHtml = '<div class="none">Nothing points at this table.</div>';
+  if(inc.length){
+    inHtml = DOMAINS.map(d=>{
+      const rows = inc.filter(e=>byName[e.from].domain===d.id);
+      if(!rows.length) return '';
+      return `<div class="relgroup">${d.name}</div>`+rows.map(e=>row(`${jump(e.from)}<span>.${e.col}</span><span class="arrow">→</span><span>${n}</span>`, e.d)).join('');
+    }).join('');
+  }
+  return `<div class="relcols">
+    <div class="relbox out"><header><h4>References</h4><small>${out.length} FK${out.length===1?'':'s'} held here</small></header>${outHtml}</div>
+    <div class="relbox in"><header><h4>Referenced by</h4><small>${inc.length} FK${inc.length===1?'':'s'} from ${new Set(inc.map(e=>e.from)).size} tables</small></header>${inHtml}</div>
+  </div>`;
+}
+
+/* ---------- full FK table ---------- */
+let fkRule = 'all';
+function renderFkTable(){
+  const q = document.getElementById('fk-q').value.trim().toLowerCase();
+  const rows = EDGES.filter(e=>(fkRule==='all'||e.d===fkRule) &&
+    (!q || e.from.includes(q) || e.to.includes(q) || e.col.includes(q)));
+  const targets = [...new Set(rows.map(e=>e.to))].sort((a,b)=>into(b).length-into(a).length || a.localeCompare(b));
+  let body = '';
+  targets.forEach(to=>{
+    const group = rows.filter(e=>e.to===to);
+    body += `<tr class="group"><td colspan="4">→ ${to} · ${group.length}</td></tr>`;
+    body += group.map(e=>`<tr><td>${jump(e.from)}</td><td class="mono">${e.col}</td><td>${jump(e.to)}</td><td>${rulePill(e.d)}</td></tr>`).join('');
+  });
+  fill('fk-table', `<thead><tr><th>Child table</th><th>Column</th><th>References</th><th style="width:120px">On delete</th></tr></thead><tbody>${body || '<tr><td colspan="4" style="color:var(--muted)">No foreign key matches.</td></tr>'}</tbody>`);
+}
+document.getElementById('fk-q').addEventListener('input', renderFkTable);
+document.querySelectorAll('[data-rule]').forEach(b=>b.addEventListener('click',()=>{
+  fkRule = b.dataset.rule;
+  document.querySelectorAll('[data-rule]').forEach(x=>x.setAttribute('aria-pressed', String(x===b)));
+  renderFkTable();
+}));
+
+/* ---------- static tables ---------- */
+const newPill = '<span class="pill p-new">new</span>';
+fill('index-table','<thead><tr><th style="width:290px">What it is for</th><th>Index</th></tr></thead><tbody>'+
+  INDEXES.map(r=>`<tr><td>${r.purpose} ${r.isNew?newPill:''}<div style="margin-top:4px;display:flex;gap:4px 10px;flex-wrap:wrap">${r.t.map(jump).join('')}</div></td><td class="mono">${esc(r.idx)}</td></tr>`).join('')+'</tbody>');
+fill('checks-table','<thead><tr><th style="width:140px">Table</th><th style="width:180px">Rule</th><th>Constraint</th></tr></thead><tbody>'+
+  CHECKS.map(([t,n,d])=>`<tr><td>${jump(t)}</td><td><strong>${n}</strong></td><td>${d}</td></tr>`).join('')+'</tbody>');
+fill('errors-table','<thead><tr><th style="width:320px">Database error</th><th>API response</th></tr></thead><tbody>'+
+  ERRORS.map(([a,b])=>`<tr><td>${a}</td><td>${b}</td></tr>`).join('')+'</tbody>');
+fill('retention-table','<thead><tr><th style="width:210px">Data</th><th>Rule</th></tr></thead><tbody>'+
+  RETENTION.map(([a,b])=>`<tr><td><strong>${a}</strong></td><td>${b}</td></tr>`).join('')+'</tbody>');
+fill('migration-table','<thead><tr><th style="width:360px">File</th><th>What it does</th></tr></thead><tbody>'+
+  MIGRATIONS.map(([f,d])=>`<tr><td class="mono">${f}</td><td>${d}</td></tr>`).join('')+'</tbody>');
+fill('gap-table','<thead><tr><th style="width:290px">Gap today</th><th>Plan</th><th style="width:170px">When</th></tr></thead><tbody>'+
+  GAPS.map(([g,p,w])=>`<tr><td><strong>${g}</strong></td><td>${p}</td><td><span class="pill">${w}</span></td></tr>`).join('')+'</tbody>');
+fill('kept-table','<thead><tr><th style="width:230px">Table</th><th>Why it stays</th></tr></thead><tbody>'+
+  KEPT.map(([a,b])=>`<tr><td class="mono">${a}</td><td>${b}</td></tr>`).join('')+'</tbody>');
+fill('flows', FLOWS.map(f=>`<div class="card"><h3>${f.title}</h3>
+  <div class="flow" style="margin:8px 0">${f.steps.map(s=>`<b>${s}</b>`).join('<s>→</s>')}${f.alt?`<s>or</s><b>${f.alt}</b>`:''}</div>
+  <p>${f.note}</p></div>`).join(''));
+fill('changes', CHANGES.map((c,i)=>`<div class="card change"><h3><span class="pill p-accent">${i+1}</span> ${c.title} ${jump(c.tag)}</h3>
+  <div class="ba"><div class="before"><b>Before</b>${c.before}</div><div class="after"><b>After</b>${c.after}</div></div>
+  <div class="where">Where: <span class="mono">${c.where}</span></div></div>`).join(''));
+
+/* ---------- deleting a user ---------- */
+(function(){
+  const intoUsers = into('users');
+  const by = r => [...new Set(intoUsers.filter(e=>e.d===r).map(e=>e.from))];
+  const box = (r, title, text) => `<div class="card"><h3 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${title} ${rulePill(r)}</h3>
+    <div style="display:flex;flex-wrap:wrap;gap:6px 10px;margin:10px 0">${by(r).map(jump).join('')}</div><p>${text}</p></div>`;
+  fill('cascade-grid',
+    box('cascade','Deleted with the user','Their posts (and those posts\' likes, saves, comments and notifications), likes, saves, follows, blocks, sessions, sign-in links, codes, progress, attempts and notifications.') +
+    box('setnull','Kept, author forgotten','Comment threads keep a <code>[deleted]</code> placeholder; reports, media ownership, audit history and team content <code>created_by</code>/<code>updated_by</code> survive.'));
+})();
+
+/* ---------- table explorer ---------- */
+const listEl = document.getElementById('tablelist');
+const detailEl = document.getElementById('detail');
+const qEl = document.getElementById('q');
+let selected = 'users';
+
+function matches(t, q){
+  if(!q) return {hit:true, cols:[]};
+  const cols = t.columns.filter(c=>c.n.toLowerCase().includes(q) || (c.t||'').toLowerCase().includes(q)).map(c=>c.n);
+  const hit = t.name.includes(q) || t.purpose.toLowerCase().includes(q) || (t.badges||[]).some(b=>b.includes(q)) || cols.length>0;
+  return {hit, cols};
+}
+function renderList(){
+  const q = qEl.value.trim().toLowerCase();
+  let shown = 0, html = '';
+  DOMAINS.forEach(d=>{
+    const rows = TABLES.filter(t=>t.domain===d.id).map(t=>({t, m:matches(t,q)})).filter(x=>x.m.hit);
+    if(!rows.length) return;
+    html += `<div class="domain-h"><span>${d.name}</span><span>${rows.length}</span></div>`;
+    rows.forEach(({t,m})=>{
+      shown++;
+      html += `<button data-goto="${t.name}" aria-current="${t.name===selected}">${t.name}`+
+        (q && m.cols.length ? `<span class="hitcol">${m.cols.slice(0,4).join(', ')}${m.cols.length>4?' +'+(m.cols.length-4):''}</span>` : '')+`</button>`;
+    });
+  });
+  listEl.innerHTML = html || '<div class="domain-h">No table or column matches</div>';
+  document.getElementById('q-count').textContent = q ? `${shown} of ${TABLES.length} tables` : `${TABLES.length} tables · ${EDGES.length} foreign keys`;
+}
+function keyBadges(k){
+  if(!k) return '';
+  return k.split('+').map(x=>({pk:'<span class="k k-pk">PK</span>',fk:'<span class="k k-fk">FK</span>',u:'<span class="k k-u">UNIQUE</span>'})[x]||'').join('');
+}
+function renderDetail(){
+  const t = byName[selected];
+  const idx = INDEXES.filter(i=>i.t.includes(t.name));
+  const inc = into(t.name);
+  const badges = [`<span class="pill p-accent">${domainOf(t.name).name}</span>`]
+    .concat((t.badges||[]).map(b=>`<span class="pill ${b==='toggle row'?'p-new':'p-key'}">${b}</span>`))
+    .concat([`<span class="pill">${t.columns.length} columns</span>`,`<span class="pill">↗ ${outOf(t.name).length} out</span>`,`<span class="pill">↙ ${inc.length} in</span>`]).join('');
+
+  const cols = `<div class="scroller card"><table class="grid">
+    <thead><tr><th style="width:190px">Column</th><th style="width:110px">Type</th><th style="width:100px">Key</th><th>Notes</th></tr></thead><tbody>`+
+    t.columns.map(c=>{
+      const fk = (t.fks||[]).find(f=>f.c===c.n);
+      const ref = fk ? `<div style="margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted)">→ ${jump(fk.to)} ${rulePill(fk.d)}</div>` : '';
+      return `<tr><td class="mono" style="color:var(--ink)">${c.n} ${c.isNew?newPill:''}</td><td class="mono" style="color:var(--ink-2)">${esc(c.t||'')}</td>`+
+             `<td><span class="keycell">${keyBadges(c.k)}</span></td><td>${c.note||''}${ref}</td></tr>`;
+    }).join('')+'</tbody></table></div>';
+
+  const idxHtml = idx.length
+    ? `<div class="scroller card"><table class="grid"><tbody>${idx.map(i=>`<tr><td style="width:260px">${i.purpose} ${i.isNew?newPill:''}</td><td class="mono">${esc(i.idx)}</td></tr>`).join('')}</tbody></table></div>`
+    : `<div class="card pad" style="color:var(--muted);font-size:13.8px">Only the primary key and unique constraints above.</div>`;
+  const rules = (t.checks||[]).concat(t.notes||[]);
+
+  detailEl.innerHTML = `
+    <div class="detail-head"><h2>${t.name}</h2><p>${t.purpose}</p><div class="badges">${badges}</div></div>
+    <div class="sub"><h3>Columns</h3>${cols}</div>
+    <div class="sub"><h3>Relationships</h3>${relBoxes(t.name)}</div>
+    <div class="sub"><h3>Indexes</h3>${idxHtml}</div>
+    ${rules.length?`<div class="sub"><h3>Constraints and things to know</h3><div class="card pad"><ul class="plain">${rules.map(x=>`<li>${x}</li>`).join('')}</ul></div></div>`:''}`;
+}
+function select(name){
+  if(!byName[name]) return;
+  selected = name;
+  renderList(); renderDetail();
+  show('tables');
+  detailEl.scrollIntoView({block:'start', behavior:'smooth'});
+}
+
+/* ---------- routing ---------- */
+const VIEWS = ['overview','map','tables','indexes','rules','lifecycle','changes','migrations','roadmap'];
+function show(v){
+  if(!VIEWS.includes(v)) v = 'overview';
+  VIEWS.forEach(x=>{ document.getElementById('view-'+x).hidden = (x!==v); });
+  document.querySelectorAll('#nav a').forEach(a=>{
+    if(a.getAttribute('href')==='#'+v) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
+  });
+  if(location.hash.slice(1) !== v) history.replaceState(null,'','#'+v);
+}
+window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+document.addEventListener('click',e=>{
+  const f = e.target.closest('[data-focus]');
+  if(f){ e.preventDefault(); const n = f.getAttribute('data-focus'); focus = (n && n!==focus) ? n : null; renderLanes(); return; }
+  const g = e.target.closest('[data-goto]');
+  if(g){ e.preventDefault(); select(g.getAttribute('data-goto')); }
+});
+qEl.addEventListener('input', renderList);
+
+renderLanes(); renderFkTable(); renderList(); renderDetail();
+show(location.hash.slice(1) || 'overview');
+</script>
+</body>
+</html>

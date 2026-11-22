@@ -19,16 +19,17 @@ type Handler = (trx: Db, event: Event) => Promise<(SideEffect | null)[]>;
 
 const payloadOf = <T extends OutboxEventType>(event: Event) => event.payload as unknown as OutboxEvents[T];
 
-/** Recounts instead of incrementing, so handling an event twice can't drift the numbers. */
-async function refreshPostCounters(trx: Db, postId: number): Promise<void> {
-  await sql`
-    UPDATE posts SET
-      like_count = (SELECT count(*) FROM post_likes WHERE post_id = ${postId}),
-      comment_count = (SELECT count(*) FROM comments WHERE post_id = ${postId} AND deleted_at IS NULL)
-    WHERE id = ${postId}`.execute(trx);
+/**
+ * Moves a stored post counter by one. O(1), unlike recounting every like on a busy post. Safe
+ * because each event is claimed and applied exactly once (see processOutboxBatch); the hourly
+ * repair job fixes any drift from other paths, such as account purges.
+ */
+async function bumpPostCounter(trx: Db, postId: number, column: 'like_count' | 'comment_count', delta: 1 | -1): Promise<void> {
+  await sql`UPDATE posts SET ${sql.ref(column)} = greatest(${sql.ref(column)} + ${delta}, 0) WHERE id = ${postId}`.execute(trx);
 }
 
 const handlers: Record<OutboxEventType, Handler> = {
+  /** Written only for the first follow ever between two people, so re-follows don't re-notify. */
   'follow.created': async (trx, event) => {
     const { follower_id } = payloadOf<'follow.created'>(event);
     const follow = await trx
@@ -37,27 +38,37 @@ const handlers: Record<OutboxEventType, Handler> = {
       .where('follower_id', '=', follower_id)
       .where('following_id', '=', event.entity_id)
       .executeTakeFirst();
-    if (!follow) return []; // unfollowed before we got here
+    if (!follow || follow.status === 'inactive') return []; // unfollowed before we got here
     const type = follow.status === 'pending' ? 'follow_request' : 'follow';
     return [await notify(trx, { userId: event.entity_id, actorId: follower_id, type })];
   },
 
+  'follow.changed': async (trx, event) => {
+    const { follower_id, delta } = payloadOf<'follow.changed'>(event);
+    await sql`UPDATE users SET follower_count = greatest(follower_count + ${delta}, 0) WHERE id = ${event.entity_id}`.execute(trx);
+    await sql`UPDATE users SET following_count = greatest(following_count + ${delta}, 0) WHERE id = ${follower_id}`.execute(trx);
+    return [];
+  },
+
+  /** Counts every like that became active; notifies only for the first like ever (not a re-like). */
   'post.liked': async (trx, event) => {
-    const { user_id } = payloadOf<'post.liked'>(event);
-    await refreshPostCounters(trx, event.entity_id);
+    const { user_id, first_like } = payloadOf<'post.liked'>(event);
+    await bumpPostCounter(trx, event.entity_id, 'like_count', 1);
+    if (first_like === false) return [];
     const like = await trx
       .selectFrom('post_likes as l')
       .innerJoin('posts as p', 'p.id', 'l.post_id')
       .select('p.user_id')
       .where('l.post_id', '=', event.entity_id)
       .where('l.user_id', '=', user_id)
+      .where('l.is_active', '=', true)
       .executeTakeFirst();
-    if (!like) return [];
+    if (!like) return []; // unliked before we got here
     return [await notify(trx, { userId: like.user_id, actorId: user_id, type: 'like', postId: event.entity_id })];
   },
 
   'post.unliked': async (trx, event) => {
-    await refreshPostCounters(trx, event.entity_id);
+    await bumpPostCounter(trx, event.entity_id, 'like_count', -1);
     return [];
   },
 
@@ -70,9 +81,10 @@ const handlers: Record<OutboxEventType, Handler> = {
       .select(['c.id', 'c.user_id', 'c.post_id', 'c.deleted_at', 'parent.user_id as parent_author', 'p.user_id as post_author'])
       .where('c.id', '=', event.entity_id)
       .executeTakeFirst();
-    if (!comment || comment.user_id === null) return [];
-    if (comment.post_id) await refreshPostCounters(trx, comment.post_id);
-    if (comment.deleted_at) return [];
+    if (!comment) return [];
+    // Always +1 for a post comment: if it was deleted meanwhile, its comment.deleted event comes later and takes it off.
+    if (comment.post_id) await bumpPostCounter(trx, comment.post_id, 'comment_count', 1);
+    if (comment.user_id === null || comment.deleted_at) return [];
 
     const effects: (SideEffect | null)[] = [];
     const base = { actorId: comment.user_id, postId: comment.post_id, commentId: comment.id };
@@ -83,9 +95,10 @@ const handlers: Record<OutboxEventType, Handler> = {
     return effects;
   },
 
+  /** Written only when a live comment becomes deleted, so it is taken off exactly once. */
   'comment.deleted': async (trx, event) => {
     const comment = await trx.selectFrom('comments').select('post_id').where('id', '=', event.entity_id).executeTakeFirst();
-    if (comment?.post_id) await refreshPostCounters(trx, comment.post_id);
+    if (comment?.post_id) await bumpPostCounter(trx, comment.post_id, 'comment_count', -1);
     return [];
   },
 
@@ -178,8 +191,11 @@ async function createAuthToken(trx: Db, userId: number, purpose: 'verify_email' 
 }
 
 /**
- * Handles pending events in order. Each event's database work and its "processed" mark commit
- * together; push and email run after the commit. Returns how many events were picked up.
+ * Handles pending events in order. Each event is first claimed (marked processed only if it still
+ * isn't), then handled, in one transaction: its database work and its mark commit together or not
+ * at all, and a second worker that picked the same event finds it claimed and skips it. That is
+ * what makes counter deltas safe. Push and email run after the commit. Returns how many events
+ * were picked up.
  */
 export async function processOutboxBatch(log: Logger, limit = 50): Promise<number> {
   const events = await db
@@ -196,9 +212,15 @@ export async function processOutboxBatch(log: Logger, limit = 50): Promise<numbe
     try {
       if (!handler) throw new Error(`No handler for outbox event "${event.event_type}"`);
       const effects = await db.transaction().execute(async (trx) => {
-        const result = await handler(trx, event);
-        await trx.updateTable('outbox_events').set({ processed_at: new Date(), attempts: sql`attempts + 1` }).where('id', '=', event.id).execute();
-        return result;
+        const claimed = await trx
+          .updateTable('outbox_events')
+          .set({ processed_at: new Date(), attempts: sql`attempts + 1` })
+          .where('id', '=', event.id)
+          .where('processed_at', 'is', null)
+          .returning('id')
+          .executeTakeFirst();
+        if (!claimed) return []; // another worker already handled it
+        return handler(trx, event);
       });
       for (const effect of effects) {
         if (effect) await effect().catch((error: unknown) => log.warn({ err: error, eventId: event.id }, 'Side effect failed'));

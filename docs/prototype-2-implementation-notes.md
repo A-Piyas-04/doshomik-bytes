@@ -47,7 +47,7 @@ The API reference is in `apps/api/README.md`.
 | Migration `…002` finishes the appendix's "after backfill" steps: slugs `NOT NULL`, post media moved into `media_assets`, `posts.media_url` and `duration_seconds` dropped, `CHECK (type = 'text' OR media_id IS NOT NULL)` | The doc says to do it after the backfill; doing it now means only one source of truth for media | Prototype 1 post media becomes `provider = 'legacy'` assets whose `playback_key` is the old URL, returned unchanged. Prototype 1 never shipped, so no real files are affected. |
 | `learn_items_check` now allows `media_url` **or** `media_id` | A learn item can use the new pipeline (`media_id`) or an outside link (`media_url`); the old check required `media_url` | — |
 | Migration `…003` adds `sessions.public_id`, `users.totp_secret`, `users.totp_enabled_at` and four indexes | The API needs to name a device session ("sign out of this device"), and tokens carry it, without exposing numeric ids. Two-factor sign-in is required for staff but has no columns in the appendix. | `totp_secret` is AES-256-GCM encrypted with a key derived from `APP_SECRET` |
-| Follower counts are still counted with `COUNT(*)`, not stored | The appendix adds stored counters only to `posts`; `follows` has indexes on both sides, so counts are cheap at this scale | Add `users.follower_count` and `following_count`, kept by the `follow.created` handler, when profiles get hot |
+| ~~Follower counts are still counted with `COUNT(*)`~~ Superseded by migration `…004` (§2.6) | — | — |
 
 ### 2.2 Security and auth
 
@@ -94,7 +94,7 @@ The API reference is in `apps/api/README.md`.
 | **No Redis.** The worker reads `outbox_events` and `media_assets` from Postgres | The doc's design needs no Redis for this; Redis isn't installed | §3.1 |
 | **One worker process**, enforced with a Postgres advisory lock | No double processing without lease columns | Scaling out needs leases (§3.2) |
 | Each event's database work and its "processed" mark commit together; push and email run after commit, best effort | Counters and notifications are exactly once; side effects never roll back data | A failed push or email is logged, not retried |
-| Counters are **recounted**, not incremented | Handling an event twice can't drift the numbers; the nightly repair job catches the rest | Counts are a few seconds behind the action, so the app shows optimistic counts |
+| ~~Counters are recounted, not incremented~~ Superseded by migration `…004`: counters move by ±1, exactly once per event (§2.6) | — | Counts are still a few seconds behind the action, so the app shows optimistic counts |
 | Notifications moved from the request to the worker (`follow`, `follow_request`, `like`, `comment`, `reply`, `post_ready`) | The doc: workers update notifications and push | They appear within about a second, once the worker runs |
 | `search.sync` events are written for searchable changes (users, posts, topics, learn items, courses, papers), with no consumer yet | The outbox should already record what the Elasticsearch indexer will need | The worker marks them processed and maintenance deletes them after 30 days. The indexer starts with a full rebuild anyway (§3.4) |
 | Events failing 10 times stay unprocessed for inspection | Dead-letter without an extra table | Add an alert on `attempts >= 10` (§4) |
@@ -102,6 +102,23 @@ The API reference is in `apps/api/README.md`.
 | Purge keeps the user's comments as empty `[deleted]` rows | The thread survives (the doc's goal) and the text is gone (privacy) | — |
 | Development email goes to files in `DEV_MAIL_DIR`; SMTP when `SMTP_URL` is set (works with the Hostinger mailbox) | Real sending needs only a URL | — |
 | Push uses a logging stand-in | FCM needs a Firebase project and service account | §3.5 |
+
+### 2.6 Efficiency pass (migration `…004`, 23 Nov 2026)
+
+Review of every table for rows that are deleted and recreated, and for work repeated on every read or event.
+
+| Decision | Why | Consequence / later |
+| --- | --- | --- |
+| **Likes are toggle rows.** `post_likes.is_active` (+ `updated_at`). Unlike sets it false; like upserts and reactivates the row | Delete + insert made every like → unlike → like send a new notification and push. With one row per user and post, the API can tell a first like from a re-like (`xmax = 0` on the upsert) | Only the first like ever notifies. Like and unlike write an event only when the state really changes. Inactive rows stay until the user or post is purged |
+| `is_active` and `updated_at` are in **no index**; `post_likes (post_id)` is unchanged | A toggle is then a HOT update with no index writes, where delete + insert wrote two index entries. The full `(post_id)` index still serves the post cascade and the repair job | Counting active likes reads the heap, but only the hourly repair job counts likes now |
+| **Follows are toggle rows.** A third status `inactive` (unfollowed, withdrawn, declined, or ended by a block) plus `follows.updated_at` | Same re-notification problem as likes. A status value instead of a boolean keeps every `status = 'accepted'` privacy check correct with no change | Only the first follow ever notifies, requests included: a request re-sent after a decline shows in the requests list (ordered by `updated_at`) without a new alert. The API reports `inactive` as `none`. Block ends follows as `inactive` too, so block → unblock → follow can't re-notify |
+| **Counters move by ±1** instead of being recounted | A recount read every like and every comment of the post on each event: O(n) on a busy post | Exactly once is guaranteed by the worker **claiming** each event (`UPDATE … SET processed_at … WHERE processed_at IS NULL`) in the same transaction as its work, so even a second worker can't double-apply. Moderation emits `comment.deleted` only for a live comment. The hourly repair job still fixes drift from paths with no event (account purges) |
+| **Stored `users.follower_count` and `following_count`**, moved by a new `follow.changed` event (`delta` ±1) | The Prototype 2 doc asks for stored follower counts. Profiles ran two `COUNT(*)`; "people to follow" counted followers for every active user before sorting | `users_suggest_idx (follower_count DESC, id DESC) WHERE status = 'active'` serves suggestions in index order. Counts are seconds behind, like post counters. Every path that starts or ends an accepted follow emits the event: follow, accept, going public, unfollow, block |
+| Saving interests writes only the difference | `setInterests` deleted and re-inserted every `user_fields` row on each save | — |
+| `notifications_unread_idx (user_id) WHERE NOT is_read` | The unread badge runs on every app open and scanned all of a user's notifications | The query is written as the literal `NOT n.is_read` so it matches the index predicate |
+| Dropped the Prototype 1 index `posts (created_at DESC) WHERE type = 'reel'` | `posts_reels_idx` covers the same order with the filters the reels query uses; the old one was only a write cost | — |
+| **Not** turned into toggle rows: `saved_posts`, `blocks`; `user_papers` and `course_progress` already upsert | Re-creating them has no side effects, so a toggle would only add a filter to every read. A re-save must move the post to the top of the list, which rewrites the indexed `created_at` anyway | Revisit if saving gains a side effect (e.g. "X saved your post") |
+| `src/db/types.ts` was edited by hand for the new columns | The local database rejected the `.env` credentials, so `pnpm db:types` could not run | Run `db:migrate`, the down/up round trip, `db:types` and `test` once the database is reachable; the generated types should match |
 
 ### 2.5 API shape
 

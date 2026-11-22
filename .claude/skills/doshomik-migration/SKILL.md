@@ -13,6 +13,7 @@ description: How to change the Doshomik Bytes database schema with node-pg-migra
 | `…001_prototype-2.sql` | Prototype 2 appendix SQL, unchanged except its `BEGIN`/`COMMIT` (30 tables) |
 | `…002_prototype-2-backfill.sql` | Slugs `NOT NULL`, post media moved into `media_assets`, `posts.media_url` and `duration_seconds` dropped, learn-item media check |
 | `…003_sessions-public-id-and-2fa.sql` | Additions: `sessions.public_id`, `users.totp_*`, indexes |
+| `…004_toggles-and-stored-counts.sql` | Toggle rows (`post_likes.is_active`, `follows.status = 'inactive'`), stored `users.follower_count`/`following_count`, unread and suggestion indexes, drops the redundant Prototype 1 reels index |
 
 Never edit the Prototype v1 doc or the Prototype 2 doc.
 

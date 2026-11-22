@@ -70,19 +70,32 @@ export async function purgeDeletedPosts(log: Logger): Promise<number> {
   return posts.length;
 }
 
-/** Repairs stored like and comment counts that drifted from the real rows. */
+/**
+ * Repairs stored counts that drifted from the real rows. The worker moves counts by ±1 per event;
+ * drift comes from paths that emit no event, mainly account purges (cascaded likes and follows,
+ * blanked comments).
+ */
 export async function repairCounters(log: Logger): Promise<number> {
-  const result = await sql`
+  const posts = await sql`
     UPDATE posts p SET like_count = c.likes, comment_count = c.comments
     FROM (
       SELECT p2.id,
-        (SELECT count(*) FROM post_likes l WHERE l.post_id = p2.id) AS likes,
+        (SELECT count(*) FROM post_likes l WHERE l.post_id = p2.id AND l.is_active) AS likes,
         (SELECT count(*) FROM comments c WHERE c.post_id = p2.id AND c.deleted_at IS NULL) AS comments
       FROM posts p2
     ) c
     WHERE c.id = p.id AND (p.like_count <> c.likes OR p.comment_count <> c.comments)`.execute(db);
-  const fixed = Number(result.numAffectedRows ?? 0);
-  if (fixed) log.warn({ count: fixed }, 'Repaired drifted post counters');
+  const users = await sql`
+    UPDATE users u SET follower_count = c.followers, following_count = c.following
+    FROM (
+      SELECT u2.id,
+        (SELECT count(*) FROM follows f WHERE f.following_id = u2.id AND f.status = 'accepted') AS followers,
+        (SELECT count(*) FROM follows f WHERE f.follower_id = u2.id AND f.status = 'accepted') AS following
+      FROM users u2
+    ) c
+    WHERE c.id = u.id AND (u.follower_count <> c.followers OR u.following_count <> c.following)`.execute(db);
+  const fixed = Number(posts.numAffectedRows ?? 0) + Number(users.numAffectedRows ?? 0);
+  if (fixed) log.warn({ count: fixed }, 'Repaired drifted counters');
   return fixed;
 }
 

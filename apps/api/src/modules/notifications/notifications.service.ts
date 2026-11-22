@@ -1,3 +1,4 @@
+import { sql } from 'kysely';
 import { db } from '../../db';
 import { isActiveUser, notBlocked } from '../../db/visibility';
 import { notFound } from '../../lib/errors';
@@ -36,8 +37,9 @@ export function listNotifications(userId: number, page: PageQuery) {
 }
 
 export async function countUnread(userId: number): Promise<number> {
+  // Written as a literal "NOT n.is_read" so it matches notifications_unread_idx's predicate.
   const { count } = await selectNotifications(userId)
-    .where('n.is_read', '=', false)
+    .where(sql<boolean>`NOT n.is_read`)
     .select(({ fn }) => fn.countAll<number>().as('count'))
     .executeTakeFirstOrThrow();
   return count;
