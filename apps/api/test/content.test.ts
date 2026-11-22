@@ -1,177 +1,187 @@
 import { describe, expect, it } from 'vitest';
-import { createUser, useTestApp, type TestUser } from './helpers';
+import { call, createUser, useTestApp, type TestUser } from './helpers';
 
 const ctx = useTestApp();
 
-async function post(user: TestUser, url: string, payload: object, status = 201) {
-  const response = await ctx.app.inject({ method: 'POST', url, headers: user.headers, payload });
-  expect(response.statusCode, response.body).toBe(status);
-  return response.json();
+async function ok(user: TestUser, method: string, url: string, payload?: object) {
+  const result = await call(ctx.app, user, method, url, payload);
+  expect(result.status, JSON.stringify(result.body)).toBeLessThan(300);
+  return result.body;
+}
+const publish = (admin: TestUser, path: string) => ok(admin, 'PUT', `${path}/status`, { status: 'published' });
+
+/** A field, two topics (one with a video), and a published paper with both as Learn first. */
+async function seedResearch(admin: TestUser) {
+  await ok(admin, 'POST', '/v1/admin/fields', { name: 'Large Language Models' });
+  await ok(admin, 'POST', '/v1/admin/topics', { name: 'Attention mechanism', summary: 'Weighting inputs by relevance.' });
+  await ok(admin, 'POST', '/v1/admin/topics', { name: 'Softmax', summary: 'Scores to probabilities.' });
+  const item = await ok(admin, 'POST', '/v1/admin/learn-items', {
+    topic: 'attention-mechanism',
+    title: 'Attention explained',
+    kind: 'video',
+    media_url: 'https://cdn.example.com/attention.mp4',
+  });
+  await publish(admin, `/v1/admin/learn-items/${item.id}`);
+  const paper = await ok(admin, 'POST', '/v1/admin/papers', {
+    field: 'large-language-models',
+    title: 'Attention Is All You Need',
+    paper_url: 'https://arxiv.org/abs/1706.03762',
+    main_idea: 'Self-attention replaces recurrence.',
+    figures: [{ url: 'https://cdn.example.com/fig1.png', caption: 'The Transformer' }],
+  });
+  await ok(admin, 'PUT', `/v1/admin/papers/${paper.id}/prerequisites`, { topics: ['softmax', 'attention-mechanism'] });
+  return { paper, item };
 }
 
-async function put(user: TestUser, url: string, payload: object) {
-  const response = await ctx.app.inject({ method: 'PUT', url, headers: user.headers, payload });
-  expect(response.statusCode, response.body).toBeLessThan(300);
-  return response.body ? response.json() : undefined;
-}
-
-async function get(user: TestUser, url: string) {
-  const response = await ctx.app.inject({ method: 'GET', url, headers: user.headers });
-  expect(response.statusCode, response.body).toBe(200);
-  return response.json();
-}
-
-describe('admin content', () => {
-  it('is only open to admins', async () => {
+describe('publishing workflow', () => {
+  it('keeps drafts out of every user-facing list until an admin publishes them, and audits it', async () => {
+    const admin = await createUser(ctx.app, 'boss', { role: 'admin' });
     const user = await createUser(ctx.app, 'ali');
-    const response = await ctx.app.inject({ method: 'POST', url: '/admin/topics', headers: user.headers, payload: { name: 'X' } });
-    expect(response.statusCode).toBe(403);
-  });
+    const { paper } = await seedResearch(admin);
+    expect(paper.status).toBe('draft');
 
-  it('validates MCQs: two or more options, and the answer is one of them', async () => {
-    const admin = await createUser(ctx.app, 'admin', { admin: true });
-    const topic = await post(admin, '/admin/topics', { name: 'Gradient descent' });
+    expect((await call(ctx.app, user, 'GET', `/v1/papers/${paper.id}`)).status).toBe(404);
+    expect((await ok(user, 'GET', '/v1/papers')).items).toHaveLength(0);
+    expect((await ok(user, 'GET', '/v1/search?q=attention')).papers).toHaveLength(0);
+    expect((await ok(admin, 'GET', `/v1/admin/papers/${paper.id}`)).prerequisites).toHaveLength(2); // preview
 
-    const bad = await ctx.app.inject({
-      method: 'POST',
-      url: '/admin/questions',
-      headers: admin.headers,
-      payload: { topic_id: topic.id, kind: 'mcq', prompt: 'Pick one', options: ['A', 'B'], answer: 'C' },
-    });
-    expect(bad.statusCode).toBe(400);
-  });
-});
+    await publish(admin, `/v1/admin/papers/${paper.id}`);
+    const live = await ok(user, 'GET', `/v1/papers/${paper.id}`);
+    expect(live).toMatchObject({ title: 'Attention Is All You Need', field: { slug: 'large-language-models' }, my_status: null });
+    expect(live.published_at).toEqual(expect.any(String));
+    expect(live.share_url).toBe(`http://localhost:3000/papers/${paper.id}`);
+    expect((await ok(user, 'GET', '/v1/search?q=attention')).papers).toHaveLength(1);
 
-describe('Learn and Practice', () => {
-  it('orders course items and keeps one learn item reusable across courses', async () => {
-    const admin = await createUser(ctx.app, 'admin', { admin: true });
-    const topic = await post(admin, '/admin/topics', { name: 'Transformers' });
-    const a = await post(admin, '/admin/learn-items', { topic_id: topic.id, title: 'Tokens', kind: 'text', body: '...' });
-    const b = await post(admin, '/admin/learn-items', { topic_id: topic.id, title: 'Attention', kind: 'text', body: '...' });
-    const course1 = await post(admin, '/admin/courses', { title: 'LLM basics' });
-    const course2 = await post(admin, '/admin/courses', { title: 'NLP' });
+    const log = (await ok(admin, 'GET', '/v1/admin/audit-log')).items.map((entry: { action: string }) => entry.action);
+    expect(log).toEqual(expect.arrayContaining(['paper.create', 'paper.prerequisites', 'paper.publish', 'learn_item.publish']));
 
-    await put(admin, `/admin/courses/${course1.id}/items`, { item_ids: [b.id, a.id] });
-    await put(admin, `/admin/courses/${course2.id}/items`, { item_ids: [b.id] });
-
-    const course = await get(admin, `/courses/${course1.id}`);
-    expect(course.items.map((i: { title: string; position: number }) => [i.position, i.title])).toEqual([
-      [1, 'Attention'],
-      [2, 'Tokens'],
-    ]);
-    const courses = await get(admin, '/courses');
-    expect(courses.items.map((c: { item_count: number }) => c.item_count).sort()).toEqual([1, 2]);
-
-    const external = await post(admin, '/admin/courses', { title: 'Free course', external_url: 'https://example.com/course' });
-    const rejected = await ctx.app.inject({
-      method: 'PUT',
-      url: `/admin/courses/${external.id}/items`,
-      headers: admin.headers,
-      payload: { item_ids: [a.id] },
-    });
-    expect(rejected.json().error.code).toBe('EXTERNAL_COURSE');
-  });
-
-  it('hides answers until submitted, then checks them ignoring case and spacing', async () => {
-    const admin = await createUser(ctx.app, 'admin', { admin: true });
-    const user = await createUser(ctx.app, 'ali');
-    const topic = await post(admin, '/admin/topics', { name: 'Neural networks' });
-    const question = await post(admin, '/admin/questions', {
-      topic_id: topic.id,
-      kind: 'short',
-      prompt: 'What algorithm computes gradients in a neural network?',
-      answer: 'Backpropagation',
-      explanation: 'It applies the chain rule layer by layer.',
-    });
-
-    const listed = await get(user, `/practice/questions?topic_id=${topic.id}`);
-    expect(listed.items).toHaveLength(1);
-    expect(listed.items[0]).not.toHaveProperty('answer');
-
-    const result = await post(user, `/practice/questions/${question.id}/answer`, { answer: '  backPROPagation ' }, 200);
-    expect(result).toEqual({
-      correct: true,
-      correct_answer: 'Backpropagation',
-      explanation: 'It applies the chain rule layer by layer.',
-    });
+    await ok(admin, 'PUT', `/v1/admin/papers/${paper.id}/status`, { status: 'archived' });
+    expect((await call(ctx.app, user, 'GET', `/v1/papers/${paper.id}`)).status).toBe(404);
   });
 });
 
 describe('Research', () => {
-  it('builds Learn first, the tracker, the roadmap and the discussion', async () => {
-    const admin = await createUser(ctx.app, 'admin', { admin: true });
+  it('builds Learn first from published items, tracks reading, and finds related papers', async () => {
+    const admin = await createUser(ctx.app, 'boss', { role: 'admin' });
     const user = await createUser(ctx.app, 'ali');
+    const { paper } = await seedResearch(admin);
+    await publish(admin, `/v1/admin/papers/${paper.id}`);
+    const bert = await ok(admin, 'POST', '/v1/admin/papers', { field: 'large-language-models', title: 'BERT', paper_url: 'https://arxiv.org/abs/1810.04805' });
+    await ok(admin, 'PUT', `/v1/admin/papers/${bert.id}/prerequisites`, { topics: ['attention-mechanism'] });
+    await publish(admin, `/v1/admin/papers/${bert.id}`);
 
-    const field = await post(admin, '/admin/fields', { name: 'Large Language Models' });
-    const attention = await post(admin, '/admin/topics', { name: 'Attention', summary: 'Weighting inputs by relevance.' });
-    const softmax = await post(admin, '/admin/topics', { name: 'Softmax', summary: 'Turns scores into probabilities.' });
-    await post(admin, '/admin/learn-items', {
-      topic_id: attention.id,
-      title: 'Attention explained',
-      kind: 'video',
-      media_url: 'https://cdn.example.com/attention.mp4',
-      duration_seconds: 60,
-    });
-    const paper = await post(admin, '/admin/papers', {
-      field_id: field.id,
-      title: 'Attention Is All You Need',
-      authors: 'Vaswani et al.',
-      year: 2017,
-      paper_url: 'https://arxiv.org/abs/1706.03762',
-      research_questions: ['Can attention alone replace recurrence?'],
-      method_steps: ['Encode', 'Attend', 'Decode'],
-      figures: [{ url: 'https://cdn.example.com/fig1.png', caption: 'The Transformer' }],
-    });
-    expect(paper.figures).toEqual([{ url: 'https://cdn.example.com/fig1.png', caption: 'The Transformer' }]);
-    await put(admin, `/admin/papers/${paper.id}/prerequisites`, { topic_ids: [softmax.id, attention.id] });
-    await put(admin, `/admin/fields/${field.id}/roadmap`, { steps: [{ paper_id: paper.id, note: 'Start here' }] });
-
-    // Learn first: both topics in order; only Attention has a video.
-    const learnFirst = await get(user, `/papers/${paper.id}/learn-first`);
-    expect(learnFirst).toMatchObject({
+    expect(await ok(user, 'GET', `/v1/papers/${paper.id}/learn-first`)).toMatchObject({
       topic_count: 2,
       topics_with_learn_items: 1,
       topics: [
-        { name: 'Softmax', summary: 'Turns scores into probabilities.', learn_items: [] },
-        { name: 'Attention', learn_items: [{ title: 'Attention explained', kind: 'video' }] },
+        { slug: 'softmax', learn_items: [] },
+        { slug: 'attention-mechanism', learn_items: [{ title: 'Attention explained', kind: 'video' }] },
       ],
     });
+    expect((await ok(user, 'GET', `/v1/papers/${paper.id}/related`)).items).toMatchObject([{ id: bert.id, shared_topics: 1 }]);
 
-    // Tracker: saved -> reading.
-    await put(user, `/papers/${paper.id}/status`, { status: 'saved' });
-    await put(user, `/papers/${paper.id}/status`, { status: 'reading' });
-    expect((await get(user, `/papers/${paper.id}`)).my_status).toBe('reading');
-    const tracker = await get(user, `/users/${user.id}/papers`);
-    expect(tracker.saved).toHaveLength(0);
-    expect(tracker.reading).toMatchObject([{ title: 'Attention Is All You Need' }]);
+    await ok(user, 'PUT', `/v1/papers/${paper.id}/status`, { status: 'reading' });
+    expect((await ok(user, 'GET', `/v1/users/${user.id}/papers`)).reading).toMatchObject([{ id: paper.id }]);
 
-    // List filter and search.
-    expect((await get(user, `/papers?field_id=${field.id}`)).items).toHaveLength(1);
-    expect((await get(user, '/papers?q=attention')).items).toHaveLength(1);
-    expect((await get(user, '/papers?q=convolution')).items).toHaveLength(0);
+    await ok(admin, 'PUT', '/v1/admin/fields/large-language-models/roadmap', {
+      steps: [{ paper_id: bert.id, note: 'Start here' }, { paper_id: paper.id }],
+    });
+    const roadmap = await ok(user, 'GET', '/v1/fields/large-language-models/roadmap');
+    expect(roadmap.steps.map((s: { step: number; paper: { title: string } }) => [s.step, s.paper.title])).toEqual([
+      [1, 'BERT'],
+      [2, 'Attention Is All You Need'],
+    ]);
 
-    // Roadmap.
-    const roadmap = await get(user, `/fields/${field.id}/roadmap`);
-    expect(roadmap.steps).toMatchObject([{ position: 1, note: 'Start here', paper: { id: paper.id } }]);
+    // Onboarding interests filter the paper list.
+    expect((await ok(user, 'GET', '/v1/papers?interests=true')).items).toHaveLength(0);
+    await ok(user, 'PUT', '/v1/me/interests', { fields: ['large-language-models'] });
+    expect((await ok(user, 'GET', '/v1/papers?interests=true')).items).toHaveLength(2);
+  });
+});
 
-    // Discussion uses the comments table with paper_id set.
-    const comment = await post(user, `/papers/${paper.id}/comments`, { body: 'Can someone explain multi-head attention?' });
-    expect(comment).toMatchObject({ paper_id: paper.id, post_id: null });
+describe('Learn', () => {
+  it('lists only published course steps and remembers progress', async () => {
+    const admin = await createUser(ctx.app, 'boss', { role: 'admin' });
+    const user = await createUser(ctx.app, 'ali');
+    const items = [];
+    for (const title of ['Tokens', 'Attention', 'Draft lesson']) {
+      items.push(await ok(admin, 'POST', '/v1/admin/learn-items', { title, kind: 'text', body: '...' }));
+    }
+    await publish(admin, `/v1/admin/learn-items/${items[0].id}`);
+    await publish(admin, `/v1/admin/learn-items/${items[1].id}`);
+    const course = await ok(admin, 'POST', '/v1/admin/courses', { title: 'LLM basics' });
+    await ok(admin, 'PUT', `/v1/admin/courses/${course.id}/items`, { item_ids: [items[1].id, items[2].id, items[0].id] });
+    await publish(admin, `/v1/admin/courses/${course.id}`);
+
+    const live = await ok(user, 'GET', `/v1/courses/${course.id}`);
+    expect(live.item_count).toBe(2);
+    expect(live.items.map((i: { step: number; title: string }) => [i.step, i.title])).toEqual([
+      [1, 'Attention'],
+      [2, 'Tokens'],
+    ]);
+
+    await ok(user, 'PUT', `/v1/courses/${course.id}/progress`, { last_position: 1 });
+    expect((await ok(user, 'GET', '/v1/me/courses')).items).toMatchObject([{ id: course.id, my_progress: { last_position: 1, completed_at: null } }]);
+    const done = await ok(user, 'PUT', `/v1/courses/${course.id}/progress`, { last_position: 2 });
+    expect(done.completed_at).toEqual(expect.any(String));
+    expect((await call(ctx.app, user, 'PUT', `/v1/courses/${course.id}/progress`, { last_position: 3 })).status).toBe(400);
+  });
+});
+
+describe('Practice', () => {
+  it('records answers, reports accuracy and streak, and serves quizzes in order', async () => {
+    const admin = await createUser(ctx.app, 'boss', { role: 'admin' });
+    const user = await createUser(ctx.app, 'ali');
+    await ok(admin, 'POST', '/v1/admin/topics', { name: 'Neural networks' });
+    const bad = await call(ctx.app, admin, 'POST', '/v1/admin/questions', { topic: 'neural-networks', kind: 'mcq', prompt: 'Pick', options: ['A', 'B'], answer: 'C' });
+    expect(bad.status).toBe(400);
+
+    const q1 = await ok(admin, 'POST', '/v1/admin/questions', { topic: 'neural-networks', kind: 'short', prompt: 'Which rule does backprop use?', answer: 'Chain rule' });
+    const q2 = await ok(admin, 'POST', '/v1/admin/questions', { topic: 'neural-networks', kind: 'mcq', prompt: 'Gradient direction?', options: ['Along', 'Against'], answer: 'Against' });
+    expect((await ok(user, 'GET', '/v1/practice/questions?topic=neural-networks')).items).toHaveLength(0); // drafts
+    await publish(admin, `/v1/admin/questions/${q1.id}`);
+    await publish(admin, `/v1/admin/questions/${q2.id}`);
+
+    const listed = (await ok(user, 'GET', '/v1/practice/questions?topic=neural-networks')).items;
+    expect(listed).toHaveLength(2);
+    expect(listed[0]).not.toHaveProperty('answer');
+
+    expect((await ok(user, 'POST', `/v1/practice/questions/${q1.id}/answer`, { answer: ' CHAIN  rule ' })).correct).toBe(true);
+    expect((await ok(user, 'POST', `/v1/practice/questions/${q2.id}/answer`, { answer: 'Along' })).correct).toBe(false);
+    expect(await ok(user, 'GET', '/v1/me/practice/stats')).toMatchObject({
+      attempts: 2,
+      correct: 1,
+      accuracy: 0.5,
+      streak_days: 1,
+      topics: [{ slug: 'neural-networks', attempts: 2, correct: 1 }],
+    });
+    expect((await ok(user, 'GET', '/v1/me/practice/history')).items).toHaveLength(2);
+
+    const quiz = await ok(admin, 'POST', '/v1/admin/quizzes', { title: 'Backprop basics', topic: 'neural-networks' });
+    await ok(admin, 'PUT', `/v1/admin/quizzes/${quiz.id}/questions`, { question_ids: [q2.id, q1.id] });
+    await publish(admin, `/v1/admin/quizzes/${quiz.id}`);
+    const live = await ok(user, 'GET', `/v1/quizzes/${quiz.id}`);
+    expect(live).toMatchObject({ title: 'Backprop basics', question_count: 2 });
+    expect(live.questions.map((q: { id: string }) => q.id)).toEqual([q2.id, q1.id]);
   });
 });
 
 describe('search', () => {
-  it('groups matches by type and tolerates typos in usernames and topic names', async () => {
-    const admin = await createUser(ctx.app, 'admin', { admin: true });
-    const user = await createUser(ctx.app, 'rahimuddin');
-    await post(admin, '/admin/topics', { name: 'Backpropagation' });
-    await post(user, '/posts', { type: 'text', caption: 'My notes on transformers' });
+  it('tolerates typos, leaves out private posts, and suggests while typing', async () => {
+    const admin = await createUser(ctx.app, 'boss', { role: 'admin' });
+    const user = await createUser(ctx.app, 'rahman_ml');
+    const secretive = await createUser(ctx.app, 'secretive');
+    await ok(admin, 'POST', '/v1/admin/topics', { name: 'Backpropagation' });
+    await ok(user, 'POST', '/v1/posts', { type: 'text', caption: 'My transformer notes' });
+    await ok(secretive, 'PATCH', '/v1/me', { is_private: true });
+    await ok(secretive, 'POST', '/v1/posts', { type: 'text', caption: 'Private transformer notes' });
 
-    const typo = await get(user, '/search?q=rahimudin');
-    expect(typo.users).toMatchObject([{ username: 'rahimuddin' }]);
-    expect(Object.keys(typo).sort()).toEqual(['courses', 'learn_items', 'papers', 'posts', 'topics', 'users']);
+    expect((await ok(admin, 'GET', '/v1/search?q=rahmn_ml')).users).toMatchObject([{ username: 'rahman_ml' }]);
+    expect((await ok(admin, 'GET', '/v1/search?q=backpropogation')).topics).toMatchObject([{ slug: 'backpropagation' }]);
+    expect((await ok(admin, 'GET', '/v1/search?q=transformer&type=posts')).posts).toMatchObject([{ caption: 'My transformer notes' }]);
 
-    expect((await get(user, '/search?q=backpropogation')).topics).toMatchObject([{ name: 'Backpropagation' }]);
-    expect((await get(user, '/search?q=transformer&type=posts')).posts).toHaveLength(1);
+    const suggestions = (await ok(admin, 'GET', '/v1/search/suggest?q=ra')).items;
+    expect(suggestions).toContainEqual({ type: 'user', id: user.id, label: 'rahman_ml' });
+    expect((await call(ctx.app, admin, 'GET', '/v1/search/suggest?q=r')).status).toBe(400);
   });
 });

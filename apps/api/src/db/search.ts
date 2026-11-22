@@ -32,7 +32,10 @@ export function similarity(table: string, column: string, q: string) {
   return sql<number>`similarity(${col(table, column)}, ${q})`;
 }
 
+const escapeLike = (q: string) => q.replace(/[\\%_]/g, (char) => `\\${char}`);
+
 /** `%q%` for ILIKE, with q's own wildcards escaped. */
-export function containsPattern(q: string): string {
-  return `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
-}
+export const containsPattern = (q: string) => `%${escapeLike(q)}%`;
+
+/** `q%` for ILIKE: starts with q. */
+export const startsWithPattern = (q: string) => `${escapeLike(q)}%`;

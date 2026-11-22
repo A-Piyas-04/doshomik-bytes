@@ -1,78 +1,167 @@
 import { describe, expect, it } from 'vitest';
-import { createUser, useTestApp } from './helpers';
+import { db } from '../src/db';
+import { call, createUser, currentCode, googleAccounts, runWorker, sent, tokenFromLastEmail, useTestApp } from './helpers';
 
 const ctx = useTestApp();
+const device = { platform: 'android', app_version: '1.0.0' };
 
 const signup = (payload: Record<string, string>) =>
-  ctx.app.inject({ method: 'POST', url: '/auth/signup', payload });
+  ctx.app.inject({ method: 'POST', url: '/v1/auth/signup', payload: { password: 'password123', ...device, ...payload } });
+const login = (loginName: string, password = 'password123') =>
+  ctx.app.inject({ method: 'POST', url: '/v1/auth/login', payload: { login: loginName, password, ...device } });
+const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
-describe('sign up and log in', () => {
-  it('creates an account, lowercasing email and username, without exposing the password hash', async () => {
-    const response = await signup({ email: 'Ali@Example.com', username: 'Ali_01', password: 'password123' });
-
+describe('sign-up and sign-in', () => {
+  it('returns an access token, a refresh token and the account, with public ids only', async () => {
+    const response = await signup({ email: 'Ali@Example.com', username: 'Ali_01' });
     expect(response.statusCode).toBe(201);
-    const { token, user } = response.json();
-    expect(token).toEqual(expect.any(String));
-    expect(user).toMatchObject({ email: 'ali@example.com', username: 'ali_01', role: 'user' });
-    expect(user).not.toHaveProperty('password_hash');
+    const body = response.json();
+    expect(body).toMatchObject({ token_type: 'Bearer', expires_in: 900, user: { email: 'ali@example.com', username: 'ali_01', email_verified: false } });
+    expect(body.user.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(body.refresh_token).toMatch(new RegExp(`^[0-9a-f-]{36}\\.`));
+    expect(body.user).not.toHaveProperty('password_hash');
+
+    const me = await ctx.app.inject({ method: 'GET', url: '/v1/me', headers: bearer(body.access_token) });
+    expect(me.json().id).toBe(body.user.id);
   });
 
-  it('gives specific errors for a taken username, a used email and a short password', async () => {
-    await signup({ email: 'a@example.com', username: 'ali', password: 'password123' });
-
-    const taken = await signup({ email: 'b@example.com', username: 'ali', password: 'password123' });
-    expect(taken.statusCode).toBe(409);
-    expect(taken.json().error.code).toBe('USERNAME_TAKEN');
-
-    const used = await signup({ email: 'A@example.com', username: 'other', password: 'password123' });
-    expect(used.json().error.code).toBe('EMAIL_TAKEN');
-
-    const short = await signup({ email: 'c@example.com', username: 'third', password: 'short' });
-    expect(short.statusCode).toBe(400);
-    expect(short.json().error.code).toBe('VALIDATION_ERROR');
+  it('rejects case-only duplicates of an email or username', async () => {
+    await signup({ email: 'ali@example.com', username: 'ali' });
+    expect((await signup({ email: 'other@example.com', username: 'ALI' })).json().error.code).toBe('USERNAME_TAKEN');
+    expect((await signup({ email: 'ALI@example.com', username: 'other' })).json().error.code).toBe('EMAIL_TAKEN');
   });
 
-  it('logs in with email or username and rejects a wrong password', async () => {
-    await signup({ email: 'ali@example.com', username: 'ali', password: 'password123' });
-    const login = (body: object) => ctx.app.inject({ method: 'POST', url: '/auth/login', payload: body });
+  it('signs in by email or username, and slows down repeated failures for an account', async () => {
+    await signup({ email: 'bina@example.com', username: 'bina' });
+    expect((await login('bina')).statusCode).toBe(200);
+    expect((await login('BINA@example.com')).statusCode).toBe(200);
 
-    expect((await login({ login: 'ali', password: 'password123' })).statusCode).toBe(200);
-    expect((await login({ login: 'ALI@example.com', password: 'password123' })).statusCode).toBe(200);
-    expect((await login({ login: 'ali', password: 'wrong-password' })).statusCode).toBe(401);
+    for (let i = 0; i < 3; i++) expect((await login('bina', 'wrong-password')).statusCode).toBe(401);
+    const throttled = await login('bina');
+    expect(throttled.statusCode).toBe(429);
+    expect(throttled.json().error.code).toBe('TOO_MANY_ATTEMPTS');
   });
 
-  it('requires a valid token everywhere else', async () => {
-    expect((await ctx.app.inject({ method: 'GET', url: '/me' })).statusCode).toBe(401);
-    const bad = await ctx.app.inject({ method: 'GET', url: '/me', headers: { authorization: 'Bearer nope' } });
-    expect(bad.statusCode).toBe(401);
+  it('returns errors with a code and a request id, never a stack trace', async () => {
+    const response = await ctx.app.inject({ method: 'GET', url: '/v1/me' });
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error).toMatchObject({ code: 'UNAUTHORIZED', request_id: response.headers['x-request-id'] });
   });
 });
 
-describe('profile', () => {
-  it('edits display name and bio; an empty string clears a field', async () => {
-    const ali = await createUser(ctx.app, 'ali');
-    const patch = (payload: object) => ctx.app.inject({ method: 'PATCH', url: '/me', headers: ali.headers, payload });
+describe('sessions', () => {
+  it('rotates the refresh token, and revokes the session when an old one is reused', async () => {
+    const user = await createUser(ctx.app, 'ali');
+    const refresh = (token: string) => ctx.app.inject({ method: 'POST', url: '/v1/auth/refresh', payload: { refresh_token: token } });
 
-    expect((await patch({ display_name: 'Ali Khan', bio: 'ML student' })).json()).toMatchObject({
-      display_name: 'Ali Khan',
-      bio: 'ML student',
-    });
-    expect((await patch({ bio: '' })).json()).toMatchObject({ display_name: 'Ali Khan', bio: null });
+    const first = await refresh(user.refreshToken);
+    expect(first.statusCode).toBe(200);
+    const { access_token, refresh_token } = first.json();
+    expect(refresh_token).not.toBe(user.refreshToken);
+
+    // The old token comes back: someone copied it. The whole session ends.
+    const reused = await refresh(user.refreshToken);
+    expect(reused.json().error.code).toBe('REFRESH_TOKEN_REUSED');
+    expect((await refresh(refresh_token)).statusCode).toBe(401);
+    expect((await ctx.app.inject({ method: 'GET', url: '/v1/me', headers: bearer(access_token) })).statusCode).toBe(401);
   });
 
-  it('shows post and follow counts on the profile page', async () => {
-    const ali = await createUser(ctx.app, 'ali');
-    const bina = await createUser(ctx.app, 'bina');
-    await ctx.app.inject({ method: 'PUT', url: `/users/${ali.id}/follow`, headers: bina.headers });
-    await ctx.app.inject({ method: 'POST', url: '/posts', headers: ali.headers, payload: { type: 'text', caption: 'Hi' } });
+  it('lists devices and signs out one of them at once', async () => {
+    const phone = await createUser(ctx.app, 'ali');
+    const tablet = (await login('ali')).json();
 
-    const profile = await ctx.app.inject({ method: 'GET', url: `/users/${ali.id}`, headers: bina.headers });
-    expect(profile.json()).toMatchObject({
-      username: 'ali',
-      posts_count: 1,
-      followers_count: 1,
-      following_count: 0,
-      is_following: true,
-    });
+    const sessions = await call(ctx.app, phone, 'GET', '/v1/sessions');
+    expect(sessions.body.items).toHaveLength(2);
+    const other = sessions.body.items.find((s: { current: boolean }) => !s.current);
+
+    expect((await call(ctx.app, phone, 'DELETE', `/v1/sessions/${other.id}`)).status).toBe(204);
+    expect((await ctx.app.inject({ method: 'GET', url: '/v1/me', headers: bearer(tablet.access_token) })).statusCode).toBe(401);
+
+    expect((await call(ctx.app, phone, 'POST', '/v1/auth/logout')).status).toBe(204);
+    expect((await call(ctx.app, phone, 'GET', '/v1/me')).status).toBe(401);
+  });
+});
+
+describe('email verification and password reset', () => {
+  it('emails a one-time code that verifies the address', async () => {
+    const user = await createUser(ctx.app, 'ali');
+    await runWorker();
+    expect(sent.emails).toHaveLength(1);
+
+    const token = tokenFromLastEmail();
+    const stored = await db.selectFrom('auth_tokens').select('token_hash').executeTakeFirstOrThrow();
+    expect(stored.token_hash).not.toBe(token); // only the hash is kept
+
+    expect((await call(ctx.app, null, 'POST', '/v1/auth/verify-email', { token })).status).toBe(204);
+    expect((await call(ctx.app, user, 'GET', '/v1/me')).body.email_verified).toBe(true);
+    expect((await call(ctx.app, null, 'POST', '/v1/auth/verify-email', { token })).body.error.code).toBe('INVALID_TOKEN');
+  });
+
+  it('resets the password, signs out everywhere, and never reveals whether an email exists', async () => {
+    const user = await createUser(ctx.app, 'ali');
+    await runWorker();
+    sent.emails.length = 0;
+
+    const unknown = await call(ctx.app, null, 'POST', '/v1/auth/password-reset/request', { email: 'nobody@example.com' });
+    const known = await call(ctx.app, null, 'POST', '/v1/auth/password-reset/request', { email: 'ali@example.com' });
+    expect(unknown).toEqual(known);
+    await runWorker();
+    expect(sent.emails).toHaveLength(1);
+
+    const reset = await call(ctx.app, null, 'POST', '/v1/auth/password-reset/confirm', { token: tokenFromLastEmail(), password: 'new-password-1' });
+    expect(reset.status).toBe(204);
+    expect((await call(ctx.app, user, 'GET', '/v1/me')).status).toBe(401);
+    expect((await login('ali', 'new-password-1')).statusCode).toBe(200);
+  });
+});
+
+describe('Google sign-in', () => {
+  it('creates an account on first sign-in and signs into it afterwards', async () => {
+    googleAccounts.set('google-token', { subject: 'g-123', email: 'Rahman.ML@gmail.com', emailVerified: true });
+    const google = () => call(ctx.app, null, 'POST', '/v1/auth/google', { id_token: 'google-token', ...device });
+
+    const first = await google();
+    expect(first.status).toBe(200);
+    expect(first.body.user).toMatchObject({ email: 'rahman.ml@gmail.com', username: 'rahman.ml', email_verified: true });
+
+    const second = await google();
+    expect(second.body.user.id).toBe(first.body.user.id);
+    expect((await call(ctx.app, null, 'POST', '/v1/auth/google', { id_token: 'forged', ...device })).status).toBe(401);
+  });
+
+  it('links to an existing account with the same verified email', async () => {
+    const user = await createUser(ctx.app, 'ali');
+    googleAccounts.set('google-token', { subject: 'g-456', email: 'ali@example.com', emailVerified: true });
+    const result = await call(ctx.app, null, 'POST', '/v1/auth/google', { id_token: 'google-token', ...device });
+    expect(result.body.user.id).toBe(user.id);
+  });
+});
+
+describe('two-factor sign-in', () => {
+  it('asks for a code after the password once it is on', async () => {
+    const user = await createUser(ctx.app, 'ali');
+    const { body: setup } = await call(ctx.app, user, 'POST', '/v1/me/2fa/setup');
+    expect(setup.otpauth_url).toContain('otpauth://totp/');
+    expect((await call(ctx.app, user, 'POST', '/v1/me/2fa/enable', { code: '000000' })).body.error.code).toBe('WRONG_CODE');
+    expect((await call(ctx.app, user, 'POST', '/v1/me/2fa/enable', { code: currentCode(setup.secret) })).status).toBe(204);
+
+    const step1 = (await login('ali')).json();
+    expect(step1).toMatchObject({ mfa_required: true });
+    expect(step1).not.toHaveProperty('access_token');
+
+    const step2 = await call(ctx.app, null, 'POST', '/v1/auth/login/mfa', { mfa_token: step1.mfa_token, code: currentCode(setup.secret) });
+    expect(step2.status).toBe(200);
+    expect(step2.body.access_token).toEqual(expect.any(String));
+  });
+
+  it('is required before staff can use admin routes', async () => {
+    const admin = await createUser(ctx.app, 'boss', { role: 'admin' });
+    expect((await call(ctx.app, admin, 'GET', '/v1/admin/papers')).status).toBe(200);
+
+    await db.updateTable('users').set({ totp_enabled_at: null }).where('public_id', '=', admin.id).execute();
+    expect((await call(ctx.app, admin, 'GET', '/v1/admin/papers')).body.error.code).toBe('MFA_REQUIRED');
+
+    const regular = await createUser(ctx.app, 'ali');
+    expect((await call(ctx.app, regular, 'GET', '/v1/admin/papers')).status).toBe(403);
   });
 });

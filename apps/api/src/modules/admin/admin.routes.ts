@@ -1,26 +1,27 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
-import { requireAdmin } from '../../lib/auth';
-import { badRequest } from '../../lib/errors';
-import { readMultipart, storeUpload } from '../../lib/uploads';
+import { requireRole } from '../../lib/auth';
 import { adminLearnRoutes } from './learn.routes';
+import { moderationRoutes } from './moderation.routes';
 import { adminPracticeRoutes } from './practice.routes';
 import { adminResearchRoutes } from './research.routes';
+import { staffRoutes } from './staff.routes';
 
-/** The content CMS used by the admin dashboard. Every route requires users.role = 'admin'. */
+/**
+ * The admin panel API. Staff need two-factor sign-in. Moderators work the reports queue;
+ * admins also manage content (drafts → published), accounts and roles.
+ * Team media is uploaded through POST /v1/media/uploads with purpose "learn" or "paper_figure".
+ */
 export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
-  app.addHook('onRequest', requireAdmin);
-
-  // multipart/form-data with one image or video. Returns the URL to put in media_url,
-  // thumbnail_url or a paper figure.
-  app.post('/media', async (request, reply) => {
-    const { file } = await readMultipart(request, ['image', 'video']);
-    if (!file) throw badRequest('Send one image or video file');
-    const kind = file.kind;
-    const { url, durationSeconds } = await storeUpload(file, 'content');
-    return reply.status(201).send({ url, kind, duration_seconds: durationSeconds });
+  await app.register(async (moderators) => {
+    moderators.addHook('onRequest', requireRole('moderator'));
+    await moderators.register(moderationRoutes);
   });
 
-  await app.register(adminLearnRoutes);
-  await app.register(adminPracticeRoutes);
-  await app.register(adminResearchRoutes);
+  await app.register(async (admins) => {
+    admins.addHook('onRequest', requireRole('admin'));
+    await admins.register(adminLearnRoutes);
+    await admins.register(adminPracticeRoutes);
+    await admins.register(adminResearchRoutes);
+    await admins.register(staffRoutes);
+  });
 };

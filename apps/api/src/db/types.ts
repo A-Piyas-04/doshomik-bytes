@@ -23,14 +23,50 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AuditLog {
+  action: string;
+  actor_id: number | null;
+  changes: Json | null;
+  created_at: Generated<Timestamp>;
+  entity_id: number | null;
+  entity_type: string | null;
+  id: Generated<number>;
+  ip: string | null;
+}
+
+export interface AuthIdentities {
+  created_at: Generated<Timestamp>;
+  provider: string;
+  provider_subject: string;
+  user_id: number;
+}
+
+export interface AuthTokens {
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<number>;
+  purpose: string;
+  token_hash: string;
+  used_at: Timestamp | null;
+  user_id: number;
+}
+
+export interface Blocks {
+  blocked_id: number;
+  blocker_id: number;
+  created_at: Generated<Timestamp>;
+}
+
 export interface Comments {
   body: string;
   created_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
   id: Generated<number>;
   paper_id: number | null;
   parent_id: number | null;
   post_id: number | null;
-  user_id: number;
+  public_id: Generated<string>;
+  user_id: number | null;
 }
 
 export interface CourseItems {
@@ -39,36 +75,81 @@ export interface CourseItems {
   position: number;
 }
 
+export interface CourseProgress {
+  completed_at: Timestamp | null;
+  course_id: number;
+  last_position: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  user_id: number;
+}
+
 export interface Courses {
   created_at: Generated<Timestamp>;
+  created_by: number | null;
   description: string | null;
   external_url: string | null;
   id: Generated<number>;
+  public_id: Generated<string>;
+  published_at: Timestamp | null;
+  status: Generated<string>;
   thumbnail_url: string | null;
   title: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: number | null;
 }
 
 export interface Fields {
   description: string | null;
   id: Generated<number>;
   name: string;
+  slug: string;
 }
 
 export interface Follows {
   created_at: Generated<Timestamp>;
   follower_id: number;
   following_id: number;
+  status: Generated<string>;
 }
 
 export interface LearnItems {
   body: string | null;
   created_at: Generated<Timestamp>;
+  created_by: number | null;
   duration_seconds: number | null;
   id: Generated<number>;
   kind: string;
+  media_id: number | null;
   media_url: string | null;
+  public_id: Generated<string>;
+  published_at: Timestamp | null;
+  status: Generated<string>;
   title: string;
   topic_id: number | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: number | null;
+}
+
+export interface MediaAssets {
+  created_at: Generated<Timestamp>;
+  duration_ms: number | null;
+  error: string | null;
+  height: number | null;
+  id: Generated<number>;
+  kind: string;
+  mime_type: string | null;
+  owner_id: number | null;
+  playback_key: string | null;
+  provider: Generated<string>;
+  provider_asset_id: string | null;
+  public_id: Generated<string>;
+  purpose: string;
+  raw_key: string | null;
+  size_bytes: number | null;
+  status: Generated<string>;
+  thumbnail_key: string | null;
+  updated_at: Generated<Timestamp>;
+  width: number | null;
 }
 
 export interface Notifications {
@@ -78,8 +159,20 @@ export interface Notifications {
   id: Generated<number>;
   is_read: Generated<boolean>;
   post_id: number | null;
+  public_id: Generated<string>;
   type: string;
   user_id: number;
+}
+
+export interface OutboxEvents {
+  attempts: Generated<number>;
+  created_at: Generated<Timestamp>;
+  entity_id: number;
+  entity_type: string;
+  event_type: string;
+  id: Generated<number>;
+  payload: Generated<Json>;
+  processed_at: Timestamp | null;
 }
 
 export interface PaperPrerequisites {
@@ -91,6 +184,7 @@ export interface PaperPrerequisites {
 export interface Papers {
   authors: string | null;
   created_at: Generated<Timestamp>;
+  created_by: number | null;
   data_source: string | null;
   evaluation: string | null;
   field_id: number;
@@ -100,9 +194,14 @@ export interface Papers {
   main_idea: string | null;
   method_steps: Generated<string[]>;
   paper_url: string;
+  public_id: Generated<string>;
+  published_at: Timestamp | null;
   research_questions: Generated<string[]>;
   results: string | null;
+  status: Generated<string>;
   title: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: number | null;
   year: number | null;
 }
 
@@ -114,22 +213,72 @@ export interface PostLikes {
 
 export interface Posts {
   caption: string | null;
+  comment_count: Generated<number>;
   created_at: Generated<Timestamp>;
-  duration_seconds: number | null;
+  deleted_at: Timestamp | null;
   id: Generated<number>;
-  media_url: string | null;
+  like_count: Generated<number>;
+  media_id: number | null;
+  public_id: Generated<string>;
+  status: Generated<string>;
   type: string;
+  updated_at: Generated<Timestamp>;
+  user_id: number;
+}
+
+export interface QuestionAttempts {
+  answer: string | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<number>;
+  is_correct: boolean;
+  question_id: number;
   user_id: number;
 }
 
 export interface Questions {
   answer: string;
+  created_by: number | null;
   explanation: string | null;
   id: Generated<number>;
   kind: string;
   options: string[] | null;
   prompt: string;
+  public_id: Generated<string>;
+  published_at: Timestamp | null;
+  status: Generated<string>;
   topic_id: number;
+  updated_at: Generated<Timestamp>;
+  updated_by: number | null;
+}
+
+export interface QuizQuestions {
+  position: number;
+  question_id: number;
+  quiz_id: number;
+}
+
+export interface Quizzes {
+  created_at: Generated<Timestamp>;
+  created_by: number | null;
+  id: Generated<number>;
+  public_id: Generated<string>;
+  status: Generated<string>;
+  title: string;
+  topic_id: number | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface Reports {
+  created_at: Generated<Timestamp>;
+  details: string | null;
+  id: Generated<number>;
+  reason: string;
+  reporter_id: number | null;
+  reviewed_at: Timestamp | null;
+  reviewed_by: number | null;
+  status: Generated<string>;
+  target_id: number;
+  target_type: string;
 }
 
 export interface RoadmapSteps {
@@ -139,10 +288,36 @@ export interface RoadmapSteps {
   position: number;
 }
 
+export interface SavedPosts {
+  created_at: Generated<Timestamp>;
+  post_id: number;
+  user_id: number;
+}
+
+export interface Sessions {
+  app_version: string | null;
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<number>;
+  last_used_at: Generated<Timestamp>;
+  platform: string;
+  public_id: Generated<string>;
+  push_token: string | null;
+  refresh_token_hash: string;
+  revoked_at: Timestamp | null;
+  user_id: number;
+}
+
 export interface Topics {
   id: Generated<number>;
   name: string;
+  slug: string;
   summary: string | null;
+}
+
+export interface UserFields {
+  field_id: number;
+  user_id: number;
 }
 
 export interface UserPapers {
@@ -156,29 +331,51 @@ export interface Users {
   avatar_url: string | null;
   bio: string | null;
   created_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
   display_name: string | null;
   email: string;
+  email_verified_at: Timestamp | null;
   id: Generated<number>;
-  password_hash: string;
+  is_private: Generated<boolean>;
+  password_hash: string | null;
+  public_id: Generated<string>;
   role: Generated<string>;
+  status: Generated<string>;
+  totp_enabled_at: Timestamp | null;
+  totp_secret: string | null;
+  updated_at: Generated<Timestamp>;
   username: string;
 }
 
 export interface DB {
+  audit_log: AuditLog;
+  auth_identities: AuthIdentities;
+  auth_tokens: AuthTokens;
+  blocks: Blocks;
   comments: Comments;
   course_items: CourseItems;
+  course_progress: CourseProgress;
   courses: Courses;
   fields: Fields;
   follows: Follows;
   learn_items: LearnItems;
+  media_assets: MediaAssets;
   notifications: Notifications;
+  outbox_events: OutboxEvents;
   paper_prerequisites: PaperPrerequisites;
   papers: Papers;
   post_likes: PostLikes;
   posts: Posts;
+  question_attempts: QuestionAttempts;
   questions: Questions;
+  quiz_questions: QuizQuestions;
+  quizzes: Quizzes;
+  reports: Reports;
   roadmap_steps: RoadmapSteps;
+  saved_posts: SavedPosts;
+  sessions: Sessions;
   topics: Topics;
+  user_fields: UserFields;
   user_papers: UserPapers;
   users: Users;
 }

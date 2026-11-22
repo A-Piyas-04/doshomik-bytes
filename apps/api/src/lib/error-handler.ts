@@ -1,57 +1,58 @@
-import type { FastifyError, FastifyInstance } from 'fastify';
+import type { FastifyError, FastifyInstance, FastifyReply } from 'fastify';
 import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { isPgError, PgError } from '../db/errors';
 import { HttpError } from './errors';
 
-// Every error response has the shape { error: { code, message, details? } }.
-const errorBody = (code: string, message: string, details?: unknown) => ({ error: { code, message, details } });
+// Every error response is { error: { code, message, request_id, details? } }. Never a stack trace;
+// the request id lets support find the full error in the logs.
 
 export function registerErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((error: FastifyError, request, reply) => {
-    if (error instanceof HttpError) {
-      return reply.status(error.statusCode).send(errorBody(error.code, error.message));
-    }
+    const send = (status: number, code: string, message: string, details?: unknown) =>
+      sendError(reply, status, code, message, details);
+
+    if (error instanceof HttpError) return send(error.statusCode, error.code, error.message);
 
     if (hasZodFastifySchemaValidationErrors(error)) {
       const details = error.validation.map((issue) => ({ path: issue.instancePath, message: issue.message }));
-      return reply.status(400).send(errorBody('VALIDATION_ERROR', 'Invalid request', details));
+      return send(400, 'VALIDATION_ERROR', 'Invalid request', details);
     }
-
     if (error instanceof z.ZodError) {
       const details = error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message }));
-      return reply.status(400).send(errorBody('VALIDATION_ERROR', 'Invalid request', details));
+      return send(400, 'VALIDATION_ERROR', 'Invalid request', details);
     }
 
     // The schema's constraints are the last line of defence; report their failures as client errors.
-    if (isPgError(error, PgError.uniqueViolation)) {
-      return reply.status(409).send(errorBody('ALREADY_EXISTS', 'This already exists'));
-    }
+    if (isPgError(error, PgError.uniqueViolation)) return send(409, 'ALREADY_EXISTS', 'This already exists');
     if (isPgError(error, PgError.foreignKeyViolation)) {
       return error.detail?.includes('is still referenced')
-        ? reply.status(409).send(errorBody('IN_USE', 'Other records still use this'))
-        : reply.status(400).send(errorBody('INVALID_REFERENCE', 'A referenced record does not exist'));
+        ? send(409, 'IN_USE', 'Other records still use this')
+        : send(400, 'INVALID_REFERENCE', 'A referenced record does not exist');
     }
-    if (
-      [
-        PgError.checkViolation,
-        PgError.notNullViolation,
-        PgError.invalidTextRepresentation,
-        PgError.invalidDatetimeFormat,
-        PgError.datetimeFieldOverflow,
-      ].some((code) => isPgError(error, code))
-    ) {
-      return reply.status(400).send(errorBody('INVALID_DATA', 'The data breaks a validation rule'));
+    const invalidData = [
+      PgError.checkViolation,
+      PgError.notNullViolation,
+      PgError.invalidTextRepresentation,
+      PgError.invalidDatetimeFormat,
+      PgError.datetimeFieldOverflow,
+    ];
+    if (invalidData.some((code) => isPgError(error, code))) {
+      return send(400, 'INVALID_DATA', 'The data breaks a validation rule');
     }
 
     // Fastify and plugin errors (bad JSON, payload too large, rate limit) carry their own status.
     if (error.statusCode && error.statusCode < 500) {
-      return reply.status(error.statusCode).send(errorBody(error.code ?? 'REQUEST_ERROR', error.message));
+      return send(error.statusCode, error.code ?? 'REQUEST_ERROR', error.message);
     }
 
     request.log.error(error);
-    return reply.status(500).send(errorBody('INTERNAL_ERROR', 'Something went wrong'));
+    return send(500, 'INTERNAL_ERROR', 'Something went wrong');
   });
 
-  app.setNotFoundHandler((_request, reply) => reply.status(404).send(errorBody('NOT_FOUND', 'Route not found')));
+  app.setNotFoundHandler((_request, reply) => sendError(reply, 404, 'NOT_FOUND', 'Route not found'));
+}
+
+function sendError(reply: FastifyReply, status: number, code: string, message: string, details?: unknown) {
+  return reply.status(status).send({ error: { code, message, request_id: reply.request.id, details } });
 }

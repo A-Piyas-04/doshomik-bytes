@@ -1,136 +1,158 @@
 import { describe, expect, it } from 'vitest';
-import { createUser, useTestApp, type TestUser } from './helpers';
+import { call, createUser, runWorker, sent, useTestApp, type TestUser } from './helpers';
 
 const ctx = useTestApp();
 
-const textPost = async (user: TestUser, caption: string) =>
-  (await ctx.app.inject({ method: 'POST', url: '/posts', headers: user.headers, payload: { type: 'text', caption } })).json();
+const textPost = async (user: TestUser, caption: string) => (await call(ctx.app, user, 'POST', '/v1/posts', { type: 'text', caption })).body;
+const notificationTypes = async (user: TestUser) =>
+  (await call(ctx.app, user, 'GET', '/v1/notifications')).body.items.map((n: { type: string }) => n.type);
 
-const notificationsOf = async (user: TestUser) =>
-  (await ctx.app.inject({ method: 'GET', url: '/notifications', headers: user.headers })).json().items;
-
-describe('follow', () => {
-  it('notifies once, and rejects following yourself', async () => {
+describe('following', () => {
+  it('follows a public account at once and shows its posts on Home', async () => {
     const ali = await createUser(ctx.app, 'ali');
     const bina = await createUser(ctx.app, 'bina');
-
-    for (let i = 0; i < 2; i++) {
-      const response = await ctx.app.inject({ method: 'PUT', url: `/users/${ali.id}/follow`, headers: bina.headers });
-      expect(response.statusCode).toBe(204);
-    }
-    const notifications = await notificationsOf(ali);
-    expect(notifications).toHaveLength(1);
-    expect(notifications[0]).toMatchObject({ type: 'follow', actor: { username: 'bina' }, is_read: false });
-
-    const self = await ctx.app.inject({ method: 'PUT', url: `/users/${ali.id}/follow`, headers: ali.headers });
-    expect(self.json().error.code).toBe('SELF_FOLLOW');
-  });
-
-  it('suggests people the user does not follow yet', async () => {
-    const ali = await createUser(ctx.app, 'ali');
-    const bina = await createUser(ctx.app, 'bina');
-    await createUser(ctx.app, 'chandra');
-    await ctx.app.inject({ method: 'PUT', url: `/users/${bina.id}/follow`, headers: ali.headers });
-
-    const response = await ctx.app.inject({ method: 'GET', url: '/users/suggestions', headers: ali.headers });
-    expect(response.json().items.map((u: { username: string }) => u.username)).toEqual(['chandra']);
-  });
-});
-
-describe('posts and Home feed', () => {
-  it('shows only followed people, newest first, with cursor pagination', async () => {
-    const ali = await createUser(ctx.app, 'ali');
-    const bina = await createUser(ctx.app, 'bina');
-    const stranger = await createUser(ctx.app, 'stranger');
-    await ctx.app.inject({ method: 'PUT', url: `/users/${bina.id}/follow`, headers: ali.headers });
+    expect((await call(ctx.app, ali, 'PUT', `/v1/users/${bina.id}/follow`)).body).toEqual({ status: 'accepted' });
 
     for (const caption of ['one', 'two', 'three']) await textPost(bina, caption);
-    await textPost(stranger, 'not followed');
-
-    const page1 = (await ctx.app.inject({ method: 'GET', url: '/feed?limit=2', headers: ali.headers })).json();
+    const page1 = (await call(ctx.app, ali, 'GET', '/v1/feed?limit=2')).body;
     expect(page1.items.map((p: { caption: string }) => p.caption)).toEqual(['three', 'two']);
-    expect(page1.next_cursor).toEqual(expect.any(String));
-
-    const page2 = (
-      await ctx.app.inject({ method: 'GET', url: `/feed?limit=2&cursor=${page1.next_cursor}`, headers: ali.headers })
-    ).json();
+    const page2 = (await call(ctx.app, ali, 'GET', `/v1/feed?limit=2&cursor=${page1.next_cursor}`)).body;
     expect(page2.items.map((p: { caption: string }) => p.caption)).toEqual(['one']);
-    expect(page2.next_cursor).toBeNull();
+
+    await runWorker();
+    expect(await notificationTypes(bina)).toEqual(['follow']);
   });
 
-  it('requires a caption on text posts, and only the author can delete a post', async () => {
+  it('sends a follow request to a private account, which hides posts until accepted', async () => {
     const ali = await createUser(ctx.app, 'ali');
     const bina = await createUser(ctx.app, 'bina');
+    await call(ctx.app, bina, 'PATCH', '/v1/me', { is_private: true });
+    const post = await textPost(bina, 'for followers only');
 
-    const empty = await ctx.app.inject({ method: 'POST', url: '/posts', headers: ali.headers, payload: { type: 'text' } });
-    expect(empty.statusCode).toBe(400);
+    expect((await call(ctx.app, ali, 'PUT', `/v1/users/${bina.id}/follow`)).body).toEqual({ status: 'pending' });
+    expect((await call(ctx.app, ali, 'GET', `/v1/users/${bina.id}`)).body).toMatchObject({ is_private: true, follow_status: 'pending' });
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).status).toBe(404);
+    expect((await call(ctx.app, ali, 'GET', `/v1/users/${bina.id}/posts`)).body.items).toHaveLength(0);
+    expect((await call(ctx.app, ali, 'GET', `/v1/users/${bina.id}/papers`)).body).toEqual({ saved: [], reading: [], completed: [] });
 
-    const post = await textPost(ali, 'mine');
-    expect((await ctx.app.inject({ method: 'DELETE', url: `/posts/${post.id}`, headers: bina.headers })).statusCode).toBe(403);
-    expect((await ctx.app.inject({ method: 'DELETE', url: `/posts/${post.id}`, headers: ali.headers })).statusCode).toBe(204);
-    expect((await ctx.app.inject({ method: 'GET', url: `/posts/${post.id}`, headers: ali.headers })).statusCode).toBe(404);
+    await runWorker();
+    expect(await notificationTypes(bina)).toEqual(['follow_request']);
+    const requests = (await call(ctx.app, bina, 'GET', '/v1/me/follow-requests')).body.items;
+    expect(requests).toMatchObject([{ id: ali.id, username: 'ali' }]);
+
+    expect((await call(ctx.app, bina, 'POST', `/v1/me/follow-requests/${ali.id}/accept`)).status).toBe(204);
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).status).toBe(200);
+    expect((await call(ctx.app, ali, 'GET', '/v1/feed')).body.items).toHaveLength(1);
   });
 });
 
-describe('likes, comments and notifications', () => {
-  it('counts likes and notifies the author, but not for liking your own post', async () => {
-    const ali = await createUser(ctx.app, 'ali');
-    const bina = await createUser(ctx.app, 'bina');
-    const post = await textPost(ali, 'Gradient descent in one picture');
-
-    await ctx.app.inject({ method: 'PUT', url: `/posts/${post.id}/like`, headers: bina.headers });
-    await ctx.app.inject({ method: 'PUT', url: `/posts/${post.id}/like`, headers: ali.headers });
-
-    const seenByBina = (await ctx.app.inject({ method: 'GET', url: `/posts/${post.id}`, headers: bina.headers })).json();
-    expect(seenByBina).toMatchObject({ like_count: 2, liked_by_me: true });
-    expect(await notificationsOf(ali)).toMatchObject([{ type: 'like', post_id: post.id, actor: { username: 'bina' } }]);
-
-    await ctx.app.inject({ method: 'DELETE', url: `/posts/${post.id}/like`, headers: bina.headers });
-    const after = (await ctx.app.inject({ method: 'GET', url: `/posts/${post.id}`, headers: bina.headers })).json();
-    expect(after).toMatchObject({ like_count: 1, liked_by_me: false });
-  });
-
-  it('threads replies and notifies the post author and the person replied to', async () => {
+describe('likes and comments', () => {
+  it('updates stored counters and notifies through the worker', async () => {
     const ali = await createUser(ctx.app, 'ali');
     const bina = await createUser(ctx.app, 'bina');
     const chandra = await createUser(ctx.app, 'chandra');
-    const post = await textPost(ali, 'What is attention?');
-    const comment = (user: TestUser, body: string, parent_id?: number) =>
-      ctx.app.inject({ method: 'POST', url: `/posts/${post.id}/comments`, headers: user.headers, payload: { body, parent_id } });
+    await call(ctx.app, bina, 'PUT', '/v1/sessions/current/push-token', { push_token: 'fcm-token-bina' });
+    const post = await textPost(bina, 'What is attention?');
 
-    const top = (await comment(bina, 'Great question')).json();
-    const reply = await comment(chandra, 'Agreed', top.id);
-    expect(reply.statusCode).toBe(201);
+    await call(ctx.app, ali, 'PUT', `/v1/posts/${post.id}/like`);
+    const top = (await call(ctx.app, ali, 'POST', `/v1/posts/${post.id}/comments`, { body: 'Great question' })).body;
+    await call(ctx.app, chandra, 'POST', `/v1/posts/${post.id}/comments`, { body: 'Agreed', parent_id: top.id });
 
-    expect((await notificationsOf(bina)).map((n: { type: string }) => n.type)).toEqual(['reply']);
-    expect((await notificationsOf(ali)).map((n: { type: string }) => n.type)).toEqual(['comment', 'comment']);
+    // Counters are the worker's job: right after the request they haven't moved yet.
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).body).toMatchObject({ like_count: 0, liked_by_me: true });
+    await runWorker();
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).body).toMatchObject({ like_count: 1, comment_count: 2 });
 
-    const list = (await ctx.app.inject({ method: 'GET', url: `/posts/${post.id}/comments`, headers: ali.headers })).json();
-    expect(list.items).toMatchObject([{ id: top.id, reply_count: 1 }]);
-    const replies = (await ctx.app.inject({ method: 'GET', url: `/comments/${top.id}/replies`, headers: ali.headers })).json();
-    expect(replies.items).toMatchObject([{ body: 'Agreed', parent_id: top.id }]);
-
-    const otherPost = await textPost(ali, 'Another post');
-    const crossThread = await ctx.app.inject({
-      method: 'POST',
-      url: `/posts/${otherPost.id}/comments`,
-      headers: bina.headers,
-      payload: { body: 'wrong thread', parent_id: top.id },
-    });
-    expect(crossThread.json().error.code).toBe('INVALID_PARENT');
+    expect(await notificationTypes(bina)).toEqual(['comment', 'comment', 'like']);
+    expect(await notificationTypes(ali)).toEqual(['reply']);
+    expect(sent.pushes.filter((p) => p.tokens.includes('fcm-token-bina'))).toHaveLength(3);
   });
 
-  it('counts unread notifications and marks one read', async () => {
+  it('keeps a deleted comment as a placeholder so its replies survive', async () => {
     const ali = await createUser(ctx.app, 'ali');
     const bina = await createUser(ctx.app, 'bina');
-    await ctx.app.inject({ method: 'PUT', url: `/users/${ali.id}/follow`, headers: bina.headers });
+    const post = await textPost(ali, 'Thread');
+    const top = (await call(ctx.app, bina, 'POST', `/v1/posts/${post.id}/comments`, { body: 'First' })).body;
+    await call(ctx.app, ali, 'POST', `/v1/posts/${post.id}/comments`, { body: 'Reply', parent_id: top.id });
 
-    const unread = () => ctx.app.inject({ method: 'GET', url: '/notifications/unread-count', headers: ali.headers });
-    expect((await unread()).json()).toEqual({ count: 1 });
+    expect((await call(ctx.app, ali, 'DELETE', `/v1/comments/${top.id}`)).status).toBe(403);
+    expect((await call(ctx.app, bina, 'DELETE', `/v1/comments/${top.id}`)).status).toBe(204);
 
-    const [notification] = await notificationsOf(ali);
-    expect((await ctx.app.inject({ method: 'POST', url: `/notifications/${notification.id}/read`, headers: bina.headers })).statusCode).toBe(404);
-    await ctx.app.inject({ method: 'POST', url: `/notifications/${notification.id}/read`, headers: ali.headers });
-    expect((await unread()).json()).toEqual({ count: 0 });
+    const list = (await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}/comments`)).body.items;
+    expect(list).toMatchObject([{ id: top.id, is_deleted: true, body: null, author: null, reply_count: 1 }]);
+    await runWorker();
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).body.comment_count).toBe(1);
+  });
+
+  it('saves posts and soft-deletes them', async () => {
+    const ali = await createUser(ctx.app, 'ali');
+    const bina = await createUser(ctx.app, 'bina');
+    const post = await textPost(bina, 'Keep this');
+
+    await call(ctx.app, ali, 'PUT', `/v1/posts/${post.id}/save`);
+    expect((await call(ctx.app, ali, 'GET', '/v1/me/saved')).body.items).toMatchObject([{ id: post.id, saved_by_me: true }]);
+
+    expect((await call(ctx.app, ali, 'DELETE', `/v1/posts/${post.id}`)).status).toBe(403);
+    expect((await call(ctx.app, bina, 'DELETE', `/v1/posts/${post.id}`)).status).toBe(204);
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).status).toBe(404);
+    expect((await call(ctx.app, ali, 'GET', '/v1/me/saved')).body.items).toHaveLength(0);
+  });
+});
+
+describe('blocking', () => {
+  it('hides each user from the other everywhere and ends follows', async () => {
+    const ali = await createUser(ctx.app, 'ali');
+    const bina = await createUser(ctx.app, 'bina');
+    await call(ctx.app, ali, 'PUT', `/v1/users/${bina.id}/follow`);
+    const post = await textPost(bina, 'transformer notes');
+
+    expect((await call(ctx.app, bina, 'PUT', `/v1/users/${ali.id}/block`)).status).toBe(204);
+
+    expect((await call(ctx.app, ali, 'GET', `/v1/users/${bina.id}`)).status).toBe(404);
+    expect((await call(ctx.app, bina, 'GET', `/v1/users/${ali.id}`)).status).toBe(404);
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).status).toBe(404);
+    expect((await call(ctx.app, ali, 'GET', '/v1/feed')).body.items).toHaveLength(0);
+    expect((await call(ctx.app, ali, 'GET', '/v1/search?q=bina')).body.users).toHaveLength(0);
+    expect((await call(ctx.app, ali, 'GET', '/v1/search?q=transformer')).body.posts).toHaveLength(0);
+    expect((await call(ctx.app, ali, 'PUT', `/v1/users/${bina.id}/follow`)).status).toBe(404);
+
+    expect((await call(ctx.app, bina, 'GET', '/v1/me/blocks')).body.items).toMatchObject([{ user: { id: ali.id } }]);
+    await call(ctx.app, bina, 'DELETE', `/v1/users/${ali.id}/block`);
+    expect((await call(ctx.app, ali, 'GET', `/v1/users/${bina.id}`)).status).toBe(200);
+  });
+});
+
+describe('reports and moderation', () => {
+  it('queues a report once, and a moderator removes the content', async () => {
+    const ali = await createUser(ctx.app, 'ali');
+    const spammer = await createUser(ctx.app, 'spammer');
+    const moderator = await createUser(ctx.app, 'mod', { role: 'moderator' });
+    const post = await textPost(spammer, 'buy followers now');
+
+    const report = { target_type: 'post', target_id: post.id, reason: 'spam' };
+    expect((await call(ctx.app, ali, 'POST', '/v1/reports', report)).status).toBe(201);
+    expect((await call(ctx.app, ali, 'POST', '/v1/reports', report)).status).toBe(200); // already open
+
+    const queue = (await call(ctx.app, moderator, 'GET', '/v1/admin/reports')).body.items;
+    expect(queue).toMatchObject([{ reason: 'spam', reporter: 'ali', target: { id: post.id, caption: 'buy followers now' } }]);
+    // Moderators can't reach content admin routes.
+    expect((await call(ctx.app, moderator, 'GET', '/v1/admin/papers')).status).toBe(403);
+
+    expect((await call(ctx.app, moderator, 'POST', `/v1/admin/reports/${queue[0].id}/resolve`, { action: 'remove_content' })).status).toBe(204);
+    expect((await call(ctx.app, ali, 'GET', `/v1/posts/${post.id}`)).status).toBe(404);
+    expect((await call(ctx.app, moderator, 'GET', '/v1/admin/reports')).body.items).toHaveLength(0);
+  });
+
+  it('suspends an account, which signs it out at once', async () => {
+    const ali = await createUser(ctx.app, 'ali');
+    const troll = await createUser(ctx.app, 'troll');
+    const moderator = await createUser(ctx.app, 'mod', { role: 'moderator' });
+    await call(ctx.app, ali, 'POST', '/v1/reports', { target_type: 'user', target_id: troll.id, reason: 'harassment' });
+
+    const [report] = (await call(ctx.app, moderator, 'GET', '/v1/admin/reports')).body.items;
+    await call(ctx.app, moderator, 'POST', `/v1/admin/reports/${report.id}/resolve`, { action: 'suspend_user' });
+
+    expect((await call(ctx.app, troll, 'GET', '/v1/me')).status).toBe(401);
+    expect((await call(ctx.app, ali, 'GET', `/v1/users/${troll.id}`)).status).toBe(404);
   });
 });

@@ -2,61 +2,58 @@ import { POST_TYPES } from '@doshomik/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { pageQuery } from '../../lib/pagination';
-import { discardUpload, readMultipart } from '../../lib/uploads';
-import { idParams, optionalText } from '../../lib/validation';
+import { perUser } from '../../lib/rate-limits';
+import { idParams, optionalText, publicId } from '../../lib/validation';
 import * as posts from './posts.service';
 
-const CreatePostFields = z.object({
+const CreatePostBody = z.object({
   type: z.enum(POST_TYPES),
   caption: optionalText(2200),
+  media_id: publicId.optional(), // from POST /v1/media/uploads, after /complete
 });
 
 export const postRoutes: FastifyPluginAsyncZod = async (app) => {
-  app.get('/feed', { schema: { querystring: pageQuery } }, async (request) =>
-    posts.listFeed(request.user.id, request.query),
-  );
+  app.get('/feed', { schema: { querystring: pageQuery } }, async (request) => posts.listFeed(request.auth.userId, request.query));
 
-  app.get('/reels', { schema: { querystring: pageQuery } }, async (request) =>
-    posts.listReels(request.user.id, request.query),
-  );
+  app.get('/reels', { schema: { querystring: pageQuery } }, async (request) => posts.listReels(request.auth.userId, request.query));
 
   app.get('/users/:id/posts', { schema: { params: idParams, querystring: pageQuery } }, async (request) =>
-    posts.listUserPosts(request.user.id, request.params.id, request.query),
+    posts.listUserPosts(request.auth.userId, request.params.id, request.query),
   );
 
-  // Image and reel posts: multipart/form-data with `type`, optional `caption` and one file.
-  // Text posts may also send a JSON body: { type: "text", caption }.
-  app.post('/posts', async (request, reply) => {
-    const { fields, file } = request.isMultipart()
-      ? await readMultipart(request, ['image', 'video'])
-      : { fields: request.body, file: undefined };
+  app.get('/me/saved', { schema: { querystring: pageQuery } }, async (request) =>
+    posts.listSavedPosts(request.auth.userId, request.query),
+  );
 
-    const parsed = CreatePostFields.safeParse(fields);
-    if (!parsed.success) {
-      await discardUpload(file);
-      throw parsed.error;
-    }
-
-    const post = await posts.createPost(request.user.id, { ...parsed.data, caption: parsed.data.caption ?? null, file });
+  app.post('/posts', { config: perUser(20), schema: { body: CreatePostBody } }, async (request, reply) => {
+    const post = await posts.createPost(request.auth.userId, { ...request.body, caption: request.body.caption ?? null });
     return reply.status(201).send(post);
   });
 
-  app.get('/posts/:id', { schema: { params: idParams } }, async (request) =>
-    posts.getPost(request.user.id, request.params.id),
-  );
+  app.get('/posts/:id', { schema: { params: idParams } }, async (request) => posts.getPost(request.auth.userId, request.params.id));
 
   app.delete('/posts/:id', { schema: { params: idParams } }, async (request, reply) => {
-    await posts.deletePost(request.user.id, request.params.id);
+    await posts.deletePost(request.auth.userId, request.params.id);
     return reply.status(204).send();
   });
 
-  app.put('/posts/:id/like', { schema: { params: idParams } }, async (request, reply) => {
-    await posts.likePost(request.user.id, request.params.id);
+  app.put('/posts/:id/like', { config: perUser(120), schema: { params: idParams } }, async (request, reply) => {
+    await posts.likePost(request.auth.userId, request.params.id);
     return reply.status(204).send();
   });
 
   app.delete('/posts/:id/like', { schema: { params: idParams } }, async (request, reply) => {
-    await posts.unlikePost(request.user.id, request.params.id);
+    await posts.unlikePost(request.auth.userId, request.params.id);
+    return reply.status(204).send();
+  });
+
+  app.put('/posts/:id/save', { schema: { params: idParams } }, async (request, reply) => {
+    await posts.savePost(request.auth.userId, request.params.id);
+    return reply.status(204).send();
+  });
+
+  app.delete('/posts/:id/save', { schema: { params: idParams } }, async (request, reply) => {
+    await posts.unsavePost(request.auth.userId, request.params.id);
     return reply.status(204).send();
   });
 };

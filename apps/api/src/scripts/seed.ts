@@ -3,6 +3,7 @@
 
 import argon2 from 'argon2';
 import { db, type Db } from '../db';
+import { slugify } from '../lib/validation';
 import * as data from './seed-data';
 
 function requireEnv(name: string): string {
@@ -11,7 +12,8 @@ function requireEnv(name: string): string {
   return value;
 }
 
-async function seedAdmin() {
+/** Creates the admin, or confirms the role of an existing account with that email. Returns its id. */
+async function seedAdmin(): Promise<number> {
   const email = requireEnv('SEED_ADMIN_EMAIL').toLowerCase();
   const username = requireEnv('SEED_ADMIN_USERNAME').toLowerCase();
   const password = requireEnv('SEED_ADMIN_PASSWORD');
@@ -20,13 +22,15 @@ async function seedAdmin() {
   if (existing) {
     await db.updateTable('users').set({ role: 'admin' }).where('id', '=', existing.id).execute();
     console.log(`Admin ${email} already exists; role confirmed.`);
-    return;
+    return existing.id;
   }
-  await db
+  const { id } = await db
     .insertInto('users')
-    .values({ email, username, password_hash: await argon2.hash(password), role: 'admin' })
-    .execute();
-  console.log(`Created admin ${email}.`);
+    .values({ email, username, password_hash: await argon2.hash(password), role: 'admin', email_verified_at: new Date() })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  console.log(`Created admin ${email}. Turn on two-factor sign-in (POST /v1/me/2fa/setup) to use the admin API.`);
+  return id;
 }
 
 /** Maps each inserted row's name or title to its id, failing loudly on a name the seed data doesn't define. */
@@ -39,14 +43,18 @@ function idLookup<K extends 'name' | 'title'>(rows: ({ id: number } & Record<K, 
   };
 }
 
-async function seedContent(trx: Db) {
-  const fieldId = idLookup(await trx.insertInto('fields').values(data.fields).returning(['id', 'name']).execute(), 'name');
-  const topicId = idLookup(await trx.insertInto('topics').values(data.topics).returning(['id', 'name']).execute(), 'name');
+async function seedContent(trx: Db, adminId: number) {
+  // Starter content goes live at once, credited to the seeded admin.
+  const live = { status: 'published', published_at: new Date(), created_by: adminId, updated_by: adminId };
+  const withSlug = <T extends { name: string }>(row: T) => ({ ...row, slug: slugify(row.name) });
+
+  const fieldId = idLookup(await trx.insertInto('fields').values(data.fields.map(withSlug)).returning(['id', 'name']).execute(), 'name');
+  const topicId = idLookup(await trx.insertInto('topics').values(data.topics.map(withSlug)).returning(['id', 'name']).execute(), 'name');
 
   const itemId = idLookup(
     await trx
       .insertInto('learn_items')
-      .values(data.learnItems.map(({ topic, ...item }) => ({ ...item, kind: 'text', topic_id: topicId(topic) })))
+      .values(data.learnItems.map(({ topic, ...item }) => ({ ...item, ...live, kind: 'text', topic_id: topicId(topic) })))
       .returning(['id', 'title'])
       .execute(),
     'title',
@@ -55,20 +63,21 @@ async function seedContent(trx: Db) {
   const { course, externalCourse } = data;
   const { id: courseId } = await trx
     .insertInto('courses')
-    .values({ title: course.title, description: course.description })
+    .values({ title: course.title, description: course.description, ...live })
     .returning('id')
     .executeTakeFirstOrThrow();
   await trx
     .insertInto('course_items')
     .values(course.items.map((title, index) => ({ course_id: courseId, item_id: itemId(title), position: index + 1 })))
     .execute();
-  await trx.insertInto('courses').values(externalCourse).execute();
+  await trx.insertInto('courses').values({ ...externalCourse, ...live }).execute();
 
   await trx
     .insertInto('questions')
     .values(
       data.questions.map(({ topic, ...question }) => ({
         ...question,
+        ...live,
         topic_id: topicId(topic),
         options: 'options' in question ? question.options : null,
       })),
@@ -78,7 +87,7 @@ async function seedContent(trx: Db) {
   const paperId = idLookup(
     await trx
       .insertInto('papers')
-      .values(data.papers.map(({ field, prerequisites: _, ...paper }) => ({ ...paper, field_id: fieldId(field) })))
+      .values(data.papers.map(({ field, prerequisites: _, ...paper }) => ({ ...paper, ...live, field_id: fieldId(field) })))
       .returning(['id', 'title'])
       .execute(),
     'title',
@@ -117,13 +126,13 @@ async function seedContent(trx: Db) {
 }
 
 async function main() {
-  await seedAdmin();
+  const adminId = await seedAdmin();
 
   const hasContent = await db.selectFrom('fields').select('id').limit(1).executeTakeFirst();
   if (hasContent) {
     console.log('Content already exists; skipping starter content.');
   } else {
-    await db.transaction().execute(seedContent);
+    await db.transaction().execute((trx) => seedContent(trx, adminId));
   }
 }
 

@@ -1,24 +1,36 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import { z } from 'zod';
 import { pageQuery } from '../../lib/pagination';
-import { id, idParams } from '../../lib/validation';
+import { idParams, slug, slugParams } from '../../lib/validation';
 import * as learn from './learn.service';
 
 export const learnRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/topics', async () => ({ items: await learn.listTopics() }));
 
-  app.get('/topics/:id', { schema: { params: idParams } }, async (request) => learn.getTopic(request.params.id));
+  app.get('/topics/:slug', { schema: { params: slugParams } }, async (request) => learn.getTopic(request.params.slug));
 
-  app.get(
-    '/learn-items',
-    { schema: { querystring: pageQuery.extend({ topic_id: id.optional() }) } },
-    async (request) => learn.listLearnItems({ topicId: request.query.topic_id }, request.query),
+  app.get('/learn-items', { schema: { querystring: pageQuery.extend({ topic: slug.optional() }) } }, async (request) => {
+    const { topic, ...page } = request.query;
+    return learn.listLearnItems({ topic }, page);
+  });
+
+  app.get('/learn-items/:id', { schema: { params: idParams } }, async (request) => learn.getLearnItem(request.params.id));
+
+  app.get('/courses', { schema: { querystring: pageQuery } }, async (request) =>
+    learn.listCourses(request.auth.userId, request.query),
   );
 
-  app.get('/learn-items/:id', { schema: { params: idParams } }, async (request) =>
-    learn.getLearnItem(request.params.id),
+  app.get('/courses/:id', { schema: { params: idParams } }, async (request) =>
+    learn.getCourse(request.auth.userId, request.params.id),
   );
 
-  app.get('/courses', { schema: { querystring: pageQuery } }, async (request) => learn.listCourses(request.query));
+  app.put(
+    '/courses/:id/progress',
+    { schema: { params: idParams, body: z.object({ last_position: z.number().int().min(0).max(1000) }) } },
+    async (request) => learn.saveProgress(request.auth.userId, request.params.id, request.body.last_position),
+  );
 
-  app.get('/courses/:id', { schema: { params: idParams } }, async (request) => learn.getCourse(request.params.id));
+  app.get('/me/courses', { schema: { querystring: pageQuery } }, async (request) =>
+    learn.listMyCourses(request.auth.userId, request.query),
+  );
 };

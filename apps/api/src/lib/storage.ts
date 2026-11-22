@@ -1,49 +1,128 @@
-import { mkdir, rename, rm } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { mkdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { env } from '../config/env';
+import { signToken } from './crypto';
+import { HttpError } from './errors';
 
 /**
- * Where uploaded media lives. The database only stores the returned URL, so the
- * local disk can later be swapped for the VPS or S3/R2 behind this interface.
+ * Object storage with the two areas the doc describes:
+ * - raw: original uploads. Private; written only through short-lived signed upload URLs.
+ * - processed: worker output. Keys under "public/" (avatars, learn media, paper figures) get plain,
+ *   cacheable URLs. Everything else (post media) is reachable only through signed URLs, so a
+ *   private account's media stops being reachable once its links expire.
+ *
+ * The database stores keys, never URLs, so moving to S3/R2 behind a CDN means a new
+ * implementation of this interface and no data change.
  */
 export interface Storage {
-  /** Moves a validated temp file to `key` and returns its public URL. */
-  save(tempPath: string, key: string): Promise<string>;
-  /** Deletes a file by the URL `save` returned. URLs it does not own are ignored. */
-  remove(url: string): Promise<void>;
+  createUploadUrl(rawKey: string, options: { contentType: string; maxBytes: number; expiresAt: Date }): string;
+  /** Size in bytes of an uploaded raw file, or null if nothing was uploaded. */
+  rawSize(rawKey: string): Promise<number | null>;
+  /** A local file path for ffmpeg and sharp. A remote implementation downloads first and cleans up in release(). */
+  openRaw(rawKey: string): Promise<{ path: string; release(): Promise<void> }>;
+  deleteRaw(rawKey: string): Promise<void>;
+  /** Moves a finished local folder into processed storage under `prefix`. */
+  putProcessed(localDir: string, prefix: string): Promise<void>;
+  deleteProcessed(prefix: string): Promise<void>;
+  publicUrl(key: string): string;
+  /** A URL for `key` that works until `expiresAt` for every file under `scopePrefix` (an HLS manifest and its segments). */
+  signedUrl(key: string, scopePrefix: string, expiresAt: Date): string;
 }
 
-class LocalDiskStorage implements Storage {
+/** Stand-in for S3/R2 + CDN during local development. Its HTTP side is modules/media/storage.routes.ts. */
+export class LocalDiskStorage implements Storage {
+  readonly rawDir: string;
+  readonly processedDir: string;
+  /** Scratch space for the worker, on the same disk so finished folders can be moved, not copied. */
+  readonly workDir: string;
+
   constructor(
-    private readonly rootDir: string,
+    rootDir: string,
     private readonly baseUrl: string,
-  ) {}
+  ) {
+    this.rawDir = path.join(rootDir, 'raw');
+    this.processedDir = path.join(rootDir, 'processed');
+    this.workDir = path.join(rootDir, 'work');
+  }
 
-  async save(tempPath: string, key: string): Promise<string> {
-    const target = this.resolve(key);
+  createUploadUrl(rawKey: string, options: { contentType: string; maxBytes: number; expiresAt: Date }): string {
+    const token = signToken('upload', { k: rawKey, t: options.contentType, m: options.maxBytes }, options.expiresAt);
+    return `${this.baseUrl}/storage/raw/${token}`;
+  }
+
+  async rawSize(rawKey: string): Promise<number | null> {
+    try {
+      return (await stat(inside(this.rawDir, rawKey))).size;
+    } catch {
+      return null;
+    }
+  }
+
+  async openRaw(rawKey: string) {
+    return { path: inside(this.rawDir, rawKey), release: async () => {} };
+  }
+
+  async deleteRaw(rawKey: string): Promise<void> {
+    await rm(inside(this.rawDir, rawKey), { force: true });
+  }
+
+  async putProcessed(localDir: string, prefix: string): Promise<void> {
+    const target = inside(this.processedDir, prefix);
+    await rm(target, { recursive: true, force: true });
     await mkdir(path.dirname(target), { recursive: true });
-    await rename(tempPath, target);
-    return `${this.baseUrl}/${key}`;
+    await rename(localDir, target);
   }
 
-  async remove(url: string): Promise<void> {
-    const prefix = `${this.baseUrl}/`;
-    if (!url.startsWith(prefix)) return;
-    const target = this.resolve(url.slice(prefix.length));
-    await rm(target, { force: true });
+  async deleteProcessed(prefix: string): Promise<void> {
+    await rm(inside(this.processedDir, prefix), { recursive: true, force: true });
   }
 
-  /** Resolves a key inside the root directory, refusing anything that escapes it. */
-  private resolve(key: string): string {
-    const target = path.resolve(this.rootDir, key);
-    if (!target.startsWith(this.rootDir + path.sep)) throw new Error(`Invalid storage key: ${key}`);
-    return target;
+  publicUrl(key: string): string {
+    return `${this.baseUrl}/media/${key}`;
+  }
+
+  signedUrl(key: string, scopePrefix: string, expiresAt: Date): string {
+    return `${this.baseUrl}/media/s/${signToken('media', { p: scopePrefix }, expiresAt)}/${key}`;
+  }
+
+  /** Writes an upload body, stopping at `maxBytes` (what a signed S3 PUT with a size condition does). */
+  async writeRaw(rawKey: string, body: Readable, maxBytes: number): Promise<number> {
+    const target = inside(this.rawDir, rawKey);
+    await mkdir(path.dirname(target), { recursive: true });
+    let bytes = 0;
+    body.on('data', (chunk: Buffer) => {
+      bytes += chunk.length;
+      if (bytes > maxBytes) body.destroy(new HttpError(413, 'FILE_TOO_LARGE', 'File is larger than the upload allows'));
+    });
+    try {
+      await pipeline(body, createWriteStream(target));
+      if (bytes > maxBytes) throw new HttpError(413, 'FILE_TOO_LARGE', 'File is larger than the upload allows');
+    } catch (error) {
+      await rm(target, { force: true });
+      throw error;
+    }
+    return bytes;
+  }
+
+  /** The file for a processed key, or null if the key escapes the processed folder. */
+  processedPath(key: string): string | null {
+    try {
+      return inside(this.processedDir, key);
+    } catch {
+      return null;
+    }
   }
 }
 
-export const mediaRoot = path.resolve(env.MEDIA_DIR);
+/** Resolves `key` inside `root`, refusing anything that escapes it. */
+function inside(root: string, key: string): string {
+  const target = path.resolve(root, key);
+  if (!target.startsWith(path.resolve(root) + path.sep)) throw new Error(`Invalid storage key: ${key}`);
+  return target;
+}
 
-/** Unvalidated uploads wait here; this folder is never served. */
-export const uploadTempDir = path.join(mediaRoot, 'tmp');
-
-export const storage: Storage = new LocalDiskStorage(mediaRoot, env.MEDIA_BASE_URL);
+export const localStorage = new LocalDiskStorage(path.resolve(env.MEDIA_DIR), env.PUBLIC_URL);
+export const storage: Storage = localStorage;

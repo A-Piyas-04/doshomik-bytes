@@ -1,0 +1,237 @@
+# Prototype 2: implementation notes
+
+Nov 22, 2026
+
+The Prototype 2 backend is built from `docs/Prototype 2 — Features, Database, Security & Efficiency.md`. This file records:
+
+- the decisions made where that doc left a choice open, and why;
+- what is **not** built yet, why, and the exact steps to finish each item.
+
+The API reference is in `apps/api/README.md`.
+
+## Contents
+
+1. [What was built](#1-what-was-built)
+2. [Decisions](#2-decisions)
+3. [Deferred work: install later](#3-deferred-work-install-later)
+4. [Deferred work: product and hardening](#4-deferred-work-product-and-hardening)
+5. [Known limitations to keep in mind](#5-known-limitations-to-keep-in-mind)
+6. [Breaking changes from Prototype 1](#6-breaking-changes-from-prototype-1)
+
+---
+
+## 1. What was built
+
+| Area | Built |
+| --- | --- |
+| Database | The doc's appendix migration (30 tables) unchanged, plus a backfill migration and one migration of additions (§2.1). Tested on Prototype 1 data, up and down. |
+| Security | Access tokens (15 min) and rotating refresh tokens (30 days, sliding) with reuse detection. Sessions per device: list, sign out one. Public UUIDs everywhere. Encrypted cursors. Object-level visibility in one shared layer. Signed upload and media URLs. Request ids in every error. No tokens or emails in logs. HSTS in production. Per-IP and per-user rate limits. Per-account growing delays after failed sign-ins. Argon2id. |
+| Account | Email verification, password reset (with "if that email exists"), Google sign-in, account deletion with a 30-day purge, two-factor sign-in (TOTP; required for staff), onboarding interests. |
+| Social | Private accounts with follow requests, block, report, saved posts, soft-deleted posts and comments ("[deleted]" placeholders), stored like and comment counters, share URLs. |
+| Video and images | Upload slot → direct upload to storage → complete → worker: ffprobe check, 90 s reel limit, HLS ladder (360p–1080p, H.264 + AAC), poster, WebP image variants, metadata (GPS) stripped → ready → post published + "post is live" notification. |
+| Learn and Practice | Drafts → published → archived. Course progress, practice history with accuracy and streak, quizzes. |
+| Research | Drafts and publishing, related papers, interest filter, roadmaps of published papers only. |
+| Admin panel API | CRUD for all team content with drafts, preview, publish and archive. `created_by` and `updated_by` on content, and an audit log of every admin action. Reports queue with resolve actions (dismiss, remove content, suspend). Account status and staff roles. |
+| Worker | Separate process (`pnpm worker`) with three loops: media processing, the outbox (counters, notifications, push, email) and hourly maintenance (account purge, deleted-post purge, counter repair, clean-up). |
+| Across the app | Search with the new visibility rules, autocomplete, the `/v1/app/config` minimum-version endpoint, Android App Links file and share-link fallback, ETags and compression. |
+| Tests | 34 route tests through `fastify.inject`, including the real ffmpeg and sharp pipeline. |
+
+## 2. Decisions
+
+### 2.1 Database
+
+| Decision | Why | Consequence / later |
+| --- | --- | --- |
+| The appendix SQL is migration `…001` **unchanged**, except its `BEGIN`/`COMMIT` | node-pg-migrate already wraps each migration in a transaction; a `COMMIT` inside it would commit early | None |
+| Kept `gen_random_uuid()`, did not switch to `uuidv7()` | `uuidv7()` exists only on PostgreSQL 18; the production version isn't fixed yet, and `gen_random_uuid()` works on 13+ | When production is known to run PG 18, a migration can change the column defaults to `uuidv7()` (better index locality). Existing ids stay valid. |
+| Migration `…002` finishes the appendix's "after backfill" steps: slugs `NOT NULL`, post media moved into `media_assets`, `posts.media_url` and `duration_seconds` dropped, `CHECK (type = 'text' OR media_id IS NOT NULL)` | The doc says to do it after the backfill; doing it now means only one source of truth for media | Prototype 1 post media becomes `provider = 'legacy'` assets whose `playback_key` is the old URL, returned unchanged. Prototype 1 never shipped, so no real files are affected. |
+| `learn_items_check` now allows `media_url` **or** `media_id` | A learn item can use the new pipeline (`media_id`) or an outside link (`media_url`); the old check required `media_url` | — |
+| Migration `…003` adds `sessions.public_id`, `users.totp_secret`, `users.totp_enabled_at` and four indexes | The API needs to name a device session ("sign out of this device"), and tokens carry it, without exposing numeric ids. Two-factor sign-in is required for staff but has no columns in the appendix. | `totp_secret` is AES-256-GCM encrypted with a key derived from `APP_SECRET` |
+| Follower counts are still counted with `COUNT(*)`, not stored | The appendix adds stored counters only to `posts`; `follows` has indexes on both sides, so counts are cheap at this scale | Add `users.follower_count` and `following_count`, kept by the `follow.created` handler, when profiles get hot |
+
+### 2.2 Security and auth
+
+| Decision | Why | Consequence / later |
+| --- | --- | --- |
+| One `APP_SECRET`; separate keys derived with HKDF for JWTs, cursors, upload links, media links, MFA tokens and TOTP secrets | One secret to manage; a leaked key for one purpose can't forge another | Rotating `APP_SECRET` signs everyone out and breaks media links: plan it as a migration |
+| Refresh token = `<session public id>.<secret>`; only the secret's hash is stored; rotation is a compare-and-swap | Lets the server spot reuse of an old token and revoke that session, as the doc requires | Two refreshes racing with the same token (a flaky retry) revoke the session; the app should serialize refreshes |
+| Each request checks that its session is live and the account is active (one indexed query) | Signing out a device, suspension and deletion take effect at once, not after 15 minutes | One extra query per request; cache it in Redis when Redis is installed |
+| Access tokens carry public ids only (`sub` = user, `sid` = session) | A decoded token must not reveal row counts | — |
+| Pagination cursors are encrypted | They contain the internal id tie-breaker | — |
+| Google sign-in uses `jose` against Google's public keys and checks issuer, audience and expiry | Same checks as Google's library with less code | Set `GOOGLE_CLIENT_IDS` (Android, iOS and web client ids) |
+| A verified Google email is linked to an existing account with the same email | Google is authoritative for its verified emails; avoids duplicate accounts | Common practice; revisit if other providers are added |
+| Google-only accounts get a username from the email's local part (plus digits if taken) | The doc has no username step for Google sign-up | No "change username" feature exists yet |
+| Two-factor sign-in is TOTP (authenticator apps), written in-house (RFC 6238, about 60 lines) | Required for admins and moderators; TOTP needs no paid service | No recovery codes and no replay guard yet (§4) |
+| Staff routes require role **and** two-factor sign-in; without it they return `403 MFA_REQUIRED` | The doc: "Admins and moderators must use two-factor authentication" | The seeded admin must call `POST /v1/me/2fa/setup` and `/enable` once |
+| Failed-sign-in delays are kept per account in memory | No Redis yet | Per process, reset on restart (§3.1) |
+| Login always runs argon2, against a dummy hash when there is no account | Response time doesn't reveal which accounts exist | — |
+| Password reset revokes every session | A reset usually means the account may be compromised | — |
+| Deleted accounts can't sign in or be restored during the grace period | The doc doesn't ask for restore; it adds a user-facing state to design | Add "cancel deletion" if wanted (§4) |
+| Errors carry `request_id`; the `x-request-id` header is always set; client-sent request ids are ignored | Support can match a user's error to the logs; clients can't spoof log ids | — |
+| Logs redact the tokens in `/storage/raw/<token>` and `/media/s/<token>/…`; no emails or bodies are logged | "Logs never contain passwords, tokens or full email addresses" | Keep the redaction when adding routes with tokens in the path |
+
+### 2.3 Media
+
+| Decision | Why | Consequence / later |
+| --- | --- | --- |
+| **Self-hosted pipeline** (FFmpeg worker + local disk), behind a `Storage` interface | Runs locally with no accounts; the doc keeps `media_assets` provider-neutral so a managed service can replace it later | §3.3 covers moving to S3/R2 + CDN, or to Mux, Cloudflare or Bunny |
+| Local storage has a `raw/` area (private) and `processed/` (`public/…` unsigned, `posts/…` signed only) | Matches the doc's private raw bucket and CDN-served processed files | — |
+| The API process serves `PUT /storage/raw/:token` and `GET /media/…` in development | Stands in for S3 presigned PUTs and the CDN. Bytes still never go through the API routes themselves | In production these routes are replaced by the real bucket and CDN URLs |
+| A media asset's `processing` status is the worker's queue; there is no extra outbox event for "uploaded" | Simpler, no duplicate state; the worker polls `media_assets` | — |
+| Post media URLs are signed: about 24–48 h for public accounts (cacheable), 1–2 h for private ones | The doc: private content uses signed URLs that expire within hours. One signature covers an asset's folder, so HLS segments resolve too | When an account turns private, links already handed out keep working until they expire |
+| Avatars, learn media and paper figures are public, unsigned and `immutable` | They are public content; stable URLs can be stored in `users.avatar_url` and `papers.figures` | Keys contain unguessable UUIDs |
+| An upload with purpose `avatar` becomes the avatar once processed; older avatar files are deleted | Saves an extra call. The doc has no avatar media column | — |
+| Ladder by the short side: 360/540/720/1080, never upscaled; smaller sources keep their size | Portrait reels and landscape videos both fit | 1080p is only made from 1080p sources |
+| The raw original is deleted after processing, success or failure | It holds GPS and camera metadata; nothing needs it afterwards | Re-encoding later means re-uploading |
+| A failed asset is final; the app uploads again | Transient worker crashes also mark it failed instead of retrying forever | Add bounded retries if crashes turn out to be common |
+| Learn videos are capped at 20 minutes (`LEARN_VIDEO_MAX_SECONDS`); reels at 90 s | The doc says learn videos run 3–4 minutes; 20 minutes leaves room | Constants live in `packages/shared` |
+| Resumable or multipart uploads are not built | The local stand-in takes one PUT. S3/R2 give resumable multipart uploads natively | Comes with §3.3 |
+
+### 2.4 Worker and outbox
+
+| Decision | Why | Consequence / later |
+| --- | --- | --- |
+| **No Redis.** The worker reads `outbox_events` and `media_assets` from Postgres | The doc's design needs no Redis for this; Redis isn't installed | §3.1 |
+| **One worker process**, enforced with a Postgres advisory lock | No double processing without lease columns | Scaling out needs leases (§3.2) |
+| Each event's database work and its "processed" mark commit together; push and email run after commit, best effort | Counters and notifications are exactly once; side effects never roll back data | A failed push or email is logged, not retried |
+| Counters are **recounted**, not incremented | Handling an event twice can't drift the numbers; the nightly repair job catches the rest | Counts are a few seconds behind the action, so the app shows optimistic counts |
+| Notifications moved from the request to the worker (`follow`, `follow_request`, `like`, `comment`, `reply`, `post_ready`) | The doc: workers update notifications and push | They appear within about a second, once the worker runs |
+| `search.sync` events are written for searchable changes (users, posts, topics, learn items, courses, papers), with no consumer yet | The outbox should already record what the Elasticsearch indexer will need | The worker marks them processed and maintenance deletes them after 30 days. The indexer starts with a full rebuild anyway (§3.4) |
+| Events failing 10 times stay unprocessed for inspection | Dead-letter without an extra table | Add an alert on `attempts >= 10` (§4) |
+| Hourly maintenance: purge accounts deleted over 30 days ago, purge posts soft-deleted over 30 days ago, repair counters, delete abandoned uploads, old sessions, used codes and processed events over 30 days old | The doc's purge job and nightly repair | Each job is safe to repeat |
+| Purge keeps the user's comments as empty `[deleted]` rows | The thread survives (the doc's goal) and the text is gone (privacy) | — |
+| Development email goes to files in `DEV_MAIL_DIR`; SMTP when `SMTP_URL` is set (works with the Hostinger mailbox) | Real sending needs only a URL | — |
+| Push uses a logging stand-in | FCM needs a Firebase project and service account | §3.5 |
+
+### 2.5 API shape
+
+| Decision | Why |
+| --- | --- |
+| Everything under `/v1` | The doc: old app versions stay installed for months |
+| `id` in every response is the public UUID. Topics and fields are named by `slug` (`/v1/topics/attention-mechanism`) | The doc's public ids and slugs |
+| Visibility rules live in `src/db/visibility.ts` and every query uses them | The doc: one shared query layer for private accounts, blocks, drafts and deleted items |
+| Another user's private upload, notification or session returns 404, not 403 | Doesn't confirm it exists |
+| Course steps are renumbered 1..n over the **published** items | Drafts in a course don't leave gaps |
+| `GET /v1/papers/:id/related` ranks by shared Learn first topics, then same field | A useful "Papers like this one" without Elasticsearch; replaced by semantic similarity later |
+| Request validation only (zod); responses are not schema-checked | Selects name their columns explicitly, so no hidden fields leak. Response schemas come with the OpenAPI spec (§4) |
+| Text in push messages and emails is English | User language isn't stored yet (§4) |
+
+## 3. Deferred work: install later
+
+### 3.1 Redis
+
+**Why it is deferred:** it isn't installed, and nothing in this round strictly needs it.
+
+**What waits on it:**
+
+- rate-limit counters shared across processes (they are in memory now);
+- the per-account sign-in delays (`LoginThrottle`, in memory now);
+- the doc's caches: the first feed page (60 s), hot profiles, paper and course pages, topic lists;
+- the ranked reels list;
+- optionally, the per-request session lookup cache.
+
+**Steps:**
+
+1. Install Memurai Developer (Windows) or Redis in WSL2 locally; on the VPS, use the Redis container from `stack-v1.txt`.
+2. Add `REDIS_URL` to `src/config/env.ts` and `pnpm add ioredis`.
+3. In `src/app.ts`, pass `redis: new Redis(env.REDIS_URL)` to `@fastify/rate-limit`. Routes keep using `lib/rate-limits.ts` unchanged.
+4. Re-implement `LoginThrottle` with `INCR` and `PEXPIRE` on keys `login:<name>`, keeping the same class API.
+5. Cache the first feed page per user for 60 s (key `feed:<userId>`). Delete the key in the `follow.created` and post-publish handlers.
+6. Reels ranking: a maintenance job scores recent reels (recency, `like_count`, and watch completion once it exists) into a sorted set `reels:ranked`; `listReels` reads ids from it, falling back to newest-first.
+
+### 3.2 Several workers (leases)
+
+**Why it is deferred:** one worker is enough at this scale, and the advisory lock in `src/worker.ts` keeps it safe.
+
+**Steps:**
+
+1. Add a migration with `locked_until timestamptz` on `outbox_events` and `media_assets`.
+2. Claim rows with `UPDATE … SET locked_until = now() + interval '5 minutes' WHERE id = (SELECT id … WHERE processed_at IS NULL AND (locked_until IS NULL OR locked_until < now()) ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`.
+3. Remove the advisory lock.
+
+### 3.3 Object storage, CDN and a video provider
+
+**Why it is deferred:** they need accounts and keys. Local disk stands in behind `Storage`.
+
+**Steps for S3/R2 + CDN (self-hosted encoding):**
+
+1. Write `S3Storage implements Storage` in `src/lib/storage.ts`:
+   - `createUploadUrl`: a presigned PUT with content-type and content-length conditions, or a presigned multipart upload for resumable uploads;
+   - `rawSize`: `HeadObject`;
+   - `openRaw`: download to a temp file, deleted in `release()`;
+   - `putProcessed`: upload the folder;
+   - `publicUrl` and `signedUrl`: CDN URLs. For HLS, use CloudFront signed cookies or a signed path prefix, like the local `/media/s/<token>/` scheme.
+2. Choose the implementation from env (`STORAGE_DRIVER=s3`). Stop registering `storageRoutes` when it isn't local.
+3. Data moves by copying `media/processed/` to the bucket; keys are unchanged.
+
+**Steps for a managed video service (Mux, Cloudflare Stream, Bunny):**
+
+1. Set `media_assets.provider` and `provider_asset_id`.
+2. Replace `processVideo` with "create the asset at the provider", and take readiness from its webhook.
+3. Write the `media.ready` outbox event exactly as the worker does now; everything downstream stays the same.
+
+### 3.4 Elasticsearch (or OpenSearch)
+
+**Why it is deferred:** it isn't installed, and semantic search needs an embedding model (Elastic's `semantic_text` needs ML features, a trial or paid licence, or an external embedding API). Search runs on Postgres meanwhile, as the doc's fallback.
+
+**Steps:**
+
+1. Run Elasticsearch 8 locally (Windows zip, no Docker) or on Elastic Cloud. Add `ELASTICSEARCH_URL` to env and `pnpm add @elastic/elasticsearch`.
+2. Create one index per type (users, posts, topics, learn, courses, papers), each behind an alias. Add search-as-you-type fields for names and titles, and a synonym list for topics ("LLM" → "large language model").
+3. Indexer: add a handler for `search.sync` in `src/worker/outbox.ts`. Load the entity, then index it or delete it when it's no longer visible (deleted, draft, private, inactive). Start with a full rebuild script that indexes everything and swaps the alias.
+4. Semantic part: give `learn`, `courses` and `papers` a `semantic_text` field built from title, summary, main idea and research questions, and merge keyword and semantic hits with RRF.
+5. Search service: query Elasticsearch, filter by the viewer's blocks (pass their blocked ids), and fall back to the current Postgres searchers on error, as the doc requires.
+6. `GET /v1/papers/:id/related`: switch to a semantic kNN query; keep the topic-overlap version as the fallback.
+7. Nightly job: compare per-type counts between Postgres and the index, and reindex any drift.
+
+### 3.5 Push notifications (Firebase Cloud Messaging)
+
+**Why it is deferred:** it needs a Firebase project and a service-account key. Push tokens are already stored per session (`PUT /v1/sessions/current/push-token`), and messages already go through `providers.push`.
+
+**Steps:**
+
+1. `pnpm add firebase-admin`. Add `FCM_SERVICE_ACCOUNT_JSON` to the secrets.
+2. Write `FcmPush implements PushSender` in `src/providers/index.ts` using `sendEachForMulticast`.
+3. Clear `sessions.push_token` for tokens FCM reports as unregistered.
+
+### 3.6 Google sign-in keys
+
+The code is done. Create OAuth client ids (Android with the app's SHA-1, iOS later, web for the admin panel) in Google Cloud, and put them in `GOOGLE_CLIENT_IDS`.
+
+## 4. Deferred work: product and hardening
+
+| Item | Why deferred | How to finish |
+| --- | --- | --- |
+| Web page for deletion requests (Google Play requires a link) | It is a web UI; the API already supports it: sign in, then `DELETE /v1/me` | A small page in the admin web app (or a static page) that signs in and calls `DELETE /v1/me` |
+| Restore an account during the grace period | Not asked for; needs UX | Allow login for `status = 'deleted'` within the grace period with a `restore: true` flag that clears `deleted_at` |
+| Sign in with Apple (iOS) | iOS comes later | `auth_identities.provider` already allows `apple`; add an `AppleIdTokens` verifier (JWKS at `appleid.apple.com/auth/keys`) and `POST /v1/auth/apple` |
+| 2FA recovery codes and replay guard | Keeps this round small | Store hashed recovery codes; remember the last used TOTP step per user to reject reuse |
+| Play Integrity / App Attest | Needs a Google Cloud project; doc phase 8 | Verify the integrity token on sign-up and posting; reject or rate-limit failures |
+| OpenAPI spec for the iOS team | Doc: "Describe the API in an OpenAPI spec" | Add `@fastify/swagger` with `jsonSchemaTransform` (the zod schemas already describe every request), plus response schemas |
+| Monitoring: metrics, tracing, crash reporting, alerts | Infra, not local | OpenTelemetry for Fastify and pg; alert on 5xx rate, p95 latency, outbox backlog (`processed_at IS NULL`) and dead events (`attempts >= 10`) |
+| PgBouncer, separate DB users, backups with point-in-time recovery, secrets manager | Deployment work (doc phase 1 / production) | App DB user with DML only and a migration user with DDL (`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES …`); run migrations with the migration user; secrets in the VPS secret store, not `.env` |
+| Watch-time and view analytics | Doc: send to an analytics store, not Postgres | Batch playback events from the app to an analytics service; feed reels ranking (§3.1) |
+| Notification and email text in Bangla | User language isn't stored | Add `users.locale`; pick templates by it, or send data-only pushes and let the app render the text |
+| Read replica, partitioning `notifications` and `question_attempts` | Only at millions of rows | As in the doc's efficiency table |
+| Feed precomputed timelines | Only once the feed's p95 latency passes about 100 ms | As in the doc |
+| Automated nudity and violence screening | Doc: "Later" | A worker step before `media.ready` |
+| Change username | Not in the doc | `PATCH /v1/me { username }` with the same lowercase and unique rules |
+
+## 5. Known limitations to keep in mind
+
+- **One API process and one worker process.** Rate limits and sign-in delays are in memory, so they aren't shared across API processes. The advisory lock refuses a second worker.
+- **Counts lag by about a second** (outbox). The app should update like and comment counts optimistically.
+- **Prototype 1 uploads.** Post media is kept as `legacy` assets with their old URLs, but the Prototype 1 `/media/posts/...` and `/media/avatars/...` routes no longer exist. Prototype 1 never shipped, so only local test files are affected.
+- **`apps/api/.env` was regenerated** for the new variables (`APP_SECRET`, `PUBLIC_URL`). Set `SEED_ADMIN_PASSWORD` again if you had changed it.
+- **Unverified email doesn't block anything yet.** `email_verified` is exposed so the app can prompt for it. Gating posting on verification is one `where` clause if wanted.
+
+## 6. Breaking changes from Prototype 1
+
+There are no clients yet, so the API changed in place:
+
+- All routes moved under `/v1`.
+- Ids are UUIDs; topics and fields use slugs.
+- Sign-in returns `access_token` and `refresh_token`, and needs `platform`.
+- Posts take a `media_id` from the upload flow instead of a multipart file.
+- `/admin/media` is replaced by `POST /v1/media/uploads` with purpose `learn` or `paper_figure`.
+- Admin content is created as a draft and must be published.

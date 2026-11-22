@@ -4,6 +4,7 @@
   "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "pnpm --filter @doshomik/api dev",
+    "worker": "pnpm --filter @doshomik/api worker",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck"
   }

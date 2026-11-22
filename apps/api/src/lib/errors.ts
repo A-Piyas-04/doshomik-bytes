@@ -11,8 +11,8 @@ export class HttpError extends Error {
 }
 
 export const badRequest = (message: string, code = 'BAD_REQUEST') => new HttpError(400, code, message);
-export const unauthorized = (message = 'Authentication required') => new HttpError(401, 'UNAUTHORIZED', message);
-export const forbidden = (message = 'You are not allowed to do this') => new HttpError(403, 'FORBIDDEN', message);
+export const unauthorized = (message = 'Authentication required', code = 'UNAUTHORIZED') => new HttpError(401, code, message);
+export const forbidden = (message = 'You are not allowed to do this', code = 'FORBIDDEN') => new HttpError(403, code, message);
 export const notFound = (resource: string) => new HttpError(404, 'NOT_FOUND', `${resource} not found`);
 export const conflict = (message: string, code = 'CONFLICT') => new HttpError(409, code, message);
 
