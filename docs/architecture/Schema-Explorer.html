@@ -521,6 +521,23 @@ nav.main a{padding-left:7px;padding-right:7px}
 .chain .box{border:0;border-radius:6px;box-shadow:var(--lift-1)}
 .swap{border:0;border-radius:8px;box-shadow:var(--lift-1)}
 .swap:hover{box-shadow:var(--lift-2)}
+/* ---- Navigation and overflow (added) ---- */
+.subnav{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;margin:4px 0 22px;border-radius:10px;background:var(--surface);box-shadow:var(--lift-1)}
+.subnav a{padding:7px 14px;border-radius:7px;text-decoration:none;color:var(--ink-2);font-weight:600;font-size:.92rem}
+.subnav a:hover{color:var(--ink);background:var(--bg)}
+.subnav a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+.pager{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:30px}
+.pager a{display:block;min-width:0;padding:14px 18px;border-radius:8px;background:var(--surface);box-shadow:var(--lift-1);text-decoration:none;color:var(--ink);overflow-wrap:anywhere}
+.pager a:hover{box-shadow:var(--lift-2);transform:translateY(-2px)}
+.pager a.to-next{grid-column:2;text-align:right}
+.pager small{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:2px}
+.pager b{font-weight:600;font-size:1.02rem}
+.pager b.t{font-family:var(--mono);font-weight:500}
+/* Long table and column names wrap inside their box instead of running out of it. */
+.pairs{grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr))}
+.pairs li,.links li,.list a.item,.path,.door,.stat,.way,.chain .box,.chip,.tree li,.flag,.cols li,.col-head,.crumbs,summary,.areas li a{min-width:0;overflow-wrap:anywhere}
+.chain .box{max-width:100%}
+.table-title{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -1647,6 +1664,7 @@ function viewArea(id) {
           }</small></a></li>`,
       )
       .join('')}</ul>
+    ${areaPager(id)}
   </section>`;
 }
 
@@ -1676,6 +1694,7 @@ function viewTable(name, tab = 'about') {
     ).join('')}</nav>
     ${panel}
     ${nextTab ? `<p class="next"><a href="#table/${name}/${nextTab[0]}">Next: ${label[nextTab[0]]}</a></p>` : `<p class="next"><a href="#explore/${d.id}">Back to ${d.name}</a></p>`}
+    ${tablePager(t)}
   </section>`;
 }
 
@@ -1777,7 +1796,7 @@ function viewRef(topic) {
   const entry = REF.find(([id]) => id === topic);
   if (!entry) return viewNotFound();
   const body = REF_PAGES[topic]();
-  return `<section>${crumbs([['Reference', '#ref'], [entry[1]]])}<h1>${entry[1]}</h1><p class="lede">${entry[2]}.</p><div class="block">${body}</div></section>`;
+  return `<section>${crumbs([['Reference', '#ref'], [entry[1]]])}<h1>${entry[1]}</h1><p class="lede">${entry[2]}.</p><div class="block">${body}</div>${refPager(topic)}</section>`;
 }
 
 const fold = (summary, inner, small = '') => `<details><summary>${summary}${small ? `<small>${small}</small>` : ''}</summary><div class="inner">${inner}</div></details>`;
@@ -2135,6 +2154,7 @@ function mapAreas() {
   });
   return `<section class="mapview">
     ${crumbs([['Tools', '#tools'], ['Map']])}
+    ${toolNav('map')}
     <h1>Map</h1>
     <p class="lede">How the parts of the database connect. Start with the areas, then open one.</p>
     ${mapTabs('areas')}
@@ -2196,6 +2216,7 @@ function mapArea(id) {
   const keyIds = [...new Set([id, ...outside.map((n) => byName[n].domain)])];
   return `<section class="mapview">
     ${crumbs([['Tools', '#tools'], ['Map', '#diagram'], [d.name]])}
+    ${toolNav('map')}
     <h1>${d.name}</h1>
     <p class="lede">The ${count(core.length, 'table', 'tables')} in this area are filled in; dashed boxes are tables elsewhere that ${grouped ? 'link to them, grouped by area' : 'they link to'}.</p>
     ${areaKey(keyIds)}
@@ -2244,6 +2265,7 @@ function mapTable(name) {
   const domains = [...new Set(nodes.map((n) => byName[n.id].domain))];
   return `<section class="mapview">
     ${crumbs([['Tools', '#tools'], ['Map', '#diagram'], [domainById[t.domain].name, `#diagram/${t.domain}`], [name]])}
+    ${toolNav('map')}
     <h1 class="table-title">${name}</h1>
     <p class="lede">${parents.length ? `Left: the ${count(parents.length, 'table', 'tables')} it points to.` : 'It points to no other table.'} ${
       children.length ? `Right: the ${count(children.length, 'table', 'tables')} that point to it.` : 'No other table points to it.'
@@ -2272,6 +2294,7 @@ function mapAll() {
   });
   return `<section class="mapview">
     ${crumbs([['Tools', '#tools'], ['Map']])}
+    ${toolNav('map')}
     <h1>Map</h1>
     <p class="lede">All ${TABLES.length} tables and ${EDGES.length} links. It is busy on purpose: hover a table to see only its links.</p>
     ${mapTabs('all')}
@@ -2419,6 +2442,7 @@ function toolImpact(start) {
     `<ul class="pairs">${list.map((e) => `<li>${tlink(e.from)}<span class="via">${e.col}</span></li>`).join('')}</ul>`;
   return `<section class="tool">
     ${crumbs([['Tools', '#tools'], ['Delete impact']])}
+    ${toolNav('impact')}
     <h1>Delete impact</h1>
     <div class="ask"><span>Delete one row from</span>${bigSelect('impact-table', start)}</div>
     <div class="stats">
@@ -2560,6 +2584,7 @@ function toolJoin(a, b) {
   }
   return `<section class="tool">
     ${crumbs([['Tools', '#tools'], ['Join path']])}
+    ${toolNav('join')}
     <h1>Join path</h1>
     <div class="ask"><span>Join</span>${bigSelect('join-a', a)}<span>to</span>${bigSelect('join-b', b)}<button type="button" class="swap" data-swap aria-label="Swap the two tables" title="Swap">⇄</button></div>
     ${result}
@@ -2614,6 +2639,34 @@ document.addEventListener('click', (event) => {
     else copy.textContent = 'Select to copy';
   }
 });
+
+/* ---- Navigation helpers (added) ---- */
+/** Switch between the tools from any tool or map page. */
+function toolNav(current) {
+  return `<nav class="subnav" aria-label="Tools">${[
+    ['map', 'Map', '#diagram'],
+    ['impact', 'Delete impact', '#tools/impact'],
+    ['join', 'Join path', '#tools/join'],
+  ]
+    .map(([key, text, href]) => `<a href="${href}"${key === current ? ' aria-current="page"' : ''}>${text}</a>`)
+    .join('')}</nav>`;
+}
+
+/** Previous / next among siblings. `items` are [label, href, mono?]. */
+function pager(items, index, what) {
+  const prev = items[index - 1];
+  const next = items[index + 1];
+  if (!prev && !next) return '';
+  const link = (item, dir) =>
+    `<a class="${dir === 'next' ? 'to-next' : 'to-prev'}" href="${item[1]}"><small>${dir === 'next' ? `Next ${what} ›` : `‹ Previous ${what}`}</small><b class="${item[2] ? 't' : ''}">${item[0]}</b></a>`;
+  return `<nav class="pager" aria-label="More ${what}s">${prev ? link(prev, 'prev') : ''}${next ? link(next, 'next') : ''}</nav>`;
+}
+const tablePager = (t) => {
+  const list = tablesIn(t.domain);
+  return pager(list.map((x) => [x.name, `#table/${x.name}`, true]), list.indexOf(t), `table in ${domainById[t.domain].name}`);
+};
+const areaPager = (id) => pager(DOMAINS.map((d) => [d.name, `#explore/${d.id}`]), DOMAINS.findIndex((d) => d.id === id), 'area');
+const refPager = (topic) => pager(REF.map(([id, title]) => [title, `#ref/${id}`]), REF.findIndex(([id]) => id === topic), 'topic');
 
 /* ============================================================
    Routing: #home, #tour/3, #explore, #explore/research,
