@@ -189,6 +189,50 @@ footer{max-width:760px;margin:0 auto;padding:0 20px 48px;color:var(--muted);font
   .bar-in{padding:12px 16px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* ---- Map: connected diagrams (added) ---- */
+:root{
+  --area-auth:#2F6A9C; --area-social:#8A4C9E; --area-feed:#B4532A; --area-media:#7C6A1F;
+  --area-learn:#2C8456; --area-practice:#A66414; --area-research:#147A86; --area-system:#5C6670;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --area-auth:#7DB3E3; --area-social:#C896DA; --area-feed:#E8977A; --area-media:#CDB866;
+    --area-learn:#7CCB9C; --area-practice:#E3A35E; --area-research:#6CC6D1; --area-system:#A6B0BA;
+  }
+}
+:root[data-theme="dark"]{
+  --area-auth:#7DB3E3; --area-social:#C896DA; --area-feed:#E8977A; --area-media:#CDB866;
+  --area-learn:#7CCB9C; --area-practice:#E3A35E; --area-research:#6CC6D1; --area-system:#A6B0BA;
+}
+.mapview .tabs{margin:18px 0 0}
+.mapview .tabs + .areakey{margin-top:16px}
+.map-wrap{overflow-x:auto;margin:22px 0 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.map{display:block;width:100%;height:auto;min-width:640px}
+.map .node{cursor:pointer;transition:opacity .15s}
+.map .node rect{stroke-width:1.6}
+.map .node text{font-family:var(--font);font-size:14px;font-weight:600;fill:var(--ink)}
+.map .node text.mono{font-family:var(--mono);font-size:13px;font-weight:500}
+.map .node text.sub{font-size:12px;font-weight:400;fill:var(--muted)}
+.map .node.center text{font-size:15px}
+.map .node.muted rect{stroke-dasharray:4 3}
+.map .node.muted text{fill:var(--ink-2)}
+.map .node:focus{outline:none}
+.map .node:focus-visible rect{stroke-width:3.5}
+.map .edge{transition:opacity .15s}
+.map .edge line,.map .edge path{fill:none;stroke-width:1.6}
+.map .e-cascade line,.map .e-cascade path{stroke:var(--cascade)}
+.map .e-setnull line,.map .e-setnull path{stroke:var(--setnull)}
+.map .e-restrict line,.map .e-restrict path{stroke:var(--restrict)}
+.map .e-area line{stroke:var(--muted);stroke-opacity:.55}
+.map .e-mixed line{stroke:var(--muted)}
+.map .edge text{font-family:var(--mono);font-size:11px;fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
+.map .edge text.count{font-family:var(--font);font-size:12px;font-weight:600;fill:var(--ink-2)}
+.map.focusing .edge{opacity:.07}
+.map.focusing .edge.on{opacity:1}
+.map.focusing .node{opacity:.28}
+.map.focusing .node.on{opacity:1}
+.areakey{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.9rem;color:var(--muted);margin:0 0 8px}
+.areakey span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px;background:var(--c)}
 </style>
 </head>
 <body>
@@ -199,6 +243,7 @@ footer{max-width:760px;margin:0 auto;padding:0 20px 48px;color:var(--muted);font
       <a href="#home" data-nav="home">Home</a>
       <a href="#tour/1" data-nav="tour">Tour</a>
       <a href="#explore" data-nav="explore">Explore</a>
+      <a href="#diagram" data-nav="diagram">Map</a>
       <a href="#ref" data-nav="ref">Reference</a>
     </nav>
   </div>
@@ -1480,6 +1525,470 @@ function viewNotFound() {
 }
 
 /* ============================================================
+   Map: connected diagrams (added; the views above are unchanged)
+   #diagram          the areas and how many links join them
+   #diagram/<area>   one area's tables and the tables they link to
+   #diagram/table/x  one table: what it points to, what points to it
+   #diagram/all      every table at once
+   ============================================================ */
+const AREA_ORDER = ['auth', 'social', 'feed', 'media', 'learn', 'practice', 'research', 'system'];
+const areaColor = (id) => `var(--area-${id})`;
+const tint = (id, pct = 12) => `color-mix(in srgb, var(--area-${id}) ${pct}%, var(--surface))`;
+const TABLE_H = 30;
+const tableW = (label) => Math.round(label.length * 7.8 + 26);
+
+/** One line per pair of tables, even when they are linked by two columns (follows, notifications…). */
+function pairEdges(edges) {
+  const pairs = new Map();
+  for (const e of edges) {
+    const key = `${e.from}>${e.to}`;
+    if (!pairs.has(key)) pairs.set(key, { from: e.from, to: e.to, d: e.d, cols: [] });
+    pairs.get(key).cols.push(e.col);
+  }
+  return [...pairs.values()];
+}
+
+const RULE_SHORT = { cascade: 'deleted too', setnull: 'kept, link cleared', restrict: 'delete refused' };
+const edgeTitle = (e) => `${e.from}.${e.cols.join(', ')} → ${e.to} (${RULE_SHORT[e.d]})`;
+
+/** Where the line from `from` meets the border of box `to`, so arrows stay visible. */
+function clipToBox(from, to) {
+  const dx = from.x - to.x;
+  const dy = from.y - to.y;
+  if (!dx && !dy) return { x: to.x, y: to.y };
+  const sx = (to.w / 2 + 4) / Math.abs(dx || 1e-9);
+  const sy = (to.h / 2 + 4) / Math.abs(dy || 1e-9);
+  const s = Math.min(sx, sy);
+  return { x: to.x + dx * s, y: to.y + dy * s };
+}
+
+/**
+ * A small, deterministic force layout: nodes repel, links pull, and each node is drawn toward
+ * an anchor (its area's place), then overlapping boxes are pushed apart.
+ */
+function forceLayout(nodes, links, W, H, options = {}) {
+  const iterations = options.iterations || 450;
+  const length = options.length || 130;
+  const repel = options.repel || 16000;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  nodes.forEach((n, i) => {
+    if (n.x == null) {
+      const a = (i / nodes.length) * 2 * Math.PI;
+      n.x = W / 2 + Math.cos(a) * W * 0.3;
+      n.y = H / 2 + Math.sin(a) * H * 0.3;
+    }
+    n.vx = 0;
+    n.vy = 0;
+  });
+  const pairs = links.map((l) => [byId.get(l.from), byId.get(l.to)]).filter(([a, b]) => a && b && a !== b);
+  const clamp = (n) => {
+    n.x = Math.max(n.w / 2 + 10, Math.min(W - n.w / 2 - 10, n.x));
+    n.y = Math.max(n.h / 2 + 10, Math.min(H - n.h / 2 - 10, n.y));
+  };
+  for (let it = 0; it < iterations; it++) {
+    const cool = 1 - it / iterations;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        const d2 = dx * dx + dy * dy || 0.01;
+        const d = Math.sqrt(d2);
+        const f = repel / d2;
+        dx /= d;
+        dy /= d;
+        a.vx -= dx * f;
+        a.vy -= dy * f;
+        b.vx += dx * f;
+        b.vy += dy * f;
+      }
+    }
+    for (const [a, b] of pairs) {
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+      const f = (d - length) * 0.02;
+      dx /= d;
+      dy /= d;
+      a.vx += dx * f;
+      a.vy += dy * f;
+      b.vx -= dx * f;
+      b.vy -= dy * f;
+    }
+    for (const n of nodes) {
+      const [ax, ay, k] = options.anchor ? options.anchor(n) : [W / 2, H / 2, 0.01];
+      n.vx += (ax - n.x) * k;
+      n.vy += (ay - n.y) * k;
+      n.x += Math.max(-30, Math.min(30, n.vx * cool));
+      n.y += Math.max(-30, Math.min(30, n.vy * cool));
+      n.vx *= 0.5;
+      n.vy *= 0.5;
+      clamp(n);
+    }
+  }
+  for (let pass = 0; pass < 200; pass++) {
+    let moved = false;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        const ox = (a.w + b.w) / 2 + 12 - Math.abs(a.x - b.x);
+        const oy = (a.h + b.h) / 2 + 12 - Math.abs(a.y - b.y);
+        if (ox > 0 && oy > 0) {
+          moved = true;
+          if (ox < oy * 2.5) {
+            const s = ((a.x <= b.x ? -1 : 1) * ox) / 2;
+            a.x += s;
+            b.x -= s;
+          } else {
+            const s = ((a.y <= b.y ? -1 : 1) * oy) / 2;
+            a.y += s;
+            b.y -= s;
+          }
+          clamp(a);
+          clamp(b);
+        }
+      }
+    }
+    if (!moved) break;
+  }
+}
+
+/** Pushes overlapping boxes apart; nodes marked `fixed` don't move. */
+function resolveOverlaps(nodes, gap = 12) {
+  for (let pass = 0; pass < 300; pass++) {
+    let moved = false;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        const ox = (a.w + b.w) / 2 + gap - Math.abs(a.x - b.x);
+        const oy = (a.h + b.h) / 2 + gap - Math.abs(a.y - b.y);
+        if (ox <= 0 || oy <= 0) continue;
+        moved = true;
+        const share = a.fixed ? [0, 1] : b.fixed ? [1, 0] : [0.5, 0.5];
+        const dir = a.y <= b.y ? -1 : 1;
+        a.y += dir * oy * share[0];
+        b.y -= dir * oy * share[1];
+      }
+    }
+    if (!moved) break;
+  }
+}
+
+/** Draws boxes and lines. `viewBox` is "x y w h". Lines are drawn first so boxes sit on top. */
+function svgGraph(nodes, links, viewBox, label) {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const markers = ['cascade', 'setnull', 'restrict', 'mixed']
+    .map(
+      (r) =>
+        `<marker id="m-${r}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--${r === 'mixed' ? 'muted' : r})"/></marker>`,
+    )
+    .join('');
+  const lines = links
+    .map((l) => {
+      const a = byId.get(l.from);
+      const b = byId.get(l.to);
+      if (!a || !b) return '';
+      const cls = `edge e-${l.d}`;
+      const title = `<title>${esc(l.title || '')}</title>`;
+      if (a === b) {
+        // A table that points to itself (comments.parent_id): a loop above the box.
+        const x = a.x + a.w / 2 - 18;
+        const y = a.y - a.h / 2;
+        return `<g class="${cls}" data-a="${a.id}" data-b="${b.id}">${title}<path d="M${x - 14},${y} C${x - 14},${y - 34} ${x + 26},${y - 34} ${x + 26},${y - 2}" marker-end="url(#m-${l.d})"/></g>`;
+      }
+      const p1 = clipToBox(b, a);
+      const p2 = clipToBox(a, b);
+      const marker = l.d === 'area' ? '' : ` marker-end="url(#m-${l.d})"`;
+      const width = l.width ? ` style="stroke-width:${l.width}"` : '';
+      const at = l.labelAt ?? 0.5;
+      const mid = { x: p1.x + (p2.x - p1.x) * at, y: p1.y + (p2.y - p1.y) * at };
+      const text = l.label ? `<text x="${mid.x}" y="${mid.y}" text-anchor="middle" dominant-baseline="central" class="${l.d === 'area' ? 'count' : ''}">${esc(l.label)}</text>` : '';
+      return `<g class="${cls}" data-a="${a.id}" data-b="${b.id}">${title}<line x1="${p1.x.toFixed(1)}" y1="${p1.y.toFixed(1)}" x2="${p2.x.toFixed(1)}" y2="${p2.y.toFixed(1)}"${marker}${width}/>${text}</g>`;
+    })
+    .join('');
+  const boxes = nodes
+    .map((n) => {
+      const cls = `node${n.muted ? ' muted' : ''}${n.center ? ' center' : ''}`;
+      const style = `stroke:${n.color};fill:${n.fill || 'var(--surface)'}`;
+      const textY = n.sub ? n.y - 8 : n.y;
+      return `<a href="${n.href}" class="${cls}" data-node="${esc(n.id)}"><title>${esc(n.title || n.label)}</title>
+        <rect x="${(n.x - n.w / 2).toFixed(1)}" y="${(n.y - n.h / 2).toFixed(1)}" width="${n.w}" height="${n.h}" rx="${n.h > TABLE_H ? 12 : 8}" style="${style}"/>
+        <text x="${n.x}" y="${textY}" text-anchor="middle" dominant-baseline="central" class="${n.mono ? 'mono' : ''}">${esc(n.label)}</text>
+        ${n.sub ? `<text x="${n.x}" y="${n.y + 11}" text-anchor="middle" dominant-baseline="central" class="sub">${esc(n.sub)}</text>` : ''}</a>`;
+    })
+    .join('');
+  return `<div class="map-wrap"><svg class="map" viewBox="${viewBox}" role="img" aria-label="${esc(label)}"><defs>${markers}</defs>${lines}${boxes}</svg></div>`;
+}
+
+/** The viewBox that fits every box, with a margin. */
+function fitBox(nodes, pad = 40) {
+  const minX = Math.min(...nodes.map((n) => n.x - n.w / 2)) - pad;
+  const maxX = Math.max(...nodes.map((n) => n.x + n.w / 2)) + pad;
+  const minY = Math.min(...nodes.map((n) => n.y - n.h / 2)) - pad - 20;
+  const maxY = Math.max(...nodes.map((n) => n.y + n.h / 2)) + pad;
+  return `${minX.toFixed(0)} ${minY.toFixed(0)} ${(maxX - minX).toFixed(0)} ${(maxY - minY).toFixed(0)}`;
+}
+
+const tableNode = (name, extra = {}) => ({
+  id: name,
+  label: name,
+  w: tableW(name),
+  h: TABLE_H,
+  mono: true,
+  href: `#diagram/table/${name}`,
+  color: areaColor(byName[name].domain),
+  title: `${name}: ${byName[name].purpose.replace(/<[^>]+>/g, '')}`,
+  ...extra,
+});
+
+const areaKey = (ids = AREA_ORDER) =>
+  `<div class="areakey">${ids.map((id) => `<span style="--c:${areaColor(id)}">${domainById[id].name}</span>`).join('')}</div>`;
+
+/** Where each area sits on the overview, reused as the pull point for its tables on the bigger maps. */
+function areaPlaces(W, H) {
+  const places = { auth: [W / 2, H / 2] };
+  const ring = AREA_ORDER.filter((id) => id !== 'auth');
+  ring.forEach((id, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / ring.length;
+    places[id] = [W / 2 + Math.cos(a) * W * 0.36, H / 2 + Math.sin(a) * H * 0.36];
+  });
+  return places;
+}
+
+function mapTabs(current) {
+  return `<nav class="tabs" aria-label="Map views">${[
+    ['areas', 'Areas', '#diagram'],
+    ['all', 'Every table', '#diagram/all'],
+  ]
+    .map(([key, text, href]) => `<a href="${href}"${key === current ? ' aria-current="page"' : ''}>${text}</a>`)
+    .join('')}</nav>`;
+}
+
+const mapHint = (text) => `<p class="hint">${text}</p>`;
+
+function viewDiagram(a, b) {
+  if (!a) return mapAreas();
+  if (a === 'all') return mapAll();
+  if (a === 'table') return byName[b] ? mapTable(b) : viewNotFound();
+  if (domainById[a]) return mapArea(a);
+  return viewNotFound();
+}
+
+/** Level 1: eight areas; a line's number is how many links join two areas. */
+function mapAreas() {
+  const W = 900;
+  const H = 560;
+  const places = areaPlaces(W, H);
+  const nodes = AREA_ORDER.map((id) => {
+    const d = domainById[id];
+    const n = tablesIn(id).length;
+    return {
+      id,
+      label: d.name,
+      sub: count(n, 'table', 'tables'),
+      x: places[id][0],
+      y: places[id][1],
+      w: Math.round(d.name.length * 8.6 + 40),
+      h: 52,
+      href: `#diagram/${id}`,
+      color: areaColor(id),
+      fill: tint(id, 14),
+      title: `${d.name}: ${d.desc.replace(/<[^>]+>/g, '')}`,
+    };
+  });
+  const between = new Map();
+  for (const e of EDGES) {
+    const x = byName[e.from].domain;
+    const y = byName[e.to].domain;
+    if (x === y) continue;
+    const key = [x, y].sort().join('|');
+    between.set(key, (between.get(key) || 0) + 1);
+  }
+  const links = [...between.entries()].map(([key, c]) => {
+    const [x, y] = key.split('|');
+    return { from: x, to: y, d: 'area', label: String(c), width: 1.4 + Math.sqrt(c) * 1.3, title: `${count(c, 'link', 'links')} between ${domainById[x].name} and ${domainById[y].name}` };
+  });
+  return `<section class="mapview">
+    <h1>Map</h1>
+    <p class="lede">How the parts of the database connect. Start with the areas, then open one.</p>
+    ${mapTabs('areas')}
+    ${svgGraph(nodes, links, `0 0 ${W} ${H}`, 'The eight areas and the links between them')}
+    ${mapHint('A thicker line means more links between two areas; the number is how many. Hover an area to see only its lines, or click it to open its tables.')}
+  </section>`;
+}
+
+/** Level 2: one area's tables, and the outside tables they link to (grouped by area when there are many). */
+function mapArea(id) {
+  const d = domainById[id];
+  const core = tablesIn(id).map((t) => t.name);
+  const rel = pairEdges(EDGES.filter((e) => core.includes(e.from) || core.includes(e.to)));
+  const outside = [...new Set(rel.flatMap((e) => [e.from, e.to]).filter((n) => !core.includes(n)))];
+  const W = 960;
+  const H = 640;
+  const places = areaPlaces(W, H);
+  const grouped = outside.length > 12;
+  let nodes = core.map((n) => tableNode(n, { fill: tint(id, 10) }));
+  let links;
+  if (!grouped) {
+    nodes = nodes.concat(outside.map((n) => tableNode(n, { muted: true })));
+    links = rel.map((e) => ({ ...e, title: edgeTitle(e) }));
+  } else {
+    // Too many outside tables (users has 29): one box per outside area instead.
+    const areaOf = (n) => (core.includes(n) ? n : `area:${byName[n].domain}`);
+    const merged = new Map();
+    for (const e of rel) {
+      const from = areaOf(e.from);
+      const to = areaOf(e.to);
+      const key = `${from}>${to}`;
+      if (!merged.has(key)) merged.set(key, { from, to, rules: new Set(), n: 0, names: [] });
+      const m = merged.get(key);
+      m.rules.add(e.d);
+      m.n += e.cols.length;
+      m.names.push(`${e.from}.${e.cols.join(', ')} → ${e.to}`);
+    }
+    links = [...merged.values()].map((m) => ({ from: m.from, to: m.to, d: m.rules.size === 1 ? [...m.rules][0] : 'mixed', label: m.n > 1 ? String(m.n) : '', width: 1.4 + Math.sqrt(m.n), title: m.names.join('\n') }));
+    const outsideAreas = [...new Set(outside.map((n) => byName[n].domain))];
+    nodes = nodes.concat(
+      outsideAreas.map((aid) => {
+        const names = outside.filter((n) => byName[n].domain === aid);
+        const label = `${domainById[aid].name} (${names.length})`;
+        return { id: `area:${aid}`, label, w: Math.round(label.length * 8 + 30), h: TABLE_H + 4, muted: true, href: `#diagram/${aid}`, color: areaColor(aid), title: names.join(', ') };
+      }),
+    );
+  }
+  forceLayout(nodes, links, W, H, {
+    repel: 30000,
+    length: 160,
+    anchor: (n) => {
+      const aid = n.id.startsWith('area:') ? n.id.slice(5) : byName[n.id].domain;
+      if (aid === id) return [W / 2, H / 2, 0.012];
+      const [x, y] = places[aid];
+      return [x, y, 0.03];
+    },
+  });
+  const mixed = links.some((l) => l.d === 'mixed');
+  const keyIds = [...new Set([id, ...outside.map((n) => byName[n].domain)])];
+  return `<section class="mapview">
+    ${crumbs([['Map', '#diagram'], [d.name]])}
+    <h1>${d.name}</h1>
+    <p class="lede">The ${count(core.length, 'table', 'tables')} in this area are filled in; dashed boxes are tables elsewhere that ${grouped ? 'link to them, grouped by area' : 'they link to'}.</p>
+    ${areaKey(keyIds)}
+    ${legend()}
+    ${svgGraph(nodes, links, fitBox(nodes, 24), `Tables in ${d.name} and their links`)}
+    ${mapHint(`Arrows point to the table being referred to.${mixed ? ' A grey line groups links with different delete rules; hover it to see each one.' : ''} Hover a table to see only its links; click it to put it in the middle.`)}
+  </section>`;
+}
+
+/** Level 3: one table in the middle; what it points to on the left, what points to it on the right. */
+function mapTable(name) {
+  const t = byName[name];
+  const parents = pairEdges(outOf(name).filter((e) => e.to !== name));
+  const order = (n) => AREA_ORDER.indexOf(byName[n].domain);
+  const children = pairEdges(into(name).filter((e) => e.from !== name)).sort((x, y) => order(x.from) - order(y.from) || x.from.localeCompare(y.from));
+  const self = pairEdges(outOf(name).filter((e) => e.to === name));
+
+  const center = tableNode(name, { x: 0, y: 0, center: true, fill: tint(t.domain, 22), w: tableW(name) + 16, h: 38 });
+  const nodes = [center];
+  // Neighbours sit on arcs; with many of them, every other box steps further out so labels don't collide.
+  center.fixed = true;
+  const place = (list, side) => {
+    const n = list.length;
+    const staggered = n > 12;
+    const step = staggered ? 27 : 50;
+    const half = ((n - 1) * step) / 2 || 1;
+    list.forEach((item, i) => {
+      const y = i * step - half;
+      const bow = 70 * (1 - (y / half) ** 2); // the middle of the column bows away from the centre
+      const x = 250 + bow + (staggered && i % 2 ? 230 : 0);
+      nodes.push(tableNode(item, { x: side * x, y }));
+    });
+  };
+  place(parents.map((e) => e.to), -1);
+  place(children.map((e) => e.from), 1);
+
+  resolveOverlaps(nodes);
+  const showLabels = parents.length + children.length <= 14;
+  // Labels go near the outer table, where lines are far apart.
+  const links = [...parents, ...children, ...self].map((e) => ({
+    ...e,
+    title: edgeTitle(e),
+    label: showLabels ? e.cols.join(', ') : '',
+    labelAt: e.from === name ? 0.72 : 0.28,
+  }));
+  const domains = [...new Set(nodes.map((n) => byName[n.id].domain))];
+  return `<section class="mapview">
+    ${crumbs([['Map', '#diagram'], [domainById[t.domain].name, `#diagram/${t.domain}`], [name]])}
+    <h1 class="table-title">${name}</h1>
+    <p class="lede">${parents.length ? `Left: the ${count(parents.length, 'table', 'tables')} it points to.` : 'It points to no other table.'} ${
+      children.length ? `Right: the ${count(children.length, 'table', 'tables')} that point to it.` : 'No other table points to it.'
+    }</p>
+    ${areaKey(domains)}
+    ${legend()}
+    ${svgGraph(nodes, links, fitBox(nodes), `${name} and the tables linked to it`)}
+    ${mapHint(`Line colour says what happens on delete; hover a line for its column. Click any table to put it in the middle, or <a href="#table/${name}">open ${name}’s details</a>.`)}
+  </section>`;
+}
+
+/** Every table at once, pulled toward its area's place so areas form clusters. */
+function mapAll() {
+  const W = 1180;
+  const H = 860;
+  const places = areaPlaces(W, H);
+  const nodes = TABLES.map((tb) => tableNode(tb.name, { fill: tint(tb.domain, 10) }));
+  const links = pairEdges(EDGES).map((e) => ({ ...e, title: edgeTitle(e) }));
+  forceLayout(nodes, links, W, H, {
+    repel: 14000,
+    length: 120,
+    anchor: (n) => {
+      const [x, y] = places[byName[n.id].domain];
+      return [x, y, byName[n.id].domain === 'auth' ? 0.012 : 0.03];
+    },
+  });
+  return `<section class="mapview">
+    <h1>Map</h1>
+    <p class="lede">All ${TABLES.length} tables and ${EDGES.length} links. It is busy on purpose: hover a table to see only its links.</p>
+    ${mapTabs('all')}
+    ${areaKey()}
+    ${legend()}
+    ${svgGraph(nodes, links, fitBox(nodes, 20), 'Every table and every link')}
+    ${mapHint('Tables of the same area sit together. Click a table to see it with only its own links.')}
+  </section>`;
+}
+
+/* Hover or keyboard focus on a box shows only its lines and neighbours. */
+function mapFocus(svg, id) {
+  svg.classList.add('focusing');
+  const near = new Set([id]);
+  svg.querySelectorAll('.edge').forEach((edge) => {
+    const on = edge.dataset.a === id || edge.dataset.b === id;
+    edge.classList.toggle('on', on);
+    if (on) {
+      near.add(edge.dataset.a);
+      near.add(edge.dataset.b);
+    }
+  });
+  svg.querySelectorAll('.node').forEach((node) => node.classList.toggle('on', near.has(node.dataset.node)));
+}
+function mapBlur(svg) {
+  svg.classList.remove('focusing');
+}
+['mouseover', 'focusin'].forEach((type) =>
+  document.addEventListener(type, (event) => {
+    const node = event.target.closest && event.target.closest('.map .node');
+    if (node) mapFocus(node.closest('svg'), node.dataset.node);
+  }),
+);
+['mouseout', 'focusout'].forEach((type) =>
+  document.addEventListener(type, (event) => {
+    const node = event.target.closest && event.target.closest('.map .node');
+    if (node && !(event.relatedTarget && node.contains(event.relatedTarget))) mapBlur(node.closest('svg'));
+  }),
+);
+
+/* ============================================================
    Routing: #home, #tour/3, #explore, #explore/research,
    #table/papers/links, #ref, #ref/indexes
    ============================================================ */
@@ -1499,10 +2008,11 @@ function route() {
     : view === 'explore' ? (a ? viewArea(a) : viewExplore())
     : view === 'table' ? viewTable(a, b)
     : view === 'ref' ? viewRef(a)
+    : view === 'diagram' ? viewDiagram(a, b)
     : viewNotFound();
   app.innerHTML = html;
 
-  const section = { home: 'home', tour: 'tour', explore: 'explore', table: 'explore', ref: 'ref' }[view];
+  const section = { home: 'home', tour: 'tour', explore: 'explore', table: 'explore', ref: 'ref', diagram: 'diagram' }[view];
   document.querySelectorAll('[data-nav]').forEach((link) => {
     if (link.dataset.nav === section) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
