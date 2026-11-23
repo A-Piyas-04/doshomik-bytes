@@ -522,10 +522,32 @@ nav.main a{padding-left:7px;padding-right:7px}
 .swap{border:0;border-radius:8px;box-shadow:var(--lift-1)}
 .swap:hover{box-shadow:var(--lift-2)}
 /* ---- Navigation and overflow (added) ---- */
-.subnav{display:inline-flex;flex-wrap:wrap;gap:4px;padding:4px;margin:4px 0 22px;border-radius:10px;background:var(--surface);box-shadow:var(--lift-1)}
-.subnav a{padding:7px 14px;border-radius:7px;text-decoration:none;color:var(--ink-2);font-weight:600;font-size:.92rem}
-.subnav a:hover{color:var(--ink);background:var(--bg)}
-.subnav a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+/* Menu order: header (sections) > header row 2 (the tools, inside Tools) > crumbs (only below a menu item) > tabs (views of one page) > pager (siblings). */
+.subbar{border-top:1px solid var(--line)}
+.subbar-in{max-width:740px;margin:0 auto;padding:0 20px;min-height:46px;display:flex;align-items:center;gap:4px;overflow-x:auto;scrollbar-width:none}
+.subbar-in::-webkit-scrollbar{display:none}
+.subbar a{flex:none;padding:6px 12px;border-radius:7px;text-decoration:none;white-space:nowrap;color:var(--ink-2);font-weight:600;font-size:.9rem}
+.subbar a:hover{color:var(--ink);background:var(--surface)}
+.subbar a[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
+.subbar a.subbar-up{padding-left:0;padding-right:4px;color:var(--muted);font-weight:500}
+.subbar a.subbar-up:hover{background:none;color:var(--ink)}
+.subbar a.subbar-up[aria-current="page"]{background:none;color:var(--ink);font-weight:600}
+.subbar span[aria-hidden]{flex:none;color:var(--muted);opacity:.6;margin-right:6px}
+.tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;border-bottom:0;box-shadow:inset 0 -1px 0 var(--line)}
+.tabs::-webkit-scrollbar{display:none}
+.tabs a{flex:none;white-space:nowrap;margin-bottom:0}
+.tabs.more{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 48px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 48px),transparent)}
+.tabs.less{-webkit-mask-image:linear-gradient(90deg,transparent,#000 48px);mask-image:linear-gradient(90deg,transparent,#000 48px)}
+.tabs.less.more{-webkit-mask-image:linear-gradient(90deg,transparent,#000 48px,#000 calc(100% - 48px),transparent);mask-image:linear-gradient(90deg,transparent,#000 48px,#000 calc(100% - 48px),transparent)}
+/* Phones: a compact header that scrolls away, so the page keeps the screen. */
+@media (max-width:560px){
+  .bar{position:static}
+  .bar-in{padding:12px 16px 0;row-gap:2px;min-height:0}
+  .brand{width:100%}
+  nav.main{margin-left:-7px}
+  nav.main a{padding-top:10px;padding-bottom:11px}
+  .subbar-in{padding:0 16px;min-height:42px}
+}
 .pager{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:30px}
 .pager a{display:block;min-width:0;padding:14px 18px;border-radius:8px;background:var(--surface);box-shadow:var(--lift-1);text-decoration:none;color:var(--ink);overflow-wrap:anywhere}
 .pager a:hover{box-shadow:var(--lift-2);transform:translateY(-2px)}
@@ -538,6 +560,100 @@ nav.main a{padding-left:7px;padding-right:7px}
 .pairs li,.links li,.list a.item,.path,.door,.stat,.way,.chain .box,.chip,.tree li,.flag,.cols li,.col-head,.crumbs,summary,.areas li a{min-width:0;overflow-wrap:anywhere}
 .chain .box{max-width:100%}
 .table-title{overflow-wrap:anywhere}
+/* ---- Map: canvas and analysis views (added) ---- */
+.mapview .tabs + .stats{margin-top:22px}
+/* The canvas is wider than the reading column, centred on the page. */
+.canvas-wrap{--cw:min(1180px, calc(100vw - 32px));position:relative;width:var(--cw);margin:20px 0 12px calc((100% - var(--cw)) / 2);height:min(74vh,780px);min-height:420px;border-radius:10px;overflow:hidden;
+  background-color:var(--surface);background-image:radial-gradient(var(--line-2) 1px, transparent 1.2px);background-size:22px 22px;box-shadow:var(--lift-1);touch-action:none;outline:none}
+.canvas-wrap:focus-visible{box-shadow:0 0 0 2px var(--accent),var(--lift-1)}
+.canvas-wrap svg{display:block;width:100%;height:100%;min-width:0;cursor:grab;user-select:none;-webkit-user-select:none}
+.canvas-wrap.dragging svg{cursor:grabbing}
+.map.is-canvas .viewport{transform-origin:0 0}
+.map.is-canvas .viewport.animate{transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.map.is-canvas .node,.map.is-canvas .edge{transition:opacity .25s ease,filter .25s ease}
+.map.is-canvas.selecting .node:not(.on),.map.is-canvas.selecting .edge:not(.on){opacity:.16;filter:blur(1.6px)}
+.map.is-canvas .node.sel rect{stroke-width:3.4}
+.map.is-canvas .edge.on line,.map.is-canvas .edge.on path{stroke-width:2.3}
+.canvas-tools{position:absolute;top:12px;left:12px;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:6px;max-width:calc(100% - 330px)}
+.canvas-tools button{width:34px;height:34px;border:0;border-radius:8px;background:var(--surface);box-shadow:var(--lift-1);font:inherit;font-size:1.05rem;font-weight:600;color:var(--ink);cursor:pointer}
+.canvas-tools button:hover{box-shadow:var(--lift-2)}
+.canvas-tools button.wide{width:auto;padding:0 13px;font-size:.88rem}
+.zoom-level{min-width:46px;text-align:center;font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.canvas-find{width:190px;height:34px;padding:0 12px;border:0;border-radius:8px;background:var(--surface);box-shadow:var(--lift-1);font:inherit;font-size:.88rem;color:var(--ink)}
+.canvas-find:focus{outline:none;box-shadow:0 0 0 2px var(--accent),var(--lift-1)}
+.canvas-panel{position:absolute;top:12px;right:12px;z-index:2;width:290px;max-height:calc(100% - 24px);overflow:auto;padding:16px 18px 18px;border-radius:10px;background:var(--surface);box-shadow:var(--lift-2)}
+.canvas-panel h3{font-size:1.1rem;margin:0 26px 6px 0;overflow-wrap:anywhere}
+.canvas-panel h3.t{font-family:var(--mono);font-weight:500;font-size:1.05rem}
+.canvas-panel h4{display:flex;justify-content:space-between;font-size:.82rem;color:var(--ink-2);margin:14px 0 8px}
+.canvas-panel h4 small{color:var(--muted)}
+.panel-note{color:var(--muted);font-size:.88rem;margin:0}
+.panel-area{display:flex;align-items:center;gap:8px;color:var(--ink-2);font-size:.88rem;margin:0 0 8px}
+.panel-area span{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.panel-purpose{font-size:.9rem;color:var(--ink-2);margin:0}
+.panel-chips{display:flex;flex-wrap:wrap;gap:6px}
+.panel-chips .chip{font:inherit;font-family:var(--mono);font-size:.78rem;cursor:pointer;color:var(--ink);background:var(--bg)}
+.panel-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.panel-actions .btn{padding:7px 12px;font-size:.84rem}
+.panel-close{position:absolute;top:10px;right:10px;width:28px;height:28px;border:0;border-radius:6px;background:var(--bg);color:var(--ink-2);font-size:1.1rem;line-height:1;cursor:pointer}
+.panel-close:hover{color:var(--ink)}
+.canvas-help{position:absolute;left:12px;bottom:10px;z-index:1;display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;padding:5px 10px;border-radius:6px;font-size:.78rem;color:var(--muted);background:color-mix(in srgb, var(--surface) 88%, transparent)}
+@media (max-width:760px){
+  .canvas-wrap{height:72vh}
+  .canvas-tools{max-width:calc(100% - 24px)}
+  .canvas-find{width:140px}
+  .canvas-panel{top:auto;bottom:12px;left:12px;right:12px;width:auto;max-height:42%}
+  .canvas-help{display:none}
+}
+
+/* Like the canvas, the level columns use the wider strip so five or six levels fit. */
+.layers{--cw:min(1180px, calc(100vw - 32px));display:flex;gap:14px;overflow-x:auto;padding:4px 4px 16px;width:var(--cw);margin:0 0 0 calc((100% - var(--cw)) / 2)}
+.layer{flex:1 1 0;min-width:176px;display:flex;flex-direction:column;gap:8px}
+.layer h3{display:flex;justify-content:space-between;font-size:.98rem;margin:0}
+.layer h3 small{color:var(--muted);font-weight:600}
+.layer-sub{margin:-4px 0 4px;color:var(--muted);font-size:.8rem}
+.layer-card{display:flex;align-items:center;gap:8px;text-align:left;font:inherit;font-family:var(--mono);font-size:.84rem;padding:9px 12px;border:0;border-radius:8px;background:var(--surface);box-shadow:var(--lift-1);color:var(--ink);cursor:pointer;overflow-wrap:anywhere;min-width:0}
+.layer-card::before{content:"";flex:none;width:9px;height:9px;border-radius:3px;background:var(--c)}
+.layer-card:hover{box-shadow:var(--lift-2);transform:translateY(-1px)}
+.layer-card,.layers .layer-card{transition:opacity .25s ease,filter .25s ease,box-shadow .2s ease,transform .25s ease,background-color .2s ease,color .2s ease}
+.layers.selecting .layer-card:not(.on){opacity:.18;filter:blur(1.3px)}
+.layer-card.needs{box-shadow:0 0 0 2px var(--accent),var(--lift-1)}
+.layer-card.needed{box-shadow:0 0 0 2px var(--setnull),var(--lift-1)}
+.layer-card.sel{background:var(--ink);color:var(--bg)}
+.layer-info{margin:6px 0 0;font-size:1rem;color:var(--ink-2);min-height:1.6em}
+.layer-info .t{font-weight:500}
+
+details.own > summary .t{font-family:var(--mono);font-weight:500}
+details.own .tree{margin-top:2px}
+
+.hubs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.hub{display:grid;grid-template-columns:minmax(0,210px) 1fr auto;align-items:center;gap:14px;padding:11px 16px;border-radius:8px;background:var(--surface);box-shadow:var(--lift-1);color:var(--ink);text-decoration:none}
+.hub:hover{box-shadow:var(--lift-2);transform:translateY(-2px)}
+.hub .t{font-family:var(--mono);font-weight:500;overflow-wrap:anywhere}
+.hub-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--bg)}
+.hub-bar i{display:block;height:100%}
+.hub-bar i.in{background:var(--accent)}
+.hub-bar i.out{background:var(--setnull)}
+.hub small{font-family:var(--mono);font-size:.76rem;color:var(--muted);white-space:nowrap;min-width:12ch;text-align:right}
+
+.vals{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.vals i{font-style:normal;color:var(--muted);font-size:.85rem}
+.val{font-family:var(--mono);font-size:.82rem;padding:3px 9px;border-radius:6px;background:var(--bg);box-shadow:0 0 0 1px var(--line-2);overflow-wrap:anywhere}
+.val-card{padding:14px 16px;border-radius:10px;background:var(--surface);box-shadow:var(--lift-1);margin-bottom:12px}
+.val-used{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:14px 0 0;padding-top:12px;border-top:1px dashed var(--line)}
+.val-used span{font-size:.8rem;font-weight:600;color:var(--muted);margin-right:2px}
+.val-used a{font-family:var(--mono);font-size:.82rem;padding:3px 9px;border-radius:6px;background:var(--accent-soft);color:var(--ink-2);text-decoration:none;overflow-wrap:anywhere}
+.val-used a b{color:var(--ink);font-weight:600}
+.val-used a:hover{color:var(--accent)}
+.val-row{display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);gap:8px 14px;padding:10px 0;border-bottom:1px dashed var(--line);align-items:start}
+.val-row:last-child{border-bottom:0}
+.val-row > a{font-size:.88rem;overflow-wrap:anywhere;text-decoration:none;color:var(--ink-2)}
+.val-row > a b{color:var(--ink);font-weight:600}
+.val-hint{margin:6px 0 0;font-size:.8rem;color:var(--muted)}
+@media (max-width:560px){
+  .val-row{grid-template-columns:1fr}
+  .hub{grid-template-columns:1fr auto}
+  .hub .hub-bar{grid-column:1 / -1;order:3}
+}
 </style>
 </head>
 <body>
@@ -578,6 +694,7 @@ nav.main a{padding-left:7px;padding-right:7px}
       </script>
     </nav>
   </div>
+  <div class="subbar" id="subbar" hidden></div>
 </header>
 <main id="app" tabindex="-1"></main>
 <script>
@@ -2019,7 +2136,8 @@ function resolveOverlaps(nodes, gap = 12) {
 }
 
 /** Draws boxes and lines. `viewBox` is "x y w h". Lines are drawn first so boxes sit on top. */
-function svgGraph(nodes, links, viewBox, label) {
+/** Markers, lines and boxes for a set of nodes and links (shared by the fixed maps and the canvas). */
+function graphParts(nodes, links) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const markers = ['cascade', 'setnull', 'restrict', 'mixed']
     .map(
@@ -2061,7 +2179,12 @@ function svgGraph(nodes, links, viewBox, label) {
         ${n.sub ? `<text x="${n.x}" y="${n.y + 11}" text-anchor="middle" dominant-baseline="central" class="sub">${esc(n.sub)}</text>` : ''}</a>`;
     })
     .join('');
-  return `<div class="map-wrap"><svg class="map" viewBox="${viewBox}" role="img" aria-label="${esc(label)}"><defs>${markers}</defs>${lines}${boxes}</svg></div>`;
+  return { defs: markers, lines, boxes };
+}
+
+function svgGraph(nodes, links, viewBox, label) {
+  const p = graphParts(nodes, links);
+  return `<div class="map-wrap"><svg class="map" viewBox="${viewBox}" role="img" aria-label="${esc(label)}"><defs>${p.defs}</defs>${p.lines}${p.boxes}</svg></div>`;
 }
 
 /** The viewBox that fits every box, with a margin. */
@@ -2103,6 +2226,10 @@ function mapTabs(current) {
   return `<nav class="tabs" aria-label="Map views">${[
     ['areas', 'Areas', '#diagram'],
     ['all', 'Every table', '#diagram/all'],
+    ['layers', 'Layers', '#diagram/layers'],
+    ['ownership', 'Ownership', '#diagram/ownership'],
+    ['hubs', 'Most connected', '#diagram/hubs'],
+    ['values', 'Values', '#diagram/values'],
   ]
     .map(([key, text, href]) => `<a href="${href}"${key === current ? ' aria-current="page"' : ''}>${text}</a>`)
     .join('')}</nav>`;
@@ -2113,6 +2240,10 @@ const mapHint = (text) => `<p class="hint">${text}</p>`;
 function viewDiagram(a, b) {
   if (!a) return mapAreas();
   if (a === 'all') return mapAll();
+  if (a === 'layers') return mapLayers();
+  if (a === 'ownership') return mapOwnership();
+  if (a === 'hubs') return mapHubs();
+  if (a === 'values') return mapValues();
   if (a === 'table') return byName[b] ? mapTable(b) : viewNotFound();
   if (domainById[a]) return mapArea(a);
   return viewNotFound();
@@ -2153,8 +2284,6 @@ function mapAreas() {
     return { from: x, to: y, d: 'area', label: String(c), width: 1.4 + Math.sqrt(c) * 1.3, title: `${count(c, 'link', 'links')} between ${domainById[x].name} and ${domainById[y].name}` };
   });
   return `<section class="mapview">
-    ${crumbs([['Tools', '#tools'], ['Map']])}
-    ${toolNav('map')}
     <h1>Map</h1>
     <p class="lede">How the parts of the database connect. Start with the areas, then open one.</p>
     ${mapTabs('areas')}
@@ -2216,13 +2345,13 @@ function mapArea(id) {
   const keyIds = [...new Set([id, ...outside.map((n) => byName[n].domain)])];
   return `<section class="mapview">
     ${crumbs([['Tools', '#tools'], ['Map', '#diagram'], [d.name]])}
-    ${toolNav('map')}
     <h1>${d.name}</h1>
     <p class="lede">The ${count(core.length, 'table', 'tables')} in this area are filled in; dashed boxes are tables elsewhere that ${grouped ? 'link to them, grouped by area' : 'they link to'}.</p>
+    ${mapTabs('areas')}
     ${areaKey(keyIds)}
     ${legend()}
-    ${svgGraph(nodes, links, fitBox(nodes, 24), `Tables in ${d.name} and their links`)}
-    ${mapHint(`Arrows point to the table being referred to.${mixed ? ' A grey line groups links with different delete rules; hover it to see each one.' : ''} Hover a table to see only its links; click it to put it in the middle.`)}
+    ${canvasGraph(nodes, links, `Tables in ${d.name} and their links`)}
+    ${mapHint(`Arrows point to the table being referred to.${mixed ? ' A grey line groups links with different delete rules; hover it to see each one.' : ''} Click a table to focus it; click it twice to put it in the middle.`)}
   </section>`;
 }
 
@@ -2265,11 +2394,11 @@ function mapTable(name) {
   const domains = [...new Set(nodes.map((n) => byName[n.id].domain))];
   return `<section class="mapview">
     ${crumbs([['Tools', '#tools'], ['Map', '#diagram'], [domainById[t.domain].name, `#diagram/${t.domain}`], [name]])}
-    ${toolNav('map')}
     <h1 class="table-title">${name}</h1>
     <p class="lede">${parents.length ? `Left: the ${count(parents.length, 'table', 'tables')} it points to.` : 'It points to no other table.'} ${
       children.length ? `Right: the ${count(children.length, 'table', 'tables')} that point to it.` : 'No other table points to it.'
     }</p>
+    ${mapTabs('areas')}
     ${areaKey(domains)}
     ${legend()}
     ${svgGraph(nodes, links, fitBox(nodes), `${name} and the tables linked to it`)}
@@ -2277,32 +2406,28 @@ function mapTable(name) {
   </section>`;
 }
 
-/** Every table at once, pulled toward its area's place so areas form clusters. */
+/** Every table on a canvas, pulled toward its area's place so areas form clusters. The space grows with the schema. */
 function mapAll() {
-  const W = 1180;
-  const H = 860;
+  const W = Math.max(1180, Math.round(Math.sqrt(TABLES.length) * 200));
+  const H = Math.round(W * 0.72);
   const places = areaPlaces(W, H);
   const nodes = TABLES.map((tb) => tableNode(tb.name, { fill: tint(tb.domain, 10) }));
   const links = pairEdges(EDGES).map((e) => ({ ...e, title: edgeTitle(e) }));
   forceLayout(nodes, links, W, H, {
     repel: 14000,
     length: 120,
+    iterations: TABLES.length > 250 ? 220 : 450,
     anchor: (n) => {
       const [x, y] = places[byName[n.id].domain];
       return [x, y, byName[n.id].domain === 'auth' ? 0.012 : 0.03];
     },
   });
-  return `<section class="mapview">
-    ${crumbs([['Tools', '#tools'], ['Map']])}
-    ${toolNav('map')}
-    <h1>Map</h1>
-    <p class="lede">All ${TABLES.length} tables and ${EDGES.length} links. It is busy on purpose: hover a table to see only its links.</p>
-    ${mapTabs('all')}
-    ${areaKey()}
-    ${legend()}
-    ${svgGraph(nodes, links, fitBox(nodes, 20), 'Every table and every link')}
-    ${mapHint('Tables of the same area sit together. Click a table to see it with only its own links.')}
-  </section>`;
+  return mapShell(
+    'all',
+    `All ${TABLES.length} tables and ${EDGES.length} links. Drag, zoom, and click a table to focus it.`,
+    `${areaKey()}${legend()}${canvasGraph(nodes, links, 'Every table and every link')}
+    ${mapHint('Tables of the same area sit together. Click a table twice to open its own map.')}`,
+  );
 }
 
 /* Hover or keyboard focus on a box shows only its lines and neighbours. */
@@ -2324,16 +2449,534 @@ function mapBlur(svg) {
 }
 ['mouseover', 'focusin'].forEach((type) =>
   document.addEventListener(type, (event) => {
-    const node = event.target.closest && event.target.closest('.map .node');
+    const node = event.target.closest && event.target.closest('.map:not(.is-canvas) .node');
     if (node) mapFocus(node.closest('svg'), node.dataset.node);
   }),
 );
 ['mouseout', 'focusout'].forEach((type) =>
   document.addEventListener(type, (event) => {
-    const node = event.target.closest && event.target.closest('.map .node');
+    const node = event.target.closest && event.target.closest('.map:not(.is-canvas) .node');
     if (node && !(event.relatedTarget && node.contains(event.relatedTarget))) mapBlur(node.closest('svg'));
   }),
 );
+
+/* ============================================================
+   Map: canvas and analysis views (added)
+   #diagram/all         every table on a canvas: drag, zoom, click to focus
+   #diagram/<area>      an area's tables on the same canvas
+   #diagram/layers      dependency levels: what must exist before what
+   #diagram/ownership   cascade trees: whose rows go with whom
+   #diagram/hubs        the most connected tables
+   #diagram/values      the value lists of status and type columns
+   ============================================================ */
+
+/** The canvas of the current view (nodes with positions, links), read by initCanvas() after rendering. */
+let CANVAS = null;
+
+/** Same markup as svgGraph, inside a pan-and-zoom viewport with a toolbar and a details panel. */
+function canvasGraph(nodes, links, label) {
+  const parts = graphParts(nodes, links);
+  CANVAS = { nodes, links, byId: new Map(nodes.map((n) => [n.id, n])) };
+  return `<div class="canvas-wrap" data-canvas tabindex="0" aria-label="${esc(label)}. Drag to move, scroll to zoom, click a table.">
+    <div class="canvas-tools">
+      <button type="button" data-zoom="in" aria-label="Zoom in" title="Zoom in (+)">+</button>
+      <button type="button" data-zoom="out" aria-label="Zoom out" title="Zoom out (−)">−</button>
+      <button type="button" class="wide" data-zoom="fit" title="Show everything (0)">Fit</button>
+      <span class="zoom-level" data-zoom-level>100%</span>
+      <input class="canvas-find" type="search" list="canvas-list" placeholder="Find a table" aria-label="Find a table" data-canvas-find>
+      <datalist id="canvas-list">${nodes.filter((n) => byName[n.id]).map((n) => `<option value="${n.id}"></option>`).join('')}</datalist>
+    </div>
+    <svg class="map is-canvas" role="img" aria-label="${esc(label)}"><defs>${parts.defs}</defs><g class="viewport">${parts.lines}${parts.boxes}</g></svg>
+    <aside class="canvas-panel" data-canvas-panel aria-live="polite">${canvasPanel(null)}</aside>
+    <p class="canvas-help"><span>Drag to move</span><span>Scroll to zoom</span><span>Click a table</span></p>
+  </div>`;
+}
+
+const nodeLabel = (id) => (id.startsWith('area:') ? domainById[id.slice(5)].name : id);
+function selectChip(id) {
+  if (CANVAS && CANVAS.byId.has(id)) return `<button type="button" class="chip" data-canvas-select="${id}">${esc(nodeLabel(id))}</button>`;
+  return `<a class="chip" href="#table/${id}">${id}</a>`;
+}
+
+/** The details panel: help and the most connected tables, or the selected table's links and actions. */
+function canvasPanel(id) {
+  if (!CANVAS) return '';
+  const close = '<button type="button" class="panel-close" data-canvas-clear aria-label="Clear selection">×</button>';
+  if (!id) {
+    const degree = (n) => CANVAS.links.filter((l) => l.from === n.id || l.to === n.id).length;
+    const top = CANVAS.nodes.filter((n) => byName[n.id]).sort((a, b) => degree(b) - degree(a)).slice(0, 6);
+    return `<h3>Click a table</h3><p class="panel-note">Its links stay sharp. Everything else blurs.</p>
+      <h4>Most connected here</h4><div class="panel-chips">${top.map((n) => selectChip(n.id)).join('')}</div>`;
+  }
+  if (id.startsWith('area:')) {
+    const aid = id.slice(5);
+    const names = (CANVAS.byId.get(id).title || '').split(', ').filter(Boolean);
+    return `${close}<h3>${domainById[aid].name}</h3><p class="panel-area"><span style="--c:${areaColor(aid)}"></span>Another area</p>
+      <h4>${count(names.length, 'table links', 'tables link')} here</h4><div class="panel-chips">${names.map((n) => `<a class="chip" href="#table/${n}">${n}</a>`).join('')}</div>
+      <div class="panel-actions"><a class="btn primary" href="#diagram/${aid}">Open its map</a></div>`;
+  }
+  const t = byName[id];
+  const outs = [...new Set(CANVAS.links.filter((l) => l.from === id && l.to !== id).map((l) => l.to))];
+  const ins = [...new Set(CANVAS.links.filter((l) => l.to === id && l.from !== id).map((l) => l.from))];
+  const group = (title, list) => `<h4>${title}<small>${list.length}</small></h4>${list.length ? `<div class="panel-chips">${list.map(selectChip).join('')}</div>` : '<p class="panel-note">None on this map.</p>'}`;
+  return `${close}<h3 class="t">${id}</h3>
+    <p class="panel-area"><span style="--c:${areaColor(t.domain)}"></span>${domainById[t.domain].name}</p>
+    <p class="panel-purpose">${t.purpose}</p>
+    ${group('Points to', outs)}${group('Pointed at by', ins)}
+    <div class="panel-actions"><a class="btn primary" href="#table/${id}">Details</a><a class="btn" href="#diagram/table/${id}">Its map</a><a class="btn" href="#tools/impact/${id}">Delete impact</a></div>`;
+}
+
+/** Wires the canvas of the current view: pan, zoom, pinch, keyboard, click to focus, find, panel. */
+function initCanvas() {
+  const wrap = document.querySelector('[data-canvas]');
+  if (!wrap || !CANVAS) return;
+  const svg = wrap.querySelector('svg');
+  const view = svg.querySelector('.viewport');
+  const panel = wrap.querySelector('[data-canvas-panel]');
+  const level = wrap.querySelector('[data-zoom-level]');
+  const st = { k: 1, x: 0, y: 0, sel: null };
+  const pointers = new Map();
+  let drag = null;
+  let pinch = null;
+  let lastTap = { id: null, at: 0 };
+  const clampK = (k) => Math.min(4, Math.max(0.12, k));
+  const panelSpace = () => (wrap.clientWidth > 760 ? 300 : 0);
+  const local = (e) => {
+    const r = svg.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  };
+  const apply = (animate) => {
+    view.classList.toggle('animate', Boolean(animate));
+    view.style.transform = `translate(${st.x}px, ${st.y}px) scale(${st.k})`;
+    const g = 22 * st.k;
+    wrap.style.backgroundSize = `${g}px ${g}px`;
+    wrap.style.backgroundPosition = `${st.x}px ${st.y}px`;
+    level.textContent = `${Math.round(st.k * 100)}%`;
+  };
+  const fit = (animate) => {
+    const ns = CANVAS.nodes;
+    const minX = Math.min(...ns.map((n) => n.x - n.w / 2));
+    const maxX = Math.max(...ns.map((n) => n.x + n.w / 2));
+    const minY = Math.min(...ns.map((n) => n.y - n.h / 2));
+    const maxY = Math.max(...ns.map((n) => n.y + n.h / 2));
+    const w = svg.clientWidth - panelSpace();
+    const h = svg.clientHeight;
+    st.k = clampK(Math.min((w - 60) / (maxX - minX || 1), (h - 120) / (maxY - minY || 1), 1.4));
+    st.x = (w - (maxX - minX) * st.k) / 2 - minX * st.k;
+    st.y = (h - (maxY - minY) * st.k) / 2 - minY * st.k + 18;
+    apply(animate);
+  };
+  const zoomAt = (factor, sx, sy, animate) => {
+    const k = clampK(st.k * factor);
+    const wx = (sx - st.x) / st.k;
+    const wy = (sy - st.y) / st.k;
+    st.k = k;
+    st.x = sx - wx * k;
+    st.y = sy - wy * k;
+    apply(animate);
+  };
+  const center = (id) => {
+    const n = CANVAS.byId.get(id);
+    if (!n) return;
+    st.k = Math.max(st.k, 1.1);
+    st.x = (svg.clientWidth - panelSpace()) / 2 - n.x * st.k;
+    st.y = svg.clientHeight / 2 - n.y * st.k;
+    apply(true);
+  };
+  const select = (id) => {
+    st.sel = id;
+    svg.classList.toggle('selecting', Boolean(id));
+    const near = new Set(id ? [id] : []);
+    svg.querySelectorAll('.edge').forEach((edge) => {
+      const on = Boolean(id) && (edge.dataset.a === id || edge.dataset.b === id);
+      edge.classList.toggle('on', on);
+      if (on) {
+        near.add(edge.dataset.a);
+        near.add(edge.dataset.b);
+      }
+    });
+    svg.querySelectorAll('.node').forEach((node) => {
+      node.classList.toggle('on', near.has(node.dataset.node));
+      node.classList.toggle('sel', node.dataset.node === id);
+    });
+    panel.innerHTML = canvasPanel(id);
+  };
+
+  svg.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return;
+    pointers.set(e.pointerId, local(e));
+    if (pointers.size === 1) {
+      const [x, y] = local(e);
+      const node = e.target.closest('.node');
+      drag = { x, y, sx: st.x, sy: st.y, moved: false, node: node ? node.dataset.node : null, pointer: e.pointerId };
+    } else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, k: st.k };
+      drag = null;
+    }
+  });
+  svg.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, local(e));
+    if (pinch && pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      zoomAt((pinch.k * d) / pinch.d / st.k, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+      return;
+    }
+    if (!drag) return;
+    const [x, y] = local(e);
+    const dx = x - drag.x;
+    const dy = y - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      wrap.classList.add('dragging');
+      svg.setPointerCapture(drag.pointer);
+    }
+    st.x = drag.sx + dx;
+    st.y = drag.sy + dy;
+    apply();
+  });
+  const end = (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    if (drag && pointers.size === 0) {
+      if (!drag.moved) {
+        const now = Date.now();
+        // A second click on the same table opens its own map.
+        if (drag.node && lastTap.id === drag.node && now - lastTap.at < 380) {
+          const node = CANVAS.byId.get(drag.node);
+          location.hash = node.href;
+          return;
+        }
+        lastTap = { id: drag.node, at: now };
+        select(drag.node && drag.node !== st.sel ? drag.node : null);
+      }
+      drag = null;
+    }
+    wrap.classList.remove('dragging');
+  };
+  svg.addEventListener('pointerup', end);
+  svg.addEventListener('pointercancel', end);
+  svg.addEventListener('click', (e) => e.preventDefault()); // boxes are links elsewhere; here a click selects
+  svg.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      const [x, y] = local(e);
+      zoomAt(Math.exp(-e.deltaY * 0.0015), x, y);
+    },
+    { passive: false },
+  );
+  wrap.addEventListener('keydown', (e) => {
+    if (e.target.matches('input')) return;
+    const node = e.target.closest && e.target.closest('.node');
+    if (e.key === 'Enter' && node) {
+      e.preventDefault();
+      select(node.dataset.node);
+      return;
+    }
+    const cx = (svg.clientWidth - panelSpace()) / 2;
+    const cy = svg.clientHeight / 2;
+    if (e.key === '+' || e.key === '=') zoomAt(1.25, cx, cy, true);
+    else if (e.key === '-' || e.key === '_') zoomAt(0.8, cx, cy, true);
+    else if (e.key === '0') fit(true);
+    else if (e.key === 'Escape') select(null);
+    else if (e.key.startsWith('Arrow')) {
+      st.x += e.key === 'ArrowLeft' ? 70 : e.key === 'ArrowRight' ? -70 : 0;
+      st.y += e.key === 'ArrowUp' ? 70 : e.key === 'ArrowDown' ? -70 : 0;
+      apply(true);
+    } else return;
+    e.preventDefault();
+  });
+  wrap.querySelectorAll('[data-zoom]').forEach((button) =>
+    button.addEventListener('click', () => {
+      if (button.dataset.zoom === 'fit') return fit(true);
+      zoomAt(button.dataset.zoom === 'in' ? 1.25 : 0.8, (svg.clientWidth - panelSpace()) / 2, svg.clientHeight / 2, true);
+    }),
+  );
+  const find = wrap.querySelector('[data-canvas-find]');
+  const go = () => {
+    const id = find.value.trim();
+    if (CANVAS.byId.has(id)) {
+      select(id);
+      center(id);
+    }
+  };
+  find.addEventListener('change', go);
+  find.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') go();
+  });
+  panel.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-canvas-select]');
+    if (chip) {
+      select(chip.dataset.canvasSelect);
+      center(chip.dataset.canvasSelect);
+    } else if (e.target.closest('[data-canvas-clear]')) select(null);
+  });
+  fit(false);
+}
+
+function mapShell(key, lede, body) {
+  return `<section class="mapview">
+    <h1>Map</h1>
+    <p class="lede">${lede}</p>
+    ${mapTabs(key)}
+    ${body}
+  </section>`;
+}
+
+/* ---------- Layers: what must exist before what ---------- */
+
+/** Level 0 points to nothing; every other table sits one level right of the deepest table it points to. */
+function dependencyLevels() {
+  const level = new Map();
+  const visiting = new Set();
+  const parentsOf = (n) => [...new Set(outOf(n).filter((e) => e.to !== n).map((e) => e.to))];
+  const visit = (n) => {
+    if (level.has(n)) return level.get(n);
+    if (visiting.has(n)) return 0; // a cycle between tables: break it here
+    visiting.add(n);
+    const parents = parentsOf(n);
+    const l = parents.length ? 1 + Math.max(...parents.map(visit)) : 0;
+    visiting.delete(n);
+    level.set(n, l);
+    return l;
+  };
+  TABLES.forEach((t) => visit(t.name));
+  const depth = Math.max(...level.values());
+  return Array.from({ length: depth + 1 }, (_, i) => TABLES.filter((t) => level.get(t.name) === i).map((t) => t.name));
+}
+
+function mapLayers() {
+  const layers = dependencyLevels();
+  const deepest = layers.length - 1;
+  const cols = layers
+    .map(
+      (names, i) => `<div class="layer">
+        <h3>Level ${i}<small>${names.length}</small></h3>
+        <p class="layer-sub">${i === 0 ? 'Point to nothing' : `Point to level ${i - 1} or lower`}</p>
+        ${names.map((n) => `<button type="button" class="layer-card" data-layer="${n}" style="--c:${areaColor(byName[n].domain)}">${n}</button>`).join('')}
+      </div>`,
+    )
+    .join('');
+  const insert = layers.map((names, i) => `-- level ${i}\n${names.join('\n')}`).join('\n\n');
+  const remove = layers
+    .map((names, i) => `-- level ${i}\n${names.join('\n')}`)
+    .reverse()
+    .join('\n\n');
+  return mapShell(
+    'layers',
+    'What must exist before what. Each table points only to tables on its left.',
+    `<div class="stats">
+      ${stat(layers.length, 'levels', 'accent')}
+      ${stat(layers[0].length, 'tables point to nothing', 'restrict')}
+      ${stat(deepest, deepest === 1 ? 'step in the longest chain' : 'steps in the longest chain', 'setnull')}
+    </div>
+    <section class="tsec" style="--c:var(--accent)"><h2>Levels</h2>
+      <div class="legend"><span style="--c:var(--accent)">What it points to</span><span style="--c:var(--setnull)">What points to it</span></div>
+      <div class="layers" data-layers>${cols}</div>
+      <p class="layer-info" data-layer-info>Click a table to see what it needs.</p>
+    </section>
+    <section class="tsec" style="--c:var(--restrict)"><h2>Order to fill and empty</h2>
+      <div class="code-card">
+        <div class="code-tabs" role="tablist">
+          <button type="button" role="tab" data-code="insert" aria-selected="true">Insert order</button>
+          <button type="button" role="tab" data-code="delete" aria-selected="false">Delete order</button>
+          <button type="button" class="copy" data-copy>Copy</button>
+        </div>
+        <pre class="code" data-lang="insert">${esc(insert)}</pre>
+        <pre class="code" data-lang="delete" hidden>${esc(remove)}</pre>
+      </div>
+      <p class="fine">Seeds and fixtures: insert top to bottom. Clean-ups: delete top to bottom.</p>
+    </section>`,
+  );
+}
+
+/* ---------- Ownership: whose rows go with whom ---------- */
+
+function mapOwnership() {
+  const ownersOf = (n) => [...new Set(outOf(n).filter((e) => e.d === 'cascade' && e.to !== n).map((e) => e.to))];
+  const ownedBy = (n) => [...new Set(into(n).filter((e) => e.d === 'cascade' && e.from !== n).map((e) => e.from))];
+  const reach = (n, seen = new Set()) => {
+    for (const c of ownedBy(n)) if (!seen.has(c)) seen.add(c), reach(c, seen);
+    return seen.size;
+  };
+  const names = TABLES.map((t) => t.name);
+  const roots = names.filter((n) => !ownersOf(n).length && ownedBy(n).length).sort((a, b) => reach(b) - reach(a) || a.localeCompare(b));
+  const loose = names.filter((n) => !ownersOf(n).length && !ownedBy(n).length);
+  const placed = new Set();
+  const selfTag = (n) => {
+    const self = outOf(n).find((e) => e.to === n && e.d === 'cascade');
+    return self ? `<span class="tag">owns its own rows via ${self.col}</span>` : '';
+  };
+  // Each table sits under its nearest owner inside the first tree that reaches it.
+  const trees = roots.map((root) => {
+    const parent = new Map();
+    const order = [root];
+    placed.add(root);
+    for (let i = 0; i < order.length; i++) {
+      for (const c of ownedBy(order[i])) {
+        if (placed.has(c)) continue;
+        placed.add(c);
+        parent.set(c, order[i]);
+        order.push(c);
+      }
+    }
+    const kids = (n) => order.filter((c) => parent.get(c) === n);
+    const li = (n) => {
+      const also = ownersOf(n).filter((o) => o !== parent.get(n));
+      const k = kids(n);
+      return `<li><span class="node-name">${tlink(n)}</span>${also.length ? `<span class="tag">also owned by ${also.join(', ')}</span>` : ''}${selfTag(n)}${k.length ? `<ul>${k.map(li).join('')}</ul>` : ''}</li>`;
+    };
+    return { root, owns: order.length - 1, html: `<ul>${kids(root).map(li).join('')}</ul>` };
+  });
+  const owned = names.filter((n) => ownersOf(n).length).length;
+  return mapShell(
+    'ownership',
+    'Whose rows go with whom. Delete an owner and everything under it goes too.',
+    `<div class="stats">
+      ${stat(roots.length, roots.length === 1 ? 'owner at the top' : 'owners at the top', 'cascade')}
+      ${stat(owned, owned === 1 ? 'owned table' : 'owned tables', 'setnull')}
+      ${stat(loose.length, loose.length === 1 ? 'table on its own' : 'tables on their own', 'restrict')}
+    </div>
+    <section class="tsec" style="--c:var(--cascade)"><h2>Owners and what they own</h2>
+      ${trees
+        .map(
+          (tr, i) => `<details class="own"${i < 3 ? ' open' : ''}><summary><span class="t">${tr.root}</span><small>owns ${count(tr.owns, 'table', 'tables')}</small></summary>
+            <div class="inner"><div class="tree">${tr.html}</div><p class="fine"><a href="#tools/impact/${tr.root}">See the full delete impact</a></p></div></details>`,
+        )
+        .join('')}
+    </section>
+    <section class="tsec" style="--c:var(--restrict)"><h2>On their own<small>${loose.length}</small></h2>
+      <p class="fine" style="margin:0 0 12px">Not owned, and own nothing. Their links only clear a column or refuse a delete.</p>
+      ${chips(loose)}
+    </section>`,
+  );
+}
+
+/* ---------- Most connected: the tables most links point to or come from ---------- */
+
+function mapHubs() {
+  const degree = TABLES.map((t) => ({ n: t.name, i: into(t.name).filter((e) => e.from !== t.name).length, o: outOf(t.name).filter((e) => e.to !== t.name).length }))
+    .sort((x, y) => y.i + y.o - (x.i + x.o) || x.n.localeCompare(y.n))
+    .slice(0, 10);
+  const top = Math.max(1, ...degree.map((d) => d.i + d.o));
+  return mapShell(
+    'hubs',
+    'The ten tables with the most links. Click one to see its own map.',
+    `<section class="tsec" style="--c:var(--accent)"><h2>Most connected tables</h2>
+      <div class="legend"><span style="--c:var(--accent)">Pointed at</span><span style="--c:var(--setnull)">Points to</span></div>
+      <ul class="hubs">${degree
+        .map(
+          (d) => `<li><a class="hub" href="#diagram/table/${d.n}"><span class="t">${d.n}</span><span class="hub-bar"><i class="in" style="width:${((100 * d.i) / top).toFixed(1)}%"></i><i class="out" style="width:${((100 * d.o) / top).toFixed(1)}%"></i></span><small>${d.i} in, ${d.o} out</small></a></li>`,
+        )
+        .join('')}</ul>
+    </section>`,
+  );
+}
+
+/* ---------- Values: what status and type columns can hold ---------- */
+
+/** Value lists written in column notes as "a · b · c", or flows as "a → b → c, or d". */
+function valueLists() {
+  const out = [];
+  for (const t of TABLES) {
+    for (const c of t.columns) {
+      if (!c.note) continue;
+      let s = c.note.replace(/<[^>]+>/g, '').trim();
+      const flow = s.includes(' → ');
+      if (!flow && !s.includes(' · ')) continue;
+      let hint = '';
+      const semi = s.indexOf(';');
+      if (semi > 0) {
+        hint = s.slice(semi + 1).trim();
+        s = s.slice(0, semi);
+      }
+      const first = s.search(flow ? / → / : / · /);
+      const colon = s.indexOf(': ');
+      if (colon > 0 && colon < first) s = s.slice(colon + 2);
+      const pieces = s.split(flow ? /( → |, or | or )/ : / · /);
+      const values = [];
+      const seps = [];
+      pieces.forEach((p, i) => {
+        if (flow && i % 2) return void seps.push(p.includes('or') ? 'or' : '→');
+        const m = p.trim().match(/^(.*?)\s*\((.*)\)$/);
+        values.push(m ? { v: m[1], hint: m[2] } : { v: p.trim(), hint: '' });
+      });
+      if (values.length < 2 || values.some((v) => !v.v || v.v.length > 32)) continue;
+      out.push({ table: t.name, column: c.n, area: t.domain, values, seps, flow, hint });
+    }
+  }
+  return out;
+}
+
+function mapValues() {
+  const lists = valueLists();
+  const key = (l) => l.values.map((v) => v.v).join('|');
+  const groups = new Map();
+  lists.forEach((l) => {
+    if (!groups.has(key(l))) groups.set(key(l), []);
+    groups.get(key(l)).push(l);
+  });
+  const shared = [...groups.values()].filter((g) => g.length > 1).sort((a, b) => b.length - a.length);
+  const chipsOf = (l) =>
+    `<div class="vals">${l.values
+      .map((v, i) => `${i && l.flow ? `<i>${l.seps[i - 1]}</i>` : ''}<span class="val"${v.hint ? ` title="${esc(v.hint)}"` : ''}>${esc(v.v)}</span>`)
+      .join('')}</div>`;
+  const hints = (l) => {
+    const parts = l.values.filter((v) => v.hint).map((v) => `<b>${esc(v.v)}</b>: ${esc(v.hint)}`);
+    if (l.hint) parts.push(esc(l.hint));
+    return parts.length ? `<p class="val-hint">${parts.join('<br>')}</p>` : '';
+  };
+  const colLink = (l) => `<a class="t" href="#table/${l.table}/columns">${l.table}.<b>${l.column}</b></a>`;
+  const flows = lists.filter((l) => l.flow).length;
+  return mapShell(
+    'values',
+    'What status and type columns can hold, and which tables share the same list.',
+    `<div class="stats">
+      ${stat(lists.length, 'value lists', 'accent')}
+      ${stat(shared.length, shared.length === 1 ? 'list shared by tables' : 'lists shared by tables', 'setnull')}
+      ${stat(flows, flows === 1 ? 'list with an order' : 'lists with an order', 'restrict')}
+    </div>
+    ${shared.length ? `<section class="tsec" style="--c:var(--setnull)"><h2>Shared by several tables<small>${shared.length}</small></h2>
+      ${shared.map((g) => `<div class="val-card">${chipsOf(g[0])}<p class="val-used"><span>Used by</span>${g.map((l) => `<a href="#table/${l.table}/columns">${l.table}.<b>${l.column}</b></a>`).join('')}</p></div>`).join('')}
+    </section>` : ''}
+    <section class="tsec" style="--c:var(--accent)"><h2>Every list, by area<small>${lists.length}</small></h2>
+      ${AREA_ORDER.map((aid) => {
+        const rows = lists.filter((l) => l.area === aid);
+        if (!rows.length) return '';
+        return fold(domainById[aid].name, rows.map((l) => `<div class="val-row">${colLink(l)}<div>${chipsOf(l)}${hints(l)}</div></div>`).join(''), count(rows.length, 'list', 'lists'));
+      }).join('')}
+    </section>`,
+  );
+}
+
+/* Clicks in the Layers view: a card shows what it needs and what needs it. */
+document.addEventListener('click', (event) => {
+  const card = event.target.closest('[data-layer]');
+  if (card) {
+    const box = card.closest('[data-layers]');
+    const id = card.dataset.layer;
+    const clear = card.classList.contains('sel');
+    const parents = new Set(outOf(id).filter((e) => e.to !== id).map((e) => e.to));
+    const children = new Set(into(id).filter((e) => e.from !== id).map((e) => e.from));
+    box.classList.toggle('selecting', !clear);
+    box.querySelectorAll('[data-layer]').forEach((c) => {
+      const n = c.dataset.layer;
+      c.classList.toggle('sel', !clear && n === id);
+      c.classList.toggle('on', !clear && (n === id || parents.has(n) || children.has(n)));
+      c.classList.toggle('needs', !clear && parents.has(n));
+      c.classList.toggle('needed', !clear && children.has(n));
+    });
+    document.querySelector('[data-layer-info]').innerHTML = clear
+      ? 'Click a table to see what it needs.'
+      : `<b class="t">${id}</b> needs ${parents.size ? [...parents].map(tlink).join(', ') : 'nothing'}. ${children.size ? `${count(children.size, 'table needs', 'tables need')} it.` : 'Nothing needs it.'}`;
+    return;
+  }
+});
 
 /* ============================================================
    Tools (added; the views above are unchanged)
@@ -2441,8 +3084,6 @@ function toolImpact(start) {
   const linkRows = (list) =>
     `<ul class="pairs">${list.map((e) => `<li>${tlink(e.from)}<span class="via">${e.col}</span></li>`).join('')}</ul>`;
   return `<section class="tool">
-    ${crumbs([['Tools', '#tools'], ['Delete impact']])}
-    ${toolNav('impact')}
     <h1>Delete impact</h1>
     <div class="ask"><span>Delete one row from</span>${bigSelect('impact-table', start)}</div>
     <div class="stats">
@@ -2583,8 +3224,6 @@ function toolJoin(a, b) {
       <section class="tsec" style="--c:var(--accent)"><h2>${paths.length > 1 ? 'Pick a way' : 'The path'}</h2>${ways}${panels}</section>`;
   }
   return `<section class="tool">
-    ${crumbs([['Tools', '#tools'], ['Join path']])}
-    ${toolNav('join')}
     <h1>Join path</h1>
     <div class="ask"><span>Join</span>${bigSelect('join-a', a)}<span>to</span>${bigSelect('join-b', b)}<button type="button" class="swap" data-swap aria-label="Swap the two tables" title="Swap">⇄</button></div>
     ${result}
@@ -2641,9 +3280,9 @@ document.addEventListener('click', (event) => {
 });
 
 /* ---- Navigation helpers (added) ---- */
-/** Switch between the tools from any tool or map page. */
-function toolNav(current) {
-  return `<nav class="subnav" aria-label="Tools">${[
+/** The second header row inside Tools: the three tools, the current one marked. */
+function toolBar(current) {
+  return `<nav class="subbar-in" aria-label="Tools"><a class="subbar-up" href="#tools"${current ? '' : ' aria-current="page"'}>Tools</a><span aria-hidden="true">›</span>${[
     ['map', 'Map', '#diagram'],
     ['impact', 'Delete impact', '#tools/impact'],
     ['join', 'Join path', '#tools/join'],
@@ -2651,6 +3290,32 @@ function toolNav(current) {
     .map(([key, text, href]) => `<a href="${href}"${key === current ? ' aria-current="page"' : ''}>${text}</a>`)
     .join('')}</nav>`;
 }
+
+/** Tab rows scroll sideways on narrow screens: keep the current tab in view and fade the edge while more is hidden. */
+function tabEdges(row) {
+  row.classList.toggle('less', row.scrollLeft > 2);
+  row.classList.toggle('more', row.scrollLeft + row.clientWidth < row.scrollWidth - 2);
+}
+function fitTabs() {
+  app.querySelectorAll('.tabs').forEach((row) => {
+    const on = row.querySelector('[aria-current]');
+    if (on) {
+      // Scroll only as far as needed to show the current tab clear of the fade.
+      const over = on.getBoundingClientRect().right - row.getBoundingClientRect().right + 56;
+      if (over > 0) row.scrollLeft += over;
+    }
+    tabEdges(row);
+  });
+}
+document.addEventListener(
+  'scroll',
+  (event) => {
+    const row = event.target.closest?.('.tabs');
+    if (row) tabEdges(row);
+  },
+  true,
+);
+window.addEventListener('resize', fitTabs);
 
 /** Previous / next among siblings. `items` are [label, href, mono?]. */
 function pager(items, index, what) {
@@ -2673,7 +3338,7 @@ const refPager = (topic) => pager(REF.map(([id, title]) => [title, `#ref/${id}`]
    #table/papers/links, #ref, #ref/indexes
    ============================================================ */
 // Older links (the previous explorer, and links inside the data) still land somewhere useful.
-const ALIASES = { overview: 'home', map: 'ref/links', tables: 'explore', indexes: 'ref/indexes', rules: 'ref/rules', lifecycle: 'ref/lifecycle', research: 'ref/research', changes: 'ref/efficiency', migrations: 'ref/migrations', roadmap: 'ref/gaps' };
+const ALIASES = { 'diagram/matrix': 'diagram/hubs', overview: 'home', map: 'ref/links', tables: 'explore', indexes: 'ref/indexes', rules: 'ref/rules', lifecycle: 'ref/lifecycle', research: 'ref/research', changes: 'ref/efficiency', migrations: 'ref/migrations', roadmap: 'ref/gaps' };
 
 function route() {
   let hash = location.hash.replace(/^#/, '') || 'home';
@@ -2698,9 +3363,15 @@ function route() {
     if (link.dataset.nav === section) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
+  const sub = document.getElementById('subbar');
+  const tool = view === 'diagram' ? 'map' : view === 'tools' ? a || '' : null;
+  sub.hidden = tool === null;
+  sub.innerHTML = tool === null ? '' : toolBar(tool);
   document.title = `Doshomik schema guide: ${app.querySelector('h1')?.textContent || 'Home'}`;
   window.scrollTo(0, 0);
   wire();
+  initCanvas();
+  fitTabs();
 }
 
 /** Behaviour for the few interactive parts of the current view. */
