@@ -3,409 +3,208 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Doshomik Schema Explorer</title>
+<title>Doshomik Schema Guide</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Mono:wght@400;500&family=Atkinson+Hyperlegible+Next:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-/* Hash-routed views. Data is transcribed from apps/api/migrations/*.sql (after migration 004). */
+/* One idea per screen: Home → Tour (step by step), Explore (area → table → one tab), Reference (one topic per page). */
 :root{
-  --bg:#f4f1ea; --surface:#fffefa; --surface-2:#ece9de;
-  --ink:#19212b; --ink-2:#4b5663; --muted:#79838f;
-  --line:#ded8c9; --line-strong:#c6beaa;
-  --accent:#17587f; --accent-soft:rgba(23,88,127,.10);
-  --key:#a1561b; --key-soft:rgba(161,86,27,.12);
-  --cascade:#99392b; --cascade-soft:rgba(153,57,43,.10);
-  --setnull:#8a6a14; --setnull-soft:rgba(138,106,20,.12);
-  --restrict:#5b6672; --restrict-soft:rgba(91,102,114,.12);
-  --ok:#2c6b4f; --ok-soft:rgba(44,107,79,.12);
-  --shadow:0 1px 2px rgba(25,33,43,.06), 0 8px 24px -16px rgba(25,33,43,.3);
-  --font-display:"IBM Plex Serif",Georgia,serif;
-  --font-body:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
-  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --bg:#F6F7F4;          /* the app's own background */
+  --surface:#FFFFFF;
+  --ink:#1D2A2A;
+  --ink-2:#465655;
+  --muted:#6C7978;
+  --line:#DDE3DF;
+  --accent:#0E6E62;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#E3F0EC;
+  --cascade:#B2432F; --cascade-soft:#F7E6E2;
+  --setnull:#8C6400; --setnull-soft:#F5EDD9;
+  --restrict:#56626D; --restrict-soft:#E8EBEE;
+  --font:"Atkinson Hyperlegible Next","Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Atkinson Hyperlegible Mono",ui-monospace,"Cascadia Mono",Menlo,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#101620; --surface:#161e28; --surface-2:#1d2631;
-    --ink:#e7ecf1; --ink-2:#aeb9c4; --muted:#7e8a97;
-    --line:#293341; --line-strong:#3a4756;
-    --accent:#72b4de; --accent-soft:rgba(114,180,222,.14);
-    --key:#d79a5f; --key-soft:rgba(215,154,95,.16);
-    --cascade:#e08b79; --cascade-soft:rgba(224,139,121,.14);
-    --setnull:#d6bb6c; --setnull-soft:rgba(214,187,108,.14);
-    --restrict:#9aa6b2; --restrict-soft:rgba(154,166,178,.14);
-    --ok:#73c69b; --ok-soft:rgba(115,198,155,.14);
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+    --bg:#121817; --surface:#1A2221; --ink:#E4ECEA; --ink-2:#B5C2BF; --muted:#86938F; --line:#2B3634;
+    --accent:#5CC3B2; --accent-ink:#0C1514; --accent-soft:#1D3330;
+    --cascade:#E58C7A; --cascade-soft:#3A2622; --setnull:#D9B45E; --setnull-soft:#352D1A; --restrict:#A2AEB9; --restrict-soft:#262E35;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#101620; --surface:#161e28; --surface-2:#1d2631;
-  --ink:#e7ecf1; --ink-2:#aeb9c4; --muted:#7e8a97;
-  --line:#293341; --line-strong:#3a4756;
-  --accent:#72b4de; --accent-soft:rgba(114,180,222,.14);
-  --key:#d79a5f; --key-soft:rgba(215,154,95,.16);
-  --cascade:#e08b79; --cascade-soft:rgba(224,139,121,.14);
-  --setnull:#d6bb6c; --setnull-soft:rgba(214,187,108,.14);
-  --restrict:#9aa6b2; --restrict-soft:rgba(154,166,178,.14);
-  --ok:#73c69b; --ok-soft:rgba(115,198,155,.14);
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+  --bg:#121817; --surface:#1A2221; --ink:#E4ECEA; --ink-2:#B5C2BF; --muted:#86938F; --line:#2B3634;
+  --accent:#5CC3B2; --accent-ink:#0C1514; --accent-soft:#1D3330;
+  --cascade:#E58C7A; --cascade-soft:#3A2622; --setnull:#D9B45E; --setnull-soft:#352D1A; --restrict:#A2AEB9; --restrict-soft:#262E35;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
-code,.mono{font-family:var(--font-mono);font-size:.86em;font-variant-ligatures:none}
-code{background:var(--surface-2);padding:1px 5px;border-radius:4px;color:var(--ink)}
-h1,h2,h3{font-family:var(--font-display);font-weight:600;text-wrap:balance;margin:0}
-a{color:var(--accent)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-button{font:inherit;color:inherit}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-underline-offset:3px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+h1,h2,h3{line-height:1.25;margin:0;font-weight:700;text-wrap:balance}
+h1{font-size:2rem;letter-spacing:-.01em;margin-bottom:14px}
+h2{font-size:1.3rem}
+h3{font-size:1.05rem}
+p{margin:0 0 1em;max-width:68ch}
+code,.t{font-family:var(--mono);font-size:.92em}
+code{background:var(--accent-soft);color:var(--ink);padding:.05em .35em;border-radius:5px}
+ul,ol{padding-left:1.2em}
 
-/* ---------- header ---------- */
-.topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.topbar-inner{max-width:1240px;margin:0 auto;padding:14px 20px 0}
-.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:2px}
-.topbar h1{font-size:21px;letter-spacing:-.01em}
-.topbar h1 span{color:var(--muted);font-weight:500}
-nav.tabs{display:flex;gap:2px;max-width:1240px;margin:0 auto;padding:10px 14px 0;overflow-x:auto;scrollbar-width:thin}
-nav.tabs a{font-size:13.5px;font-weight:500;color:var(--ink-2);text-decoration:none;padding:7px 12px;border-radius:7px 7px 0 0;border:1px solid transparent;border-bottom:none;white-space:nowrap}
-nav.tabs a:hover{background:var(--accent-soft);color:var(--accent)}
-nav.tabs a[aria-current="page"]{background:var(--surface);color:var(--ink);border-color:var(--line)}
-main{max-width:1240px;margin:0 auto;padding:26px 20px 72px}
-.view[hidden]{display:none}
+/* ---- top bar ---- */
+.bar{border-bottom:1px solid var(--line);background:var(--surface)}
+.bar-in{max-width:760px;margin:0 auto;padding:14px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px;justify-content:space-between}
+.brand{font-weight:700;color:var(--ink);text-decoration:none}
+nav.main{display:flex;gap:4px;flex-wrap:wrap}
+nav.main a{color:var(--ink-2);text-decoration:none;padding:6px 12px;border-radius:999px;font-weight:600;font-size:.95rem}
+nav.main a:hover{background:var(--accent-soft);color:var(--ink)}
+nav.main a[aria-current="page"]{background:var(--ink);color:var(--bg)}
 
-/* ---------- shared blocks ---------- */
-.lede{max-width:70ch;color:var(--ink-2);margin:0 0 22px;font-size:15.5px}
-.section{margin:0 0 38px}
-.section > h2{font-size:18px;margin:0 0 6px;display:flex;align-items:baseline;gap:10px}
-.section > h2 .num{font-family:var(--font-mono);font-size:11px;color:var(--accent);border:1px solid var(--line-strong);border-radius:4px;padding:1px 6px}
-.hint{color:var(--muted);font-size:13.8px;margin:0 0 14px;max-width:76ch}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
-.pad{padding:16px 18px}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 30px}
-.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 15px}
-.tile .v{font-family:var(--font-mono);font-size:24px;font-weight:600;letter-spacing:-.02em;display:block}
-.tile .k{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.tile .s{font-size:12.5px;color:var(--ink-2);margin-top:3px}
-.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
-.grid3 .card{padding:16px 18px}
-.grid3 h3{font-size:15px;margin-bottom:6px}
-.grid3 p{margin:0;font-size:13.8px;color:var(--ink-2)}
+main{max-width:760px;margin:0 auto;padding:36px 20px 80px}
+.lede{font-size:1.15rem;color:var(--ink-2)}
+.crumbs{font-size:.92rem;color:var(--muted);margin:0 0 18px;display:flex;flex-wrap:wrap;gap:6px}
+.crumbs a{color:var(--muted)}
+.crumbs span[aria-hidden]{opacity:.6}
+.hint{color:var(--muted);font-size:.95rem}
+.stack > * + *{margin-top:14px}
+.block{margin-top:34px}
+.block > h2{margin-bottom:12px}
 
-table.grid{width:100%;border-collapse:collapse;font-size:13.8px}
-table.grid th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;padding:10px 14px;border-bottom:1px solid var(--line-strong);white-space:nowrap;background:var(--surface)}
-table.grid td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
-table.grid tbody tr:last-child td{border-bottom:none}
-table.grid tbody tr:hover td{background:color-mix(in srgb,var(--surface-2) 45%,transparent)}
-table.grid .mono{font-size:12.6px}
-table.grid tr.group td{background:var(--surface-2);font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:7px 14px}
-.scroller{overflow-x:auto;border-radius:10px}
-.scroller > table{min-width:620px}
-.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 8px 8px 0;font-size:13.8px;color:var(--ink-2);margin:14px 0 0}
-.note strong{color:var(--ink)}
-.note.ok{border-color:var(--ok);background:var(--ok-soft)}
+/* ---- home: three ways in ---- */
+.paths{display:grid;gap:14px;margin-top:28px}
+.path{display:block;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+.path:hover{border-color:var(--accent)}
+.path b{display:block;font-size:1.2rem;margin-bottom:2px}
+.path span{color:var(--ink-2)}
+.path.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.path.primary span{color:inherit;opacity:.9}
 
-/* pills */
-.pill{display:inline-block;font-family:var(--font-mono);font-size:10.8px;letter-spacing:.02em;border:1px solid var(--line-strong);border-radius:999px;padding:1px 8px;color:var(--ink-2);white-space:nowrap;line-height:1.6}
-.r-cascade{color:var(--cascade);border-color:var(--cascade);background:var(--cascade-soft)}
-.r-setnull{color:var(--setnull);border-color:var(--setnull);background:var(--setnull-soft)}
-.r-restrict{color:var(--restrict);border-color:var(--restrict);background:var(--restrict-soft)}
-.p-new{color:var(--ok);border-color:var(--ok);background:var(--ok-soft)}
-.p-accent{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
-.p-key{color:var(--key);border-color:var(--key);background:var(--key-soft)}
-.k{font-family:var(--font-mono);font-size:10.5px;border-radius:4px;padding:1px 5px;border:1px solid;white-space:nowrap}
-.k-pk{color:var(--key);border-color:var(--key);background:var(--key-soft)}
-.k-fk{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
-.k-u{color:var(--ink-2);border-color:var(--line-strong)}
-.keycell{display:flex;gap:4px;flex-wrap:wrap}
-.jump{background:none;border:none;padding:0;font-family:var(--font-mono);font-size:12.6px;color:var(--accent);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
-.jump:hover{text-decoration-style:solid}
-ul.plain{margin:0;padding-left:18px;font-size:13.8px;color:var(--ink-2)}
-ul.plain li{margin-bottom:7px}
-ul.plain li:last-child{margin-bottom:0}
-.legend{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted);margin:0 0 14px}
-.legend span{display:inline-flex;align-items:center;gap:6px}
+/* ---- the tour: a row of cells that fills in ---- */
+.row-progress{display:grid;grid-template-columns:repeat(var(--n),1fr);border:1.5px solid var(--ink);border-radius:8px;overflow:hidden;margin-bottom:10px}
+.row-progress a{height:22px;border-left:1.5px solid var(--ink);background:var(--surface)}
+.row-progress a:first-child{border-left:none}
+.row-progress a.done{background:var(--accent)}
+.row-progress a.now{background:var(--accent-soft);box-shadow:inset 0 0 0 3px var(--accent)}
+.step-count{font-size:.92rem;color:var(--muted);margin:0 0 26px}
+.tour h1{margin-bottom:16px}
+.tour .visual{margin:26px 0}
+.tour-nav{display:flex;justify-content:space-between;gap:12px;margin-top:36px;padding-top:20px;border-top:1px solid var(--line)}
+.btn{display:inline-block;font:inherit;font-weight:600;padding:10px 20px;border-radius:999px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);text-decoration:none;cursor:pointer}
+.btn.primary{background:var(--ink);color:var(--bg)}
+.btn[aria-disabled="true"]{visibility:hidden}
 
-/* ---------- relationship map ---------- */
-.lanes{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
-.lane{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 12px 10px;box-shadow:var(--shadow)}
-.lane h3{font-family:var(--font-body);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 2px 8px;display:flex;justify-content:space-between}
-.node{display:flex;width:100%;justify-content:space-between;align-items:center;gap:8px;text-align:left;background:var(--surface-2);border:1px solid transparent;border-radius:7px;padding:6px 9px;margin-bottom:6px;cursor:pointer;font-family:var(--font-mono);font-size:12.6px;color:var(--ink);transition:opacity .15s,background .15s,border-color .15s}
-.node:last-child{margin-bottom:0}
-.node:hover{border-color:var(--accent)}
-.node .deg{font-size:10.5px;color:var(--muted);white-space:nowrap}
-.lanes.focusing .node{opacity:.32}
-.lanes.focusing .node.is-focus,.lanes.focusing .node.is-parent,.lanes.focusing .node.is-child{opacity:1}
-.node.is-focus{background:var(--accent);color:#fff;border-color:var(--accent)}
-.node.is-focus .deg{color:inherit;opacity:.85}
-:root:not([data-theme="light"]) .node.is-focus{color:#0d131b}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .node.is-focus{color:#fff}}
-.node.is-parent{border-color:var(--accent);background:var(--accent-soft)}
-.node.is-child{border-color:var(--key);background:var(--key-soft)}
-.node .tag{font-family:var(--font-body);font-size:10.5px;font-weight:600;letter-spacing:.03em}
-.node.is-parent .tag{color:var(--accent)}
-.node.is-child .tag{color:var(--key)}
+/* ---- small visual pieces ---- */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:.92rem;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.flow b{font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 10px}
+.flow i{font-style:normal;color:var(--muted)}
+.demo{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface);max-width:520px}
+.demo table{border-collapse:collapse;width:100%}
+.demo th,.demo td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line)}
+.demo tr:last-child td{border-bottom:none}
+.demo th{font-size:.9rem;color:var(--muted);font-weight:600}
+.demo td{font-family:var(--mono);font-size:.95rem}
+.three{display:grid;gap:12px}
+.rule{border-left:5px solid;border-radius:10px;padding:12px 16px}
+.rule b{display:block}
+.rule.cascade{border-color:var(--cascade);background:var(--cascade-soft)}
+.rule.setnull{border-color:var(--setnull);background:var(--setnull-soft)}
+.rule.restrict{border-color:var(--restrict);background:var(--restrict-soft)}
+.areas{display:grid;gap:8px;padding:0;list-style:none;margin:0}
+.areas li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:8px 0}
+.areas li span{color:var(--muted)}
 
-.focus-panel{margin-top:16px}
-.focus-panel .empty{color:var(--muted);font-size:13.8px}
-.relcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
-.relbox{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.relbox > header{padding:11px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.relbox > header h4{margin:0;font-size:13.5px;font-weight:600}
-.relbox > header small{color:var(--muted);font-size:12px}
-.relbox.out > header{border-top:3px solid var(--accent)}
-.relbox.in > header{border-top:3px solid var(--key)}
-.rel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:9px 15px;border-bottom:1px solid var(--line);align-items:center}
-.rel:last-child{border-bottom:none}
-.rel .path{font-family:var(--font-mono);font-size:12.4px;color:var(--ink-2);min-width:0;overflow-wrap:anywhere}
-.rel .path .arrow{color:var(--muted);padding:0 4px}
-.rel .why{grid-column:1 / -1;font-size:12.5px;color:var(--muted)}
-.relgroup{padding:6px 15px;background:var(--surface-2);font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.relbox .none{padding:12px 15px;color:var(--muted);font-size:13.5px}
+/* ---- lists of things to open ---- */
+.list{list-style:none;padding:0;margin:0;border-top:1px solid var(--line)}
+.list > li{border-bottom:1px solid var(--line)}
+.list a.item{display:block;padding:16px 4px;text-decoration:none;color:var(--ink)}
+.list a.item:hover{background:var(--surface)}
+.list a.item b{display:block;font-size:1.08rem}
+.list a.item b.t{font-weight:500}
+.list a.item span{color:var(--ink-2);font-size:.97rem}
+.list a.item small{display:block;color:var(--muted);font-size:.88rem;margin-top:2px}
+.search{width:100%;font:inherit;padding:12px 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);margin:18px 0 8px}
+.search:focus{border-color:var(--accent);outline:none}
 
-.filterbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
-.filterbar input{font:inherit;font-size:13.5px;padding:7px 10px;border-radius:7px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);min-width:220px;flex:1 1 220px;max-width:340px}
-.chipbtn{font-family:var(--font-mono);font-size:11.5px;padding:4px 10px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);cursor:pointer}
-.chipbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+/* ---- table page ---- */
+.table-title{font-family:var(--mono);font-weight:500;font-size:2rem}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:26px 0 24px;border-bottom:1px solid var(--line)}
+.tabs a{padding:9px 14px;text-decoration:none;color:var(--ink-2);font-weight:600;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs a:hover{color:var(--ink)}
+.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+.facts{display:flex;flex-wrap:wrap;gap:8px 22px;color:var(--ink-2);padding:0;list-style:none;margin:0 0 24px}
+.facts b{color:var(--ink)}
+.know{padding-left:1.1em}
+.know li{margin-bottom:10px}
+.cols{list-style:none;padding:0;margin:0}
+.cols li{padding:14px 0;border-bottom:1px solid var(--line)}
+.cols li:first-child{padding-top:0}
+.col-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}
+.col-head .t{font-weight:500;font-size:1.02rem}
+.col-head .type{color:var(--muted);font-size:.88rem;font-family:var(--mono)}
+.cols p{margin:4px 0 0;color:var(--ink-2)}
+.pill{display:inline-block;font-size:.8rem;font-weight:600;border-radius:999px;padding:1px 9px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+.pill.key{border-color:var(--accent);color:var(--accent)}
+.pill.p-new,.pill.new{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.links{list-style:none;padding:0;margin:0}
+.links li{padding:12px 14px;border-radius:10px;border-left:5px solid;margin-bottom:10px;background:var(--surface)}
+.links li.cascade{border-color:var(--cascade)}
+.links li.setnull{border-color:var(--setnull)}
+.links li.restrict{border-color:var(--restrict)}
+.links li small{display:block;color:var(--muted);font-size:.9rem;margin-top:2px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.9rem;color:var(--muted);margin:0 0 16px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.next{margin-top:32px;padding-top:18px;border-top:1px solid var(--line)}
 
-/* ---------- table explorer ---------- */
-.explorer{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;align-items:start}
-.sidebar{position:sticky;top:122px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
-.searchwrap{padding:11px;border-bottom:1px solid var(--line)}
-.searchwrap input{width:100%;font:inherit;font-size:13.5px;padding:7px 9px;border-radius:7px;border:1px solid var(--line-strong);background:var(--bg);color:var(--ink)}
-.searchwrap .count{font-size:11.5px;color:var(--muted);margin-top:6px;font-family:var(--font-mono)}
-.tablelist{max-height:calc(100vh - 230px);overflow-y:auto;padding:6px}
-.domain-h{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:10px 8px 4px;display:flex;justify-content:space-between}
-.tablelist button{display:block;width:100%;text-align:left;background:none;border:none;border-radius:6px;font-family:var(--font-mono);font-size:12.6px;color:var(--ink-2);padding:5px 8px;cursor:pointer}
-.tablelist button:hover{background:var(--accent-soft);color:var(--accent)}
-.tablelist button[aria-current="true"]{background:var(--accent);color:#fff;font-weight:500}
-:root:not([data-theme="light"]) .tablelist button[aria-current="true"]{color:#0d131b}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .tablelist button[aria-current="true"]{color:#fff}}
-.tablelist .hitcol{display:block;font-family:var(--font-body);font-size:11px;opacity:.75}
-.detail{min-width:0;scroll-margin-top:122px}
-.detail-head{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:20px}
-.detail-head h2{font-family:var(--font-mono);font-size:20px;font-weight:600}
-.detail-head p{margin:6px 0 0;color:var(--ink-2);font-size:14px;max-width:72ch}
-.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-.sub{margin:0 0 24px}
-.sub > h3{font-family:var(--font-body);font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600;margin:0 0 9px}
+details{border-bottom:1px solid var(--line)}
+details:first-of-type{border-top:1px solid var(--line)}
+/* A small chevron inside the column (the default marker hangs outside it); it turns when the row opens. */
+summary{cursor:pointer;padding:14px 4px;font-weight:600;list-style:none;display:flex;align-items:baseline;gap:12px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";flex:none;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-2px) rotate(-45deg);transition:transform .15s}
+details[open] > summary::before{transform:translateY(-4px) rotate(45deg)}
+summary:hover::before{border-color:var(--accent)}
+summary small{font-weight:400;color:var(--muted)}
+details > .inner{padding:0 4px 18px}
+details > .inner p:last-child{margin-bottom:0}
+.ba{display:grid;gap:10px}
+.ba div{border-radius:10px;padding:10px 14px}
+.ba .before{background:var(--cascade-soft)}
+.ba .after{background:var(--accent-soft)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.filters button{font:inherit;font-size:.92rem;padding:6px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.empty{color:var(--muted);padding:18px 4px}
 
-/* ---------- flows & changes ---------- */
-.flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:var(--font-mono);font-size:12px;color:var(--ink-2)}
-.flow b{font-weight:500;background:var(--surface-2);border-radius:5px;padding:2px 7px;color:var(--ink)}
-.flow s{text-decoration:none;color:var(--muted)}
-.change{padding:16px 18px;margin-bottom:12px}
-.change h3{font-family:var(--font-body);font-size:15px;font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
-.change .ba{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:10px}
-.change .ba > div{border-radius:8px;padding:10px 13px;font-size:13.6px;color:var(--ink-2)}
-.change .before{background:var(--cascade-soft)}
-.change .after{background:var(--ok-soft)}
-.change .ba b{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
-.change .before b{color:var(--cascade)}
-.change .after b{color:var(--ok)}
-.change .where{margin-top:10px;font-size:12.5px;color:var(--muted)}
-
-footer.foot{max-width:1240px;margin:0 auto;padding:0 20px 48px;color:var(--muted);font-size:12.5px}
-footer.foot p{margin:4px 0}
-
-@media (max-width:900px){
-  .explorer{grid-template-columns:1fr}
-  .sidebar{position:static}
-  .tablelist{max-height:260px}
-}
+footer{max-width:760px;margin:0 auto;padding:0 20px 48px;color:var(--muted);font-size:.9rem}
 @media (max-width:560px){
-  main{padding:18px 16px 56px}
-  .topbar-inner{padding:12px 16px 0}
-  .topbar h1{font-size:18px}
+  body{font-size:16px}
+  h1,.table-title{font-size:1.6rem}
+  main{padding:26px 16px 64px}
+  .bar-in{padding:12px 16px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
-
-<header class="topbar">
-  <div class="topbar-inner">
-    <span class="eyebrow">Prototype 2 backend · after migration 004 · 23 Nov 2026</span>
-    <h1>Doshomik database <span>· <span id="h-tables">30</span> tables on PostgreSQL</span></h1>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#home">Doshomik schema guide</a>
+    <nav class="main" aria-label="Main">
+      <a href="#home" data-nav="home">Home</a>
+      <a href="#tour/1" data-nav="tour">Tour</a>
+      <a href="#explore" data-nav="explore">Explore</a>
+      <a href="#ref" data-nav="ref">Reference</a>
+    </nav>
   </div>
-  <nav class="tabs" id="nav">
-    <a href="#overview">Overview</a>
-    <a href="#map">Relationship map</a>
-    <a href="#tables">Tables</a>
-    <a href="#indexes">Indexes</a>
-    <a href="#rules">Rules &amp; deletes</a>
-    <a href="#lifecycle">Lifecycle</a>
-    <a href="#changes">Efficiency changes</a>
-    <a href="#migrations">Migrations</a>
-    <a href="#roadmap">Known gaps</a>
-  </nav>
 </header>
-
-<main>
-
-<!-- ============ OVERVIEW ============ -->
-<section class="view" id="view-overview">
-  <p class="lede">One Postgres database runs the whole backend: no Redis, no Elasticsearch, no separate queue. Use <strong>Relationship map</strong> to see how tables connect, and <strong>Tables</strong> for each table's columns, keys and indexes.</p>
-
-  <div class="tiles">
-    <div class="tile"><span class="v" id="t-tables">30</span><span class="k">tables</span><div class="s">in 8 domains</div></div>
-    <div class="tile"><span class="v" id="t-fks">—</span><span class="k">foreign keys</span><div class="s" id="t-fks-sub"></div></div>
-    <div class="tile"><span class="v">5</span><span class="k">migrations</span><div class="s">plain SQL, one transaction each</div></div>
-    <div class="tile"><span class="v">16+</span><span class="k">PostgreSQL</span><div class="s">works on 13+</div></div>
-    <div class="tile"><span class="v">5000<small style="font-size:12px"> ms</small></span><span class="k">statement timeout</span><div class="s"><code>DB_STATEMENT_TIMEOUT_MS</code></div></div>
-  </div>
-
-  <div class="section">
-    <h2><span class="num">1</span> Postgres also does the work of three services</h2>
-    <div class="grid3">
-      <div class="card"><h3>Job queue</h3><p><code>outbox_events</code>, written in the same transaction as the change, plus <code>media_assets</code> rows at <code>processing</code>.</p></div>
-      <div class="card"><h3>Search engine</h3><p><code>tsvector</code> GIN indexes for full text; trigram indexes for fuzzy usernames and topic names.</p></div>
-      <div class="card"><h3>Audit store</h3><p><code>audit_log</code> keeps every admin and security action, with actor, changes and IP.</p></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2><span class="num">2</span> The eight domains</h2>
-    <p class="hint">Click a table to open it.</p>
-    <div class="grid3" id="domain-cards"></div>
-  </div>
-
-  <div class="section">
-    <h2><span class="num">3</span> Conventions that explain most of the schema</h2>
-    <div class="scroller card"><table class="grid" id="conv-table"></table></div>
-  </div>
-</section>
-
-<!-- ============ MAP ============ -->
-<section class="view" id="view-map">
-  <div class="section">
-    <h2><span class="num">4</span> Relationship map</h2>
-    <p class="hint">Tables grouped by domain. <strong>Click a table</strong> to highlight what it points to and what points at it; everything else fades. The numbers are <span class="mono">↗ out · ↙ in</span> foreign keys.</p>
-    <div class="legend">
-      <span><span class="pill p-accent">references</span> this table holds the FK</span>
-      <span><span class="pill p-key">referenced by</span> the other table holds the FK</span>
-    </div>
-    <div class="lanes" id="lanes"></div>
-    <div class="focus-panel" id="focus-panel"></div>
-  </div>
-
-  <div class="section">
-    <h2><span class="num">4.1</span> Every foreign key</h2>
-    <p class="hint">Grouped by the table being referenced, so the hubs stand out. The delete rule says what happens to the child row when the parent row is deleted.</p>
-    <div class="legend">
-      <span><span class="pill r-cascade">cascade</span> child row is deleted too</span>
-      <span><span class="pill r-setnull">set null</span> child row kept, link forgotten</span>
-      <span><span class="pill r-restrict">restrict</span> delete refused while referenced (<code>409 IN_USE</code>)</span>
-    </div>
-    <div class="filterbar">
-      <input id="fk-q" type="search" placeholder="Filter by table or column…" autocomplete="off" spellcheck="false">
-      <button class="chipbtn" data-rule="all" aria-pressed="true">all</button>
-      <button class="chipbtn" data-rule="cascade" aria-pressed="false">cascade</button>
-      <button class="chipbtn" data-rule="setnull" aria-pressed="false">set null</button>
-      <button class="chipbtn" data-rule="restrict" aria-pressed="false">restrict</button>
-    </div>
-    <div class="scroller card"><table class="grid" id="fk-table"></table></div>
-    <div class="note">Three columns hold an id with <strong>no foreign key</strong>, on purpose, because the row must outlive its target: <code>reports.target_id</code>, <code>outbox_events.entity_id</code> and <code>audit_log.entity_id</code>.</div>
-  </div>
-</section>
-
-<!-- ============ TABLES ============ -->
-<section class="view" id="view-tables">
-  <div class="explorer">
-    <aside class="sidebar">
-      <div class="searchwrap">
-        <label class="eyebrow" for="q" style="margin-bottom:5px">Find a table or column</label>
-        <input id="q" type="search" placeholder="user_id, is_active, position…" autocomplete="off" spellcheck="false">
-        <div class="count" id="q-count"></div>
-      </div>
-      <div class="tablelist" id="tablelist"></div>
-    </aside>
-    <div class="detail" id="detail"></div>
-  </div>
-</section>
-
-<!-- ============ INDEXES ============ -->
-<section class="view" id="view-indexes">
-  <div class="section">
-    <h2><span class="num">5</span> Indexes beyond primary keys and unique constraints</h2>
-    <p class="hint">Partial indexes carry their <code>WHERE</code> clause, which keeps the feed and queue indexes small. A query only uses a partial or expression index when its condition matches the index's.</p>
-    <div class="scroller card"><table class="grid" id="index-table"></table></div>
-    <div class="note">The full-text expressions in <code>src/db/search.ts</code> must match the index expressions <strong>exactly</strong>, or Postgres quietly stops using the indexes.</div>
-  </div>
-</section>
-
-<!-- ============ RULES ============ -->
-<section class="view" id="view-rules">
-  <div class="section">
-    <h2><span class="num">6</span> What happens when a user row is deleted</h2>
-    <p class="hint">Computed from the foreign keys. The purge job deletes the user row 30 days after an account deletion request.</p>
-    <div class="grid3" id="cascade-grid"></div>
-  </div>
-  <div class="section">
-    <h2><span class="num">6.1</span> CHECK constraints worth knowing</h2>
-    <div class="scroller card"><table class="grid" id="checks-table"></table></div>
-  </div>
-  <div class="section">
-    <h2><span class="num">6.2</span> Constraint errors become API errors</h2>
-    <div class="scroller card"><table class="grid" id="errors-table"></table></div>
-    <div class="note">Mapped in <code>src/lib/error-handler.ts</code>.</div>
-  </div>
-</section>
-
-<!-- ============ LIFECYCLE ============ -->
-<section class="view" id="view-lifecycle">
-  <div class="section">
-    <h2><span class="num">7</span> Status flows</h2>
-    <p class="hint">The state machines you meet in most queries.</p>
-    <div class="grid3" id="flows"></div>
-  </div>
-  <div class="section">
-    <h2><span class="num">7.1</span> Retention</h2>
-    <p class="hint">The worker's hourly maintenance pass (<code>src/worker/maintenance.ts</code>) enforces these. Every job is safe to run more than once.</p>
-    <div class="scroller card"><table class="grid" id="retention-table"></table></div>
-  </div>
-</section>
-
-<!-- ============ CHANGES ============ -->
-<section class="view" id="view-changes">
-  <div class="section">
-    <h2><span class="num">8</span> Efficiency changes in migration 004</h2>
-    <p class="hint">File <code>1795305600004_toggles-and-stored-counts.sql</code>, plus the matching API and worker code. Decisions are recorded in <code>docs/prototype-2-implementation-notes.md</code> §2.6.</p>
-    <div id="changes"></div>
-  </div>
-  <div class="section">
-    <h2><span class="num">8.1</span> Looked at and left as they are</h2>
-    <div class="scroller card"><table class="grid" id="kept-table"></table></div>
-  </div>
-</section>
-
-<!-- ============ MIGRATIONS ============ -->
-<section class="view" id="view-migrations">
-  <div class="section">
-    <h2><span class="num">9</span> Migrations</h2>
-    <p class="hint">node-pg-migrate, plain SQL, each file in its own transaction, applied in this order.</p>
-    <div class="scroller card"><table class="grid" id="migration-table"></table></div>
-    <div class="note"><strong>Never edit a migration that has been applied</strong>: add a new one (checklist in the <code>doshomik-migration</code> project skill). After a schema change, run <code>pnpm db:types</code> and update the enum lists in <code>packages/shared</code> if a CHECK changed.</div>
-  </div>
-</section>
-
-<!-- ============ ROADMAP ============ -->
-<section class="view" id="view-roadmap">
-  <div class="section">
-    <h2><span class="num">10</span> Known gaps and planned changes</h2>
-    <p class="hint">Nothing here is broken today. Each row is a change deferred until something gets big or busy. Details are in the implementation notes, §3–4.</p>
-    <div class="scroller card"><table class="grid" id="gap-table"></table></div>
-  </div>
-</section>
-
-</main>
-
-<footer class="foot">
-  <p>Source of truth: the SQL files in <code>apps/api/migrations/</code>. Generated types: <code>apps/api/src/db/types.ts</code>.</p>
-  <p>Related: <code>docs/architecture/database-architecture.md</code> · <code>docs/architecture/backend-architecture.md</code> · <code>docs/prototype-2-implementation-notes.md</code></p>
-</footer>
+<main id="app" tabindex="-1"></main>
+<footer>Source of truth: the SQL files in <code>apps/api/migrations/</code>. Tables, columns and delete rules here were checked against the migrated database on 23 Nov 2026 (migration 005).</footer>
 
 <script>
 /* ============================================================
@@ -419,9 +218,9 @@ const DOMAINS = [
   {id:'social',  name:'Social & safety',  desc:'The follow graph, two-way blocks and the moderation queue.'},
   {id:'feed',    name:'Posts & activity', desc:'Posts, likes, saves, comments on posts and papers, and the notification inbox.'},
   {id:'media',   name:'Media',            desc:'Every upload, whatever uses it. Storage keys only, never URLs.'},
-  {id:'learn',   name:'Learn',            desc:'Topics, learn items, and courses built from them, with progress.'},
+  {id:'learn',   name:'Learn',            desc:'Topics (concepts), learn items, courses, completions and "I already know this".'},
   {id:'practice',name:'Practice',         desc:'Questions by topic, quizzes built from them, and every attempt.'},
-  {id:'research',name:'Research',         desc:'Fields, structured papers, prerequisites, roadmaps and the reading tracker.'},
+  {id:'research',name:'Research',         desc:'Topic chips, the paper collection, bilingual Paper Cards, lineage, saves, the three-step tracker, trails and saved AI outputs.'},
   {id:'system',  name:'System',           desc:'The outbox the worker reads and the audit trail. Both outlive what they point at.'}
 ];
 
@@ -532,7 +331,7 @@ const TABLES = [
   badges:['polymorphic target'],
   columns:[
     {n:'id',t:'bigint',k:'pk'},{n:'reporter_id',t:'bigint',k:'fk'},
-    {n:'target_type',t:'text',note:'user · post · comment'},
+    {n:'target_type',t:'text',note:'user · post · comment · trail (005)'},
     {n:'target_id',t:'bigint',note:'<strong>No FK</strong>, on purpose: the report outlives its target'},
     {n:'reason',t:'text',note:'spam · harassment · nudity · violence · misinformation · other'},
     {n:'details',t:'text'},
@@ -552,13 +351,14 @@ const TABLES = [
     {n:'type',t:'text',note:'text · image · reel'},
     {n:'caption',t:'text',note:'Required for text posts; full-text indexed'},
     {n:'media_id',t:'bigint',k:'fk',note:'Required unless <code>type = \'text\'</code>'},
+    {n:'topic_id',t:'bigint',k:'fk',isNew:true,note:'Concept tag, so a reel can be a Learn before reading link (005)'},
     {n:'status',t:'text',note:'processing · published · removed (by a moderator)'},
     {n:'like_count',t:'integer',note:'Stored. Moved ±1 per like event by the worker (was: full recount)'},
     {n:'comment_count',t:'integer',note:'Stored, same as <code>like_count</code>'},
     {n:'created_at',t:'timestamptz'},{n:'updated_at',t:'timestamptz'},
     {n:'deleted_at',t:'timestamptz',note:'Hidden at once; purged after 30 days'}
   ],
-  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'media_id',to:'media_assets',d:'restrict'}],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'media_id',to:'media_assets',d:'restrict'},{c:'topic_id',to:'topics',d:'setnull'}],
   checks:['<code>type = \'text\' OR media_id IS NOT NULL</code>'],
   notes:['Feeds are keyset-paginated on <code>(created_at, id)</code>, which the two partial indexes cover.']
 },
@@ -597,7 +397,7 @@ const TABLES = [
   ],
   fks:[{c:'user_id',to:'users',d:'setnull'},{c:'post_id',to:'posts',d:'cascade'},{c:'paper_id',to:'papers',d:'cascade'},{c:'parent_id',to:'comments',d:'cascade'}],
   checks:['<code>(post_id IS NULL) &lt;&gt; (paper_id IS NULL)</code>: exactly one target'],
-  notes:['The one table shared by the social side and the research side.']
+  notes:['The one table shared by the social side and the research side: <code>paper_id</code> is a paper\'s discussion thread (A9), with the same reports, blocks, rate limits and moderation as post comments.']
 },
 {
   name:'notifications', domain:'feed', purpose:'The inbox: who receives it, who caused it, and what it points at.',
@@ -641,7 +441,7 @@ const TABLES = [
 },
 /* ---------- learn ---------- */
 {
-  name:'topics', domain:'learn', purpose:'A named concept, shared by learn items, questions, quizzes and paper prerequisites.',
+  name:'topics', domain:'learn', purpose:'A concept, shared by learn items, questions, quizzes, reels, known-topic marks and paper prerequisites.',
   badges:['slug','pg_trgm'],
   columns:[
     {n:'id',t:'bigint',k:'pk'},
@@ -758,18 +558,19 @@ const TABLES = [
 },
 /* ---------- research ---------- */
 {
-  name:'fields', domain:'research', purpose:'A research field: holds papers, one roadmap, and user interests.',
+  name:'fields', domain:'research', purpose:'A topic chip (ML fundamentals → … → Emerging research): holds papers, one roadmap, trails and user interests.',
   badges:['slug'],
   columns:[
     {n:'id',t:'bigint',k:'pk'},{n:'name',t:'text',k:'u'},
     {n:'slug',t:'text',k:'u',note:'Names the field in URLs'},
-    {n:'description',t:'text'}
+    {n:'description',t:'text'},
+    {n:'position',t:'smallint',isNew:true,note:'Chip order, smallest first (005)'}
   ],
   fks:[], notes:['A field with papers cannot be deleted (<code>papers.field_id</code> restricts).']
 },
 {
-  name:'papers', domain:'research', purpose:'A paper broken into what the app teaches: questions, method, results, limits.',
-  badges:['public_id','publishing','tsvector'],
+  name:'papers', domain:'research', purpose:'The curated collection: staff content plus scholarly metadata ingested by the worker.',
+  badges:['public_id','publishing','ingested','tsvector'],
   columns:[
     {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
     {n:'field_id',t:'bigint',k:'fk'},
@@ -779,22 +580,46 @@ const TABLES = [
     {n:'method_steps',t:'text[]',note:'In order'},
     {n:'results',t:'text'},
     {n:'figures',t:'jsonb',note:'<code>[{url, caption}]</code>'},
-    {n:'limitations',t:'text'},{n:'evaluation',t:'text'},
+    {n:'limitations',t:'text'},{n:'evaluation',t:'text',note:'The Prototype 2 summary columns stay; the English card was backfilled from them'},
+    {n:'abstract',t:'text',isNew:true,note:'OpenAlex, or staff'},
+    {n:'venue',t:'text',isNew:true},
+    {n:'published_on',t:'date',isNew:true,note:'"New" badge: within 30 days'},
+    {n:'doi',t:'text',k:'u',isNew:true,note:'Lower case, no resolver prefix'},
+    {n:'arxiv_id',t:'text',k:'u',isNew:true,note:'Without version'},
+    {n:'openalex_id',t:'text',k:'u',isNew:true},{n:'s2_id',t:'text',k:'u',isNew:true},
+    {n:'pdf_url',t:'text',isNew:true},{n:'code_url',t:'text',isNew:true,note:'Hugging Face linked repo'},
+    {n:'tldr',t:'text',isNew:true,note:'Semantic Scholar one-liner'},
+    {n:'citation_count',t:'integer',isNew:true},
+    {n:'hf_upvotes',t:'integer',isNew:true},{n:'hf_trending_at',t:'timestamptz',isNew:true},
+    {n:'trend_rank',t:'integer',isNew:true,note:'1..n, the default Research order'},
+    {n:'openalex_topics',t:'jsonb',isNew:true,note:'For staff when choosing the chip'},
+    {n:'synced_at',t:'timestamptz',isNew:true,note:'Last ingestion; NULL = queued'},
+    {n:'sync_error',t:'text',isNew:true},
+    {n:'search_vector',t:'tsvector',isNew:true,note:'Title, authors, both card questions; built by <code>refresh_paper_search()</code>'},
     {n:'created_at',t:'timestamptz'},
     ...PUB
   ],
   fks:[{c:'field_id',to:'fields',d:'restrict'},...PUBFK],
-  notes:[]
+  notes:['<code>paper_url</code> is the main <strong>Open</strong> action (A10): we never host a PDF.',
+         'Staff edits win: the worker fills descriptive fields only when empty, and refreshes counts, TLDR and ids every 7 days.']
 },
 {
-  name:'paper_prerequisites', domain:'research', purpose:'The "Learn first" topics of a paper, in order.',
-  badges:['composite PK','ordered'],
+  name:'paper_prerequisites', domain:'research', purpose:'Learn before reading (A13): the concepts a paper assumes, each with a typed link to our own content.',
+  badges:['composite PK','ordered','typed link'],
   columns:[
-    {n:'paper_id',t:'bigint',k:'pk+fk'},{n:'topic_id',t:'bigint',k:'pk+fk'},
-    {n:'position',t:'smallint',note:'Display order'}
+    {n:'paper_id',t:'bigint',k:'pk+fk'},{n:'topic_id',t:'bigint',k:'pk+fk',note:'The concept'},
+    {n:'position',t:'smallint',note:'Display order'},
+    {n:'label',t:'text',isNew:true,note:'Shown instead of the topic name'},
+    {n:'why',t:'text',isNew:true,note:'One line: why it matters here'},
+    {n:'learn_item_id',t:'bigint',k:'fk',isNew:true,note:'Lesson (video) or note (text, image)'},
+    {n:'quiz_id',t:'bigint',k:'fk',isNew:true},
+    {n:'reel_post_id',t:'bigint',k:'fk',isNew:true},
+    {n:'suggested_by',t:'text',isNew:true,note:'staff · ai (the app shows a footnote for ai)'}
   ],
-  fks:[{c:'paper_id',to:'papers',d:'cascade'},{c:'topic_id',to:'topics',d:'cascade'}],
-  notes:[]
+  fks:[{c:'paper_id',to:'papers',d:'cascade'},{c:'topic_id',to:'topics',d:'cascade'},
+       {c:'learn_item_id',to:'learn_items',d:'setnull'},{c:'quiz_id',to:'quizzes',d:'setnull'},{c:'reel_post_id',to:'posts',d:'setnull'}],
+  checks:['<code>num_nonnulls(learn_item_id, quiz_id, reel_post_id) &lt;= 1</code>: at most one link'],
+  notes:['<strong>done</strong> is computed: the linked lesson or note is completed, every question of the linked quiz was answered, or the topic is in <code>user_known_topics</code>.']
 },
 {
   name:'roadmap_steps', domain:'research', purpose:'One starting roadmap per field: which papers, in which order, and why.',
@@ -809,7 +634,7 @@ const TABLES = [
   notes:[]
 },
 {
-  name:'user_papers', domain:'research', purpose:'The reading tracker: one row per user and paper.',
+  name:'user_papers', domain:'research', purpose:'The Prototype 2 tracker (saved · reading · completed), kept as it was; superseded by paper_saves and reading_passes.',
   badges:['composite PK','upsert'],
   columns:[
     {n:'user_id',t:'bigint',k:'pk+fk'},{n:'paper_id',t:'bigint',k:'pk+fk'},
@@ -817,7 +642,7 @@ const TABLES = [
     {n:'updated_at',t:'timestamptz'}
   ],
   fks:[{c:'user_id',to:'users',d:'cascade'},{c:'paper_id',to:'papers',d:'cascade'}],
-  notes:['Status changes are already one upsert on the same row.']
+  notes:['Backfilled into <code>paper_saves</code> and <code>reading_passes</code> by migration 005. Drop once no client calls <code>/papers/:id/status</code>.']
 },
 {
   name:'user_fields', domain:'research', purpose:'The interests a user picked at onboarding.',
@@ -825,6 +650,117 @@ const TABLES = [
   columns:[{n:'user_id',t:'bigint',k:'pk+fk'},{n:'field_id',t:'bigint',k:'pk+fk'}],
   fks:[{c:'user_id',to:'users',d:'cascade'},{c:'field_id',to:'fields',d:'cascade'}],
   notes:['Saving interests now writes only the difference; before, every save deleted and re-inserted all rows.']
+},
+{
+  name:'paper_cards', domain:'research', purpose:'The Paper Card in English and in Bangla (A2, A4 step 1).',
+  badges:['composite PK','per language'], isNewTable:true,
+  columns:[
+    {n:'paper_id',t:'bigint',k:'pk+fk'},
+    {n:'lang',t:'text',k:'pk',note:'en · bn'},
+    {n:'question',t:'text',note:'The paper\'s question; searched in both languages'},
+    {n:'problem',t:'text'},{n:'key_idea',t:'text'},
+    {n:'method_steps',t:'text[]',note:'In order'},
+    {n:'findings',t:'text'},{n:'takeaway',t:'text'},{n:'limitations',t:'text'},
+    {n:'glossary',t:'jsonb',note:'[{term, definition}]'},
+    {n:'source',t:'text',note:'staff · ai'},
+    {n:'updated_by',t:'bigint',k:'fk'},
+    {n:'created_at',t:'timestamptz'},{n:'updated_at',t:'timestamptz'}
+  ],
+  fks:[{c:'paper_id',to:'papers',d:'cascade'},{c:'updated_by',to:'users',d:'setnull'}],
+  notes:['Every write calls <code>refresh_paper_search()</code> in the same transaction, so search sees it at once.']
+},
+{
+  name:'paper_edges', domain:'research', purpose:'Citation lineage inside the collection (A6): what a paper builds on and what built on it.',
+  badges:['composite PK','ingested'], isNewTable:true,
+  columns:[
+    {n:'citing_paper_id',t:'bigint',k:'pk+fk',note:'Builds on…'},
+    {n:'cited_paper_id',t:'bigint',k:'pk+fk',note:'…this one'},
+    {n:'intent',t:'text',note:'background · supporting · contrasting; NULL = unknown'},
+    {n:'s2_intents',t:'text[]',note:'Semantic Scholar\'s own labels: background · methodology · result'},
+    {n:'is_influential',t:'boolean'},
+    {n:'source',t:'text',note:'semantic_scholar · openalex · staff'},
+    {n:'created_at',t:'timestamptz'},{n:'updated_at',t:'timestamptz'}
+  ],
+  fks:[{c:'citing_paper_id',to:'papers',d:'cascade'},{c:'cited_paper_id',to:'papers',d:'cascade'}],
+  checks:['<code>citing_paper_id &lt;&gt; cited_paper_id</code>'],
+  notes:['Semantic Scholar has no supporting or contrasting label. methodology → supporting, background → background, result alone → unknown. <strong>contrasting is set only by staff</strong>, and the worker never overwrites a staff edge.']
+},
+{
+  name:'paper_saves', domain:'research', purpose:'The bookmark (A3), independent of reading progress.',
+  badges:['composite PK'], isNewTable:true,
+  columns:[{n:'user_id',t:'bigint',k:'pk+fk'},{n:'paper_id',t:'bigint',k:'pk+fk'},{n:'created_at',t:'timestamptz',note:'Orders Saved; the earliest unread one is Up next'}],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'paper_id',to:'papers',d:'cascade'}],
+  notes:['Up next = saved ∧ no reading pass with step ≥ 1, earliest first.']
+},
+{
+  name:'reading_passes', domain:'research', purpose:'The three-step tracker and private note (A4): Explored → Studied → Reproduced.',
+  badges:['composite PK','upsert'], isNewTable:true,
+  columns:[
+    {n:'user_id',t:'bigint',k:'pk+fk'},{n:'paper_id',t:'bigint',k:'pk+fk'},
+    {n:'step',t:'smallint',note:'0 not read · 1 Explored · 2 Studied · 3 Reproduced'},
+    {n:'note',t:'text',note:'Private, at most 400 characters'},
+    {n:'explored_at',t:'timestamptz'},{n:'studied_at',t:'timestamptz'},{n:'reproduced_at',t:'timestamptz'},
+    {n:'created_at',t:'timestamptz'},{n:'updated_at',t:'timestamptz'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'paper_id',to:'papers',d:'cascade'}],
+  checks:['<code>step BETWEEN 0 AND 3</code>, and each step\'s time is set exactly while the step holds','<code>char_length(note) &lt;= 400</code>'],
+  notes:['Lowering the step clears the later times, so "explored this month" never counts a step taken back.','Mark read raises the step to 1 and never lowers it.']
+},
+{
+  name:'research_outputs', domain:'research', purpose:'Saved results of the AI research tools (A5, written by Group C), reopened for free.',
+  badges:['public_id'], isNewTable:true,
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'user_id',t:'bigint',k:'fk'},
+    {n:'kind',t:'text',note:'reading_map · landscape_map · roadmap · comparison · claim_check'},
+    {n:'title',t:'text'},
+    {n:'params',t:'jsonb',note:'The inputs: topic, papers, claim'},
+    {n:'result',t:'jsonb'},
+    {n:'created_at',t:'timestamptz'}
+  ],
+  fks:[{c:'user_id',to:'users',d:'cascade'}],
+  notes:['Opening one reads this row: no AI call, nothing counted against an allowance.']
+},
+{
+  name:'trails', domain:'research', purpose:'Reading paths users make (A7): papers in order, one line per step.',
+  badges:['public_id','user content'], isNewTable:true,
+  columns:[
+    {n:'id',t:'bigint',k:'pk'},{n:'public_id',t:'uuid',k:'u'},
+    {n:'creator_id',t:'bigint',k:'fk'},
+    {n:'title',t:'text'},{n:'description',t:'text'},
+    {n:'lang',t:'text',note:'en · bn'},
+    {n:'field_id',t:'bigint',k:'fk',note:'Optional chip'},
+    {n:'status',t:'text',note:'draft · published · removed (moderator)'},
+    {n:'published_at',t:'timestamptz'},{n:'created_at',t:'timestamptz'},{n:'updated_at',t:'timestamptz'}
+  ],
+  fks:[{c:'creator_id',to:'users',d:'cascade'},{c:'field_id',to:'fields',d:'setnull'}],
+  notes:['Publishing needs at least 2 papers. A published trail follows its author\'s visibility, like a post, and can be reported.']
+},
+{
+  name:'trail_items', domain:'research', purpose:'The ordered steps of a trail.',
+  badges:['deferrable PK','ordered'], isNewTable:true,
+  columns:[
+    {n:'trail_id',t:'bigint',k:'pk+fk'},
+    {n:'position',t:'smallint',k:'pk',note:'<code>DEFERRABLE INITIALLY DEFERRED</code>'},
+    {n:'paper_id',t:'bigint',k:'fk',note:'Unique within a trail; published papers only'},
+    {n:'note',t:'text',note:'At most 280 characters'}
+  ],
+  fks:[{c:'trail_id',to:'trails',d:'cascade'},{c:'paper_id',to:'papers',d:'cascade'}],
+  notes:[]
+},
+{
+  name:'user_known_topics', domain:'learn', purpose:'"I already know this": a concept the user marked as known (A13).',
+  badges:['composite PK'], isNewTable:true,
+  columns:[{n:'user_id',t:'bigint',k:'pk+fk'},{n:'topic_id',t:'bigint',k:'pk+fk'},{n:'created_at',t:'timestamptz'}],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'topic_id',to:'topics',d:'cascade'}],
+  notes:['This is the spec’s user_known_concepts: our concepts are topics.']
+},
+{
+  name:'learn_item_completions', domain:'learn', purpose:'Lessons and notes the user completed, wherever they opened them (A13).',
+  badges:['composite PK'], isNewTable:true,
+  columns:[{n:'user_id',t:'bigint',k:'pk+fk'},{n:'learn_item_id',t:'bigint',k:'pk+fk'},{n:'completed_at',t:'timestamptz'}],
+  fks:[{c:'user_id',to:'users',d:'cascade'},{c:'learn_item_id',to:'learn_items',d:'cascade'}],
+  notes:['Course progress also writes it for the steps reached.']
 },
 /* ---------- system ---------- */
 {
@@ -879,11 +815,20 @@ const INDEXES = [
   {t:['auth_identities','auth_tokens'],purpose:'Lookups and cascades by user',idx:'auth_identities (user_id) · auth_tokens (user_id)'},
   {t:['media_assets'],purpose:'Media queue; a user\'s uploads',idx:"media_assets (status) WHERE status IN ('uploading','processing') · media_assets (owner_id)"},
   {t:['papers','learn_items','questions'],purpose:'Content by field or topic',idx:'papers (field_id) · learn_items (topic_id) · questions (topic_id)'},
+  {t:['papers'],purpose:'Research collection in trend order',idx:"papers_trend_idx ((coalesce(trend_rank, 2147483647)), id) WHERE status = 'published'",isNew:true},
+  {t:['papers','paper_cards'],purpose:'Paper search, English and Bangla',idx:'papers_search_idx GIN (search_vector)',isNew:true},
+  {t:['papers'],purpose:'Papers due for ingestion',idx:'papers_sync_idx (synced_at NULLS FIRST, id) WHERE doi IS NOT NULL OR arxiv_id IS NOT NULL',isNew:true},
+  {t:['paper_edges'],purpose:'"Built on by"',idx:'paper_edges_cited_idx (cited_paper_id)',isNew:true},
+  {t:['paper_saves'],purpose:'Saved list and Up next',idx:'paper_saves_user_idx (user_id, created_at)',isNew:true},
+  {t:['reading_passes'],purpose:'Read list',idx:'reading_passes_read_idx (user_id, updated_at DESC) WHERE step >= 1',isNew:true},
+  {t:['research_outputs'],purpose:'Saved AI outputs',idx:'research_outputs_user_idx (user_id, created_at DESC)',isNew:true},
+  {t:['trails','trail_items'],purpose:'A creator\'s trails, the public list, trails with a paper',idx:"trails_creator_idx (creator_id, created_at DESC) · trails_published_idx (created_at DESC, id DESC) WHERE status = 'published' · trail_items_paper_idx (paper_id)",isNew:true},
+  {t:['posts'],purpose:'Reels by concept',idx:'posts_topic_idx (topic_id) WHERE topic_id IS NOT NULL',isNew:true},
   {t:['outbox_events'],purpose:'Outbox queue',idx:'outbox_pending_idx (id) WHERE processed_at IS NULL'},
   {t:['reports'],purpose:'Moderation queue; lookups by target',idx:'reports (status, created_at) · reports (target_type, target_id)'},
   {t:['audit_log'],purpose:'Audit lookups',idx:'audit_log (entity_type, entity_id) · audit_log (actor_id, created_at DESC)'},
   {t:['users','topics'],purpose:'Fuzzy search',idx:'GIN trigram on users.username and topics.name'},
-  {t:['posts','learn_items','courses','papers'],purpose:'Full-text search',idx:"GIN to_tsvector('english', …) on posts.caption, learn_items (title + body), courses (title + description), papers (title + main_idea)"}
+  {t:['posts','learn_items','courses'],purpose:'Full-text search',idx:"GIN to_tsvector('english', …) on posts.caption, learn_items (title + body), courses (title + description)"}
 ];
 
 const CONVENTIONS = [
@@ -895,9 +840,11 @@ const CONVENTIONS = [
   ['Soft delete','<code>deleted_at</code> on <code>users</code>, <code>posts</code> and <code>comments</code>: hidden at once, purged later.'],
   ['Toggle rows <span class="pill p-new">new</span>','Relationships that trigger side effects keep one row per pair and flip a state instead of delete + insert: <code>post_likes.is_active</code>, <code>follows.status = \'inactive\'</code>. Only the first activation ever notifies.'],
   ['Stored counters','<code>posts.like_count</code>, <code>comment_count</code>, <code>users.follower_count</code>, <code>following_count</code>. Moved ±1 by the worker, exactly once per event; repaired hourly.'],
-  ['Publishing workflow','Team content moves <code>draft → published → archived</code>.'],
+  ['Ingested fields <span class="pill p-new">005</span>','Scholarly metadata is written only by the worker. Descriptive fields are filled only when empty, so staff edits win; counts, TLDR and ids refresh every 7 days.'],
+  ['Languages <span class="pill p-new">005</span>','Content that exists per language has <code>lang</code> <code>en</code> or <code>bn</code> (<code>paper_cards</code>, <code>trails</code>).'],
+  ['Publishing workflow','Team content moves <code>draft → published → archived</code>. Trails: <code>draft → published</code>, and <code>removed</code> by a moderator.'],
   ['Storage keys, not URLs','<code>media_assets</code> stores keys; URLs are built at read time.'],
-  ['Ordered children','<code>position</code> in a <code>DEFERRABLE</code> primary key, so a list can be reordered in one transaction.'],
+  ['Ordered children','<code>position</code> in a <code>DEFERRABLE</code> primary key (course items, quiz questions, roadmap steps, trail items), so a list can be reordered in one transaction.'],
   ['Polymorphic references','<code>reports.target_id</code>, <code>outbox_events.entity_id</code>, <code>audit_log.entity_id</code>: no FK on purpose.']
 ];
 
@@ -907,7 +854,11 @@ const CHECKS = [
   ['questions','MCQ options','<code>kind = \'short\' OR cardinality(options) &gt;= 2</code>'],
   ['learn_items','Learn item media','<code>kind = \'text\' OR media_url IS NOT NULL OR media_id IS NOT NULL</code>'],
   ['follows','Follow status','<code>status IN (\'accepted\', \'pending\', \'inactive\')</code>; no self-follow'],
-  ['blocks','No self-block','<code>blocker_id &lt;&gt; blocked_id</code>']
+  ['blocks','No self-block','<code>blocker_id &lt;&gt; blocked_id</code>'],
+  ['reading_passes','Reading steps','<code>step BETWEEN 0 AND 3</code>; each step\'s time set exactly while the step holds; note ≤ 400 characters'],
+  ['paper_prerequisites','One link at most','<code>num_nonnulls(learn_item_id, quiz_id, reel_post_id) &lt;= 1</code>'],
+  ['paper_edges','No self-citation','<code>citing_paper_id &lt;&gt; cited_paper_id</code>'],
+  ['papers','Counts','<code>citation_count &gt;= 0</code>, <code>hf_upvotes &gt;= 0</code>, <code>trend_rank &gt; 0</code>']
 ];
 
 const ERRORS = [
@@ -922,6 +873,9 @@ const RETENTION = [
   ['Deleted posts','Hidden at once; row and media deleted after 30 days.'],
   ['Stored counters','Post and follow counts recounted wherever they drifted (mainly after purges).'],
   ['Inactive likes and follows','Kept: they are what stops re-notification. They go when the user or post is purged.'],
+  ['Research order','<code>trend_rank</code> recomputed hourly and after every ingestion round.'],
+  ['Paper metadata','Refreshed from the sources every 7 days per paper; a failed sync keeps <code>sync_error</code> and is retried after 7 days or on "sync now".'],
+  ['Reading passes, saves, outputs, trails','Kept until the user or the paper is deleted.'],
   ['Abandoned uploads','<code>uploading</code>/<code>failed</code> assets older than 1 day that nothing uses.'],
   ['Sessions','Expired or revoked more than 30 days ago.'],
   ['Email codes','Expired or used more than 7 days ago.'],
@@ -932,6 +886,9 @@ const RETENTION = [
 const FLOWS = [
   {title:'Like', steps:['active','inactive','active'], note:'One row for ever. Only the first activation notifies; each real change moves <code>like_count</code> by one.'},
   {title:'Follow', steps:['pending / accepted','inactive','pending / accepted'], note:'<code>pending</code> for private accounts until accepted. Unfollow, withdraw, decline and block all go to <code>inactive</code>.'},
+  {title:'Reading pass', steps:['0 not read','1 Explored','2 Studied','3 Reproduced'], note:'Cumulative. Lowering a step clears the later step times. Mark read only raises to 1.'},
+  {title:'Trail', steps:['draft','published','removed'], note:'Publishing needs 2+ papers. <code>removed</code> is a moderator action.'},
+  {title:'Paper ingestion', steps:['synced_at NULL','synced','refresh after 7 days'], note:'Import or "sync now" queue a paper; the worker\'s papers loop takes 10 a minute.'},
   {title:'Media asset', steps:['uploading','processing','ready'], alt:'failed', note:'The worker measures duration and builds variants.'},
   {title:'Post', steps:['processing','published','removed'], note:'<code>removed</code> is a moderator action, separate from <code>deleted_at</code>.'},
   {title:'Team content', steps:['draft','published','archived'], note:'Papers, courses, learn items, questions and quizzes.'}
@@ -981,7 +938,8 @@ const MIGRATIONS = [
   ['1795305600001_prototype-2.sql','The Prototype 2 appendix SQL (14 new tables): public ids, slugs, user status and privacy, media, publishing, auth, safety, outbox, audit.'],
   ['1795305600002_prototype-2-backfill.sql','Slugs <code>NOT NULL</code>; post media into <code>media_assets</code>; drops <code>posts.media_url</code>; relaxes the learn item media check.'],
   ['1795305600003_sessions-public-id-and-2fa.sql','<code>sessions.public_id</code>, two-factor columns, and indexes for feed, reels, saves and follow requests.'],
-  ['1795305600004_toggles-and-stored-counts.sql <span class="pill p-new">new</span>','Toggle rows for likes and follows, stored follow counts, the unread and suggestion indexes, and drops the redundant reels index. See <a href="#changes">Efficiency changes</a>.']
+  ['1795305600004_toggles-and-stored-counts.sql','Toggle rows for likes and follows, stored follow counts, the unread and suggestion indexes, and drops the redundant reels index. See <a href="#changes">Efficiency (004)</a>.'],
+  ['1795305600005_research-collection.sql <span class="pill p-new">new</span>','Research tab Group A: the <code>bangla</code> search configuration, paper metadata and <code>search_vector</code>, <code>paper_cards</code>, <code>paper_saves</code>, <code>reading_passes</code>, <code>research_outputs</code>, <code>paper_edges</code>, <code>trails</code>, <code>trail_items</code>, Learn before reading links, <code>user_known_topics</code>, <code>learn_item_completions</code>. 9 new tables. See <a href="#research">Research (005)</a>.']
 ];
 
 const GAPS = [
@@ -990,246 +948,596 @@ const GAPS = [
   ['Counter repair scans every row hourly','Run it daily, or only for posts and users touched by purges.','at hundreds of thousands of posts'],
   ['Practice stats aggregate all attempts','A per-user, per-topic stats table updated by the worker.','when users have thousands of attempts'],
   ['Random practice questions use <code>ORDER BY random()</code>','Sample by id range or <code>TABLESAMPLE</code>.','at tens of thousands of questions'],
+  ['<code>user_papers</code> duplicates the new tracker','Drop it and <code>/papers/:id/status</code> once no client uses them.','after the app moves'],
+  ['Bangla search is unstemmed','Give the <code>bangla</code> configuration a real dictionary; queries stay the same.','later'],
+  ['Contrasting citations only by hand','A source with citation stances, if one becomes affordable.','later'],
+  ['No discovery queue for new papers','A <code>paper_candidates</code> table from Hugging Face daily papers, reviewed by staff.','later'],
+  ['Comment upvotes on paper discussion','<code>comment_votes</code> plus a stored count, with Paper Clubs (A15).','with A15'],
+  ['Research Groups B and C','They write <code>paper_cards</code> (source ai), <code>paper_prerequisites</code> (suggested_by ai) and <code>research_outputs</code>.','next'],
   ['Search runs on Postgres','Elasticsearch indexer reading the existing <code>search.sync</code> events.','later'],
   ['No user locale','<code>users.locale</code> for Bangla push and email.','later'],
   ['One DB role with full rights','DML-only app role, DDL migration role, PgBouncer, PITR backups.','before production'],
   ['Large tables','Partition <code>notifications</code> and <code>question_attempts</code>; read replica.','at millions of rows']
 ];
 
-/* ============================================================ */
-const RULE = {cascade:'cascade', setnull:'set null', restrict:'restrict'};
-const RULE_WHY = {
-  cascade:'deleted with the parent',
-  setnull:'kept; link set to NULL',
-  restrict:'parent cannot be deleted while this exists'
-};
-const rulePill = d => `<span class="pill r-${d}">${RULE[d]}</span>`;
-const esc = s => String(s).replace(/&(?![a-z#]+;)/g,'&amp;').replace(/</g,'&lt;');
-const byName = Object.fromEntries(TABLES.map(t=>[t.name,t]));
-const domainOf = n => DOMAINS.find(d=>d.id===byName[n].domain);
+const RESEARCH = [
+  ['A1','Paper collection, topic chips, trending order','Papers in a field (fields = chips); newest-first list','Scholarly metadata on <code>papers</code>, <code>fields.position</code>, ingestion worker (OpenAlex, Semantic Scholar, Hugging Face), <code>trend_rank</code>, default <code>?sort=trend</code>',['papers','fields']],
+  ['A2','Search papers (EN + BN)','English full text on title + main idea','<code>paper_cards</code> per language, <code>papers.search_vector</code> over title, authors and both card questions, <code>bangla</code> configuration',['papers','paper_cards']],
+  ['A3','Save / bookmark, "Up next"','"saved" was a tracker status','<code>paper_saves</code>; <code>GET /me/papers/up-next</code>',['paper_saves']],
+  ['A4','Three-step tracker and private note','saved · reading · completed','<code>reading_passes</code>: step 0–3, per-step times, 400-character note, monthly counts',['reading_passes']],
+  ['A5','My papers','—','Saved / Read lists; <code>research_outputs</code> reopened without AI',['paper_saves','reading_passes','research_outputs']],
+  ['A6','Related papers: lineage','"Related" by shared topics','<code>paper_edges</code> with intent; <code>GET /papers/:id/lineage</code>; staff-only <code>contrasting</code>',['paper_edges']],
+  ['A7','Creator reading paths (trails)','Staff roadmap, one per field','<code>trails</code>, <code>trail_items</code>; reportable and moderated',['trails','trail_items']],
+  ['A9','Discussion, comments, moderation','<strong>Complete</strong>: <code>comments.paper_id</code>, reports, blocks, rate limits, cursors, moderation','Nothing (upvotes wait for A15)',['comments','reports']],
+  ['A10','Open the original paper','<code>paper_url</code>','<code>pdf_url</code>, <code>arxiv_id</code>, <code>links.open_url</code>',['papers']],
+  ['A13','Prerequisite → Learn matching','Prerequisite topics with their learn items','Label, why, typed link and <code>suggested_by</code> on <code>paper_prerequisites</code>; <code>user_known_topics</code>; <code>learn_item_completions</code>; <code>posts.topic_id</code>; computed <code>done</code>',['paper_prerequisites','user_known_topics','learn_item_completions','posts']]
+];
 
-// All FKs as edges: from (child table, column) to parent table.
+const RESEARCH_FLOWS = [
+  {title:'Ingestion (worker only)', steps:['import / stale','OpenAlex','Semantic Scholar','papers + paper_edges'], note:'Then <code>trend_rank</code>. Hugging Face daily papers every 6 h set upvotes, trending and code links.'},
+  {title:'Search', steps:['paper or card change','refresh_paper_search()','search_vector'], note:'Query: <code>websearch_to_tsquery(\'english\', q) || websearch_to_tsquery(\'bangla\', q)</code>.'},
+  {title:'Reading loop', steps:['save','Up next','Mark read','Studied','Reproduced'], note:'Counts per month feed Profile → Reading.'},
+  {title:'Learn before reading', steps:['prerequisite','lesson · note · quiz · reel','done?'], note:'Done = completed lesson or note, every quiz question answered, or "I already know this".'}
+];
+
+const RESEARCH_DECISIONS = [
+  ['Semantic Scholar intents','Its labels are background, methodology and result: no supporting or contrasting. Mapped without guessing; <code>contrasting</code> comes only from staff (<code>PUT /admin/paper-edges</code>).'],
+  ['Edges only inside the collection','Every lineage row must be tappable. Built from each paper\'s own references, so every pair in the collection is found.'],
+  ['Trend rank','HF trending in the last 14 days first (most upvotes), then most cited, then newest. Stored as a dense 1..n for a cheap keyset page.'],
+  ['Staff edits win','Ingestion fills title, authors, venue, abstract only when empty; an import\'s empty title is filled on its first sync.'],
+  ['Existing tables kept','<code>user_papers</code> and the Prototype 2 summary columns on <code>papers</code> are unchanged; the new tables were backfilled from them.'],
+  ['bangla = simple','PostgreSQL ships no Bangla stemmer. Word splitting depends on the server locale; a C locale keeps every Bangla sign in the word.'],
+  ['Concept = topic','<code>user_known_concepts</code> of the spec is <code>user_known_topics</code>; reels get <code>posts.topic_id</code>.']
+];
+
+/* ============================================================
+   Helpers
+   ============================================================ */
+const app = document.getElementById('app');
+const esc = (s) => String(s).replace(/&(?![a-z#0-9]+;)/gi, '&amp;').replace(/</g, '&lt;');
+const byName = Object.fromEntries(TABLES.map((t) => [t.name, t]));
+const domainById = Object.fromEntries(DOMAINS.map((d) => [d.id, d]));
 const EDGES = [];
-TABLES.forEach(t=>(t.fks||[]).forEach(f=>EDGES.push({from:t.name, col:f.c, to:f.to, d:f.d})));
-const outOf = n => EDGES.filter(e=>e.from===n);
-const into  = n => EDGES.filter(e=>e.to===n);
+TABLES.forEach((t) => (t.fks || []).forEach((f) => EDGES.push({ from: t.name, col: f.c, to: f.to, d: f.d })));
+const outOf = (n) => EDGES.filter((e) => e.from === n);
+const into = (n) => EDGES.filter((e) => e.to === n);
+const tablesIn = (id) => TABLES.filter((t) => t.domain === id);
+const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const tlink = (n) => `<a class="t" href="#table/${n}">${n}</a>`;
+const chips = (names) => `<div class="chips">${names.map((n) => `<a class="chip" href="#table/${n}">${n}</a>`).join('')}</div>`;
+const flow = (steps) => `<div class="flow">${steps.map((s) => `<b>${s}</b>`).join('<i aria-hidden="true">→</i>')}</div>`;
+const crumbs = (parts) =>
+  `<nav class="crumbs" aria-label="Breadcrumb">${parts
+    .map(([label, href]) => (href ? `<a href="${href}">${label}</a>` : `<span>${label}</span>`))
+    .join('<span aria-hidden="true">›</span>')}</nav>`;
 
-const fill = (id, html) => { document.getElementById(id).innerHTML = html; };
-const jump = n => `<button class="jump" data-goto="${n}">${n}</button>`;
+const RULE_NAME = { cascade: 'Deleted too', setnull: 'Kept, link cleared', restrict: 'Delete refused' };
+const counts = { cascade: 0, setnull: 0, restrict: 0 };
+EDGES.forEach((e) => counts[e.d]++);
 
-/* ---------- overview ---------- */
-document.getElementById('t-tables').textContent = TABLES.length;
-document.getElementById('h-tables').textContent = TABLES.length;
-document.getElementById('t-fks').textContent = EDGES.length;
-const ruleCounts = ['cascade','setnull','restrict'].map(r=>`${EDGES.filter(e=>e.d===r).length} ${RULE[r]}`).join(' · ');
-document.getElementById('t-fks-sub').textContent = ruleCounts;
+/** "This table points to X": what happens to this row when the row it points to is deleted. */
+function outSentence(e) {
+  const then = {
+    cascade: 'this row is deleted with it',
+    setnull: `this row stays and <code>${e.col}</code> is cleared`,
+    restrict: 'the delete is refused while this row exists',
+  }[e.d];
+  return `Each row points to one ${tlink(e.to)} row through <code>${e.col}</code>.<small>If that ${e.to} row is deleted, ${then}.</small>`;
+}
+/** "X points to this table": what happens to X's rows when a row here is deleted. */
+function inSentence(e) {
+  const then = {
+    cascade: `its ${e.from} rows are deleted too`,
+    setnull: `its ${e.from} rows stay, with <code>${e.col}</code> cleared`,
+    restrict: `it can't be deleted while ${e.from} rows use it`,
+  }[e.d];
+  return `${tlink(e.from)} points here through <code>${e.col}</code>.<small>If a row here is deleted, ${then}.</small>`;
+}
+const legend = () =>
+  `<div class="legend"><span style="--c:var(--cascade)">Deleted too</span><span style="--c:var(--setnull)">Kept, link cleared</span><span style="--c:var(--restrict)">Delete refused</span></div>`;
 
-fill('domain-cards', DOMAINS.map(d=>{
-  const list = TABLES.filter(t=>t.domain===d.id);
-  return `<div class="card"><h3>${d.name} <span style="color:var(--muted);font-family:var(--font-mono);font-size:12px">${list.length}</span></h3>
-    <p style="margin-bottom:10px">${d.desc}</p>
-    <div style="display:flex;flex-wrap:wrap;gap:6px 10px">${list.map(t=>jump(t.name)).join('')}</div></div>`;
-}).join(''));
+/** Plain meanings for the tags on tables, shown under "Good to know". */
+const BADGE_HELP = {
+  public_id: 'Rows have a random <code>public_id</code> that the app uses; the internal <code>id</code> never leaves the server.',
+  'soft delete': 'Deleting hides a row at once (<code>deleted_at</code>); it is removed for good after 30 days.',
+  'stored counts': 'Counts are stored on the row and moved by the worker, instead of counted on every view.',
+  'composite PK': 'The key is a pair of columns, so the same pair can only appear once.',
+  'toggle row': 'One row per pair for ever: it is switched on and off instead of deleted and re-added, so nothing is notified twice.',
+  'polymorphic target': 'It points at different kinds of rows through a plain id, with no foreign key.',
+  'no FK': 'It keeps a plain id with no foreign key, so it outlives what it points at.',
+  tsvector: 'Its text is indexed for full-text search.',
+  'self-reference': 'Rows can point to other rows of the same table (replies).',
+  'work queue': 'The worker picks up rows from it as jobs.',
+  publishing: 'Team content: it starts as a draft and the app shows it only once it is published.',
+  'deferrable PK': 'Its position is part of the key and is checked at the end of a transaction, so a whole list can be reordered at once.',
+  ordered: 'Rows are kept in an order (<code>position</code>).',
+  upsert: 'Each change rewrites the same row instead of adding one.',
+  slug: 'It has a readable <code>slug</code> used in URLs.',
+  pg_trgm: 'Its name is indexed for typo-tolerant search.',
+  ingested: 'Some columns are filled by the worker from outside sources, never by the app.',
+  'per language': 'There is one row per language (<code>en</code> or <code>bn</code>).',
+  'typed link': 'Each row can link to one kind of content: a lesson or note, a quiz, or a reel.',
+  'user content': 'Made by users, so it follows their privacy and can be reported.',
+};
 
-fill('conv-table','<thead><tr><th style="width:200px">Convention</th><th>Detail</th></tr></thead><tbody>'+
-  CONVENTIONS.map(([a,b])=>`<tr><td><strong>${a}</strong></td><td>${b}</td></tr>`).join('')+'</tbody>');
+/* ============================================================
+   The tour: one idea per step
+   ============================================================ */
+const TOUR = [
+  {
+    title: 'The database in one sentence',
+    text: [
+      `One PostgreSQL database holds everything the app stores: <b>${TABLES.length} tables</b>, grouped into <b>${DOMAINS.length} areas</b>.`,
+      'This tour shows one idea at a time. You don’t need to remember table names yet.',
+    ],
+    visual: () =>
+      `<ul class="areas">${DOMAINS.map((d) => `<li><a href="#explore/${d.id}">${d.name}</a><span>${count(tablesIn(d.id).length, 'table', 'tables')}</span></li>`).join('')}</ul>`,
+  },
+  {
+    title: 'Every row has two ids',
+    text: [
+      'Each row has an internal number, <code>id</code>, that tables use to point at each other.',
+      'It also has a random <code>public_id</code>. That is the only id the app ever sees, so nobody can guess or count rows from it.',
+    ],
+    visual: () =>
+      `<div class="demo"><table><thead><tr><th>Column</th><th>Example</th><th>Who sees it</th></tr></thead><tbody>
+        <tr><td>id</td><td>1042</td><td style="font-family:var(--font)">Only the server</td></tr>
+        <tr><td>public_id</td><td>7f3c…e91a</td><td style="font-family:var(--font)">The app</td></tr></tbody></table></div>`,
+  },
+  {
+    title: 'Accounts are at the centre',
+    text: [
+      `<code>users</code> has one row per account. ${count(into('users').length, 'link', 'links')} from ${new Set(into('users').map((e) => e.from)).size} tables point to it, more than any other table.`,
+      'Next to it are the rows that sign a person in: one per device, plus Google sign-in links and one-time email codes.',
+    ],
+    tables: ['users', 'sessions', 'auth_identities', 'auth_tokens'],
+  },
+  {
+    title: 'What happens when something is deleted',
+    text: [
+      'Every link between tables says what happens to a row when the row it points to is deleted. There are only three answers.',
+    ],
+    visual: () =>
+      `<div class="three">
+        <div class="rule cascade"><b>Deleted too</b>A person’s sessions go with their account. ${count(counts.cascade, 'link', 'links')} work this way.</div>
+        <div class="rule setnull"><b>Kept, link cleared</b>A comment stays as “[deleted]” so replies keep their place. ${count(counts.setnull, 'link', 'links')}.</div>
+        <div class="rule restrict"><b>Delete refused</b>A field with papers in it can’t be deleted. ${count(counts.restrict, 'link', 'links')}.</div>
+      </div>`,
+  },
+  {
+    title: 'Following and blocking',
+    text: [
+      'A follow is one row per pair of people. Unfollowing doesn’t delete it: its status becomes <code>inactive</code>, and following again switches it back.',
+      'That is why following, unfollowing and following again sends only one notification. A block hides two people from each other everywhere.',
+    ],
+    visual: () => flow(['pending or accepted', 'inactive', 'accepted again']),
+    tables: ['follows', 'blocks'],
+  },
+  {
+    title: 'Posts, likes and comments',
+    text: [
+      'A post is text, an image or a reel. A like works like a follow: one row per person and post, switched on and off.',
+      'Comments live in one table for both posts and papers. Notifications record who did what to whom.',
+    ],
+    tables: ['posts', 'post_likes', 'saved_posts', 'comments', 'notifications'],
+  },
+  {
+    title: 'Counts are stored, not counted',
+    text: [
+      'Like, comment and follower counts are numbers kept on the row, so a profile or a post loads without counting anything.',
+      'The background worker adds or subtracts one for each change, and checks every hour that the numbers are still right.',
+    ],
+    visual: () => flow(['someone likes', 'event written', 'worker adds 1 to like_count']),
+    tables: ['posts', 'users', 'outbox_events'],
+  },
+  {
+    title: 'Uploads',
+    text: [
+      'Every image and video, whatever it is for, is one row in <code>media_assets</code>. The worker processes it and only then can it appear.',
+      'The table stores file keys, not web addresses, so the files can move to another storage service without changing data.',
+    ],
+    visual: () => flow(['uploading', 'processing', 'ready']),
+    tables: ['media_assets'],
+  },
+  {
+    title: 'Learning content',
+    text: [
+      'A <code>topic</code> is one concept, such as “Softmax”. Lessons, notes, quizzes, reels and paper prerequisites all hang off topics.',
+      'Courses put learn items in order. The database remembers how far each person got and which lessons they finished.',
+    ],
+    tables: ['topics', 'learn_items', 'courses', 'course_items', 'course_progress', 'learn_item_completions'],
+  },
+  {
+    title: 'Practice',
+    text: [
+      'Questions belong to a topic. A quiz is a named set of questions in a fixed order.',
+      'Every answer is kept as its own row, which is what accuracy, streaks and “quiz done” are worked out from.',
+    ],
+    tables: ['questions', 'quizzes', 'quiz_questions', 'question_attempts'],
+  },
+  {
+    title: 'The paper collection',
+    text: [
+      'Papers are grouped by topic chips (<code>fields</code>). Each paper has a Paper Card in English and in Bangla.',
+      'Citation counts, upvotes and other details come from OpenAlex, Semantic Scholar and Hugging Face. Only the background worker talks to them; the app just reads our tables.',
+    ],
+    tables: ['fields', 'papers', 'paper_cards'],
+  },
+  {
+    title: 'Reading a paper',
+    text: [
+      'Saving a paper is a bookmark. Reading progress is separate and has three steps, plus a private note only its owner can see.',
+      'The first saved paper not yet read is shown as “Up next”.',
+    ],
+    visual: () => flow(['saved', 'Explored', 'Studied', 'Reproduced']),
+    tables: ['paper_saves', 'reading_passes'],
+  },
+  {
+    title: 'How papers connect',
+    text: [
+      'Citation links show what a paper builds on and what built on it. Each paper lists the concepts to learn first, each linked to one of our lessons, quizzes or reels.',
+      'Anyone can make a trail: a reading path through papers, one line per step.',
+    ],
+    tables: ['paper_edges', 'paper_prerequisites', 'trails', 'trail_items'],
+  },
+  {
+    title: 'The worker’s to-do list and the record of admin actions',
+    text: [
+      'When a change needs follow-up work (a notification, a count, an email), the same transaction writes a row to <code>outbox_events</code>. The worker works through them in order.',
+      'Every admin and security action is written to <code>audit_log</code>. Both keep plain ids on purpose, so they outlive what they describe.',
+    ],
+    tables: ['outbox_events', 'audit_log'],
+  },
+  {
+    title: 'You’ve seen the whole shape',
+    text: [
+      'From here, open any area to see its tables, then open a table to see its columns and links one tab at a time.',
+      'Reference has the detailed lists: every link, every index, the migrations and the known gaps.',
+    ],
+    visual: () => `<div class="chips"><a class="btn primary" href="#explore">Explore the tables</a><a class="btn" href="#ref">Open the reference</a></div>`,
+  },
+];
 
-/* ---------- relationship map ---------- */
-let focus = null;
-function renderLanes(){
-  const parents = focus ? new Set(outOf(focus).map(e=>e.to)) : new Set();
-  const kids = focus ? new Set(into(focus).map(e=>e.from)) : new Set();
-  const lanes = document.getElementById('lanes');
-  lanes.classList.toggle('focusing', !!focus);
-  lanes.innerHTML = DOMAINS.map(d=>{
-    const list = TABLES.filter(t=>t.domain===d.id);
-    return `<div class="lane"><h3><span>${d.name}</span><span>${list.length}</span></h3>${list.map(t=>{
-      let cls='', tag='';
-      if(t.name===focus) cls='is-focus';
-      else if(parents.has(t.name) && kids.has(t.name)) { cls='is-parent'; tag='both ways'; }
-      else if(parents.has(t.name)) { cls='is-parent'; tag='references'; }
-      else if(kids.has(t.name)) { cls='is-child'; tag='referenced by'; }
-      const deg = `↗${outOf(t.name).length} · ↙${into(t.name).length}`;
-      return `<button class="node ${cls}" data-focus="${t.name}" aria-pressed="${t.name===focus}"><span>${t.name}</span>`+
-             `<span class="${tag?'tag':'deg'}">${tag||deg}</span></button>`;
-    }).join('')}</div>`;
-  }).join('');
-
-  const panel = document.getElementById('focus-panel');
-  if(!focus){ panel.innerHTML = '<p class="empty">Pick a table above to see its relationships here.</p>'; return; }
-  panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-      <h3 style="font-family:var(--font-mono);font-size:17px">${focus}</h3>
-      <span><button class="jump" data-goto="${focus}">open columns →</button> &nbsp; <button class="jump" data-focus="">clear</button></span>
-    </div>${relBoxes(focus)}`;
+function viewTour(stepParam) {
+  const i = Math.min(Math.max((parseInt(stepParam, 10) || 1) - 1, 0), TOUR.length - 1);
+  const step = TOUR[i];
+  const cells = TOUR.map(
+    (s, k) => `<a href="#tour/${k + 1}" class="${k < i ? 'done' : k === i ? 'now' : ''}" aria-label="Step ${k + 1}: ${esc(s.title)}"${k === i ? ' aria-current="step"' : ''}></a>`,
+  ).join('');
+  return `<section class="tour">
+    <div class="row-progress" style="--n:${TOUR.length}">${cells}</div>
+    <p class="step-count">Step ${i + 1} of ${TOUR.length}</p>
+    <h1>${step.title}</h1>
+    ${step.text.map((p) => `<p class="lede">${p}</p>`).join('')}
+    ${step.visual ? `<div class="visual">${step.visual()}</div>` : ''}
+    ${step.tables ? `<div class="visual"><p class="hint">Tables in this step</p>${chips(step.tables)}</div>` : ''}
+    <div class="tour-nav">
+      <a class="btn" href="#tour/${i}" ${i === 0 ? 'aria-disabled="true" tabindex="-1"' : ''}>Back</a>
+      ${i < TOUR.length - 1 ? `<a class="btn primary" href="#tour/${i + 2}">Next</a>` : `<a class="btn primary" href="#explore">Explore the tables</a>`}
+    </div>
+  </section>`;
 }
 
-/** Two clean lists: the FKs this table holds, and the FKs other tables hold to it (grouped by domain). */
-function relBoxes(n){
-  const out = outOf(n), inc = into(n);
-  const row = (path, d) => `<div class="rel"><div class="path">${path}</div>${rulePill(d)}<div class="why">${RULE_WHY[d]}</div></div>`;
+/* ============================================================
+   Home, Explore, areas, tables
+   ============================================================ */
+function viewHome() {
+  return `<section>
+    <h1>The Doshomik database, one step at a time</h1>
+    <p class="lede">${TABLES.length} tables hold everything the app stores. If this is new to you, start with the tour.</p>
+    <div class="paths">
+      <a class="path primary" href="#tour/1"><b>Take the tour</b><span>${TOUR.length} short steps, one idea each</span></a>
+      <a class="path" href="#explore"><b>Explore the tables</b><span>Pick an area, then open any table</span></a>
+      <a class="path" href="#ref"><b>Look something up</b><span>Delete rules, indexes, migrations and known gaps</span></a>
+    </div>
+  </section>`;
+}
+
+function viewExplore() {
+  return `<section>
+    <h1>Explore the tables</h1>
+    <p class="lede">The tables are grouped into ${DOMAINS.length} areas. Open one to see what it holds.</p>
+    <label class="hint" for="find">Or find a table or column by name</label>
+    <input id="find" class="search" type="search" placeholder="For example: user_id, papers, note" autocomplete="off" spellcheck="false">
+    <div id="results">${areaList()}</div>
+  </section>`;
+}
+
+function areaList() {
+  return `<ul class="list">${DOMAINS.map(
+    (d) => `<li><a class="item" href="#explore/${d.id}"><b>${d.name}</b><span>${d.desc}</span><small>${count(tablesIn(d.id).length, 'table', 'tables')}</small></a></li>`,
+  ).join('')}</ul>`;
+}
+
+function searchResults(q) {
+  const hits = TABLES.map((t) => ({ t, cols: t.columns.filter((c) => c.n.includes(q)).map((c) => c.n) })).filter(
+    ({ t, cols }) => t.name.includes(q) || cols.length,
+  );
+  if (!hits.length) return `<p class="empty">No table or column contains “${esc(q)}”. Try part of a name, such as <code>user</code>.</p>`;
+  return `<ul class="list">${hits
+    .map(
+      ({ t, cols }) =>
+        `<li><a class="item" href="#table/${t.name}"><b class="t">${t.name}</b><span>${t.purpose}</span>${
+          cols.length ? `<small>Columns: ${cols.slice(0, 5).join(', ')}${cols.length > 5 ? ` and ${cols.length - 5} more` : ''}</small>` : ''
+        }</a></li>`,
+    )
+    .join('')}</ul>`;
+}
+
+function viewArea(id) {
+  const d = domainById[id];
+  if (!d) return viewNotFound();
+  const list = tablesIn(id);
+  return `<section>
+    ${crumbs([['Explore', '#explore'], [d.name]])}
+    <h1>${d.name}</h1>
+    <p class="lede">${d.desc}</p>
+    <ul class="list block">${list
+      .map(
+        (t) =>
+          `<li><a class="item" href="#table/${t.name}"><b class="t">${t.name}</b><span>${t.purpose}</span><small>${count(t.columns.length, 'column', 'columns')}${
+            t.isNewTable ? ', added in migration 005' : ''
+          }</small></a></li>`,
+      )
+      .join('')}</ul>
+  </section>`;
+}
+
+const TABS = [
+  ['about', 'About'],
+  ['columns', 'Columns'],
+  ['links', 'Links'],
+  ['indexes', 'Indexes'],
+];
+
+function viewTable(name, tab = 'about') {
+  const t = byName[name];
+  if (!t) return viewNotFound();
+  if (!TABS.some(([key]) => key === tab)) tab = 'about';
+  const d = domainById[t.domain];
+  const idx = INDEXES.filter((i) => i.t.includes(t.name));
+  const linkCount = outOf(name).length + into(name).length;
+  const label = { about: 'About', columns: `Columns (${t.columns.length})`, links: `Links (${linkCount})`, indexes: `Indexes (${idx.length})` };
+  const panel = { about: panelAbout, columns: panelColumns, links: panelLinks, indexes: panelIndexes }[tab](t, idx);
+  const nextTab = TABS[TABS.findIndex(([key]) => key === tab) + 1];
+  return `<section>
+    ${crumbs([['Explore', '#explore'], [d.name, `#explore/${d.id}`], [t.name]])}
+    <h1 class="table-title">${t.name}</h1>
+    <p class="lede">${t.purpose}</p>
+    <nav class="tabs" aria-label="About this table">${TABS.map(
+      ([key]) => `<a href="#table/${name}/${key}"${key === tab ? ' aria-current="page"' : ''}>${label[key]}</a>`,
+    ).join('')}</nav>
+    ${panel}
+    ${nextTab ? `<p class="next"><a href="#table/${name}/${nextTab[0]}">Next: ${label[nextTab[0]]}</a></p>` : `<p class="next"><a href="#explore/${d.id}">Back to ${d.name}</a></p>`}
+  </section>`;
+}
+
+function panelAbout(t) {
+  const out = new Set(outOf(t.name).map((e) => e.to));
+  const inc = new Set(into(t.name).map((e) => e.from));
+  const facts = [
+    `In <a href="#explore/${t.domain}">${domainById[t.domain].name}</a>`,
+    `<b>${t.columns.length}</b> columns`,
+    `Points to <b>${out.size}</b> ${out.size === 1 ? 'table' : 'tables'}`,
+    `<b>${inc.size}</b> ${inc.size === 1 ? 'table points' : 'tables point'} to it`,
+  ];
+  const know = [
+    ...(t.isNewTable ? ['Added in migration 005 (Research tab).'] : []),
+    ...(t.badges || []).filter((b) => BADGE_HELP[b]).map((b) => BADGE_HELP[b]),
+    ...(t.checks || []).map((c) => `The database checks: ${c}`),
+    ...(t.notes || []),
+  ];
+  return `<ul class="facts">${facts.map((f) => `<li>${f}</li>`).join('')}</ul>
+    ${know.length ? `<h2>Good to know</h2><ul class="know">${know.map((k) => `<li>${k}</li>`).join('')}</ul>` : ''}`;
+}
+
+function keyPills(c, t) {
+  const pills = [];
+  const k = c.k || '';
+  if (k.includes('pk')) pills.push('<span class="pill key">primary key</span>');
+  if (k.includes('u')) pills.push('<span class="pill">unique</span>');
+  const fk = (t.fks || []).find((f) => f.c === c.n);
+  if (fk) pills.push(`<span class="pill">links to ${fk.to}</span>`);
+  if (c.isNew) pills.push('<span class="pill new">new</span>');
+  return pills.join('');
+}
+
+function panelColumns(t) {
+  return `<ul class="cols">${t.columns
+    .map(
+      (c) =>
+        `<li><div class="col-head"><span class="t">${c.n}</span><span class="type">${esc(c.t || '')}</span>${keyPills(c, t)}</div>${c.note ? `<p>${c.note}</p>` : ''}</li>`,
+    )
+    .join('')}</ul>`;
+}
+
+function panelLinks(t) {
+  const out = outOf(t.name).filter((e) => e.to !== t.name);
+  const self = outOf(t.name).filter((e) => e.to === t.name);
+  const inc = into(t.name).filter((e) => e.from !== t.name);
   const outHtml = out.length
-    ? out.map(e=>row(`<span>${n}.${e.col}</span><span class="arrow">→</span>${jump(e.to)}`, e.d)).join('')
-    : '<div class="none">Holds no foreign keys.</div>';
-  let inHtml = '<div class="none">Nothing points at this table.</div>';
-  if(inc.length){
-    inHtml = DOMAINS.map(d=>{
-      const rows = inc.filter(e=>byName[e.from].domain===d.id);
-      if(!rows.length) return '';
-      return `<div class="relgroup">${d.name}</div>`+rows.map(e=>row(`${jump(e.from)}<span>.${e.col}</span><span class="arrow">→</span><span>${n}</span>`, e.d)).join('');
+    ? `<ul class="links">${out.map((e) => `<li class="${e.d}">${outSentence(e)}</li>`).join('')}</ul>`
+    : `<p class="empty">This table doesn’t point to any other table.</p>`;
+  let inHtml = `<p class="empty">No other table points here.</p>`;
+  if (inc.length && inc.length <= 6) {
+    inHtml = `<ul class="links">${inc.map((e) => `<li class="${e.d}">${inSentence(e)}</li>`).join('')}</ul>`;
+  } else if (inc.length) {
+    // Many links (users has 37): one folded group per area, so the page stays short.
+    inHtml = DOMAINS.map((d) => {
+      const rows = inc.filter((e) => byName[e.from].domain === d.id);
+      if (!rows.length) return '';
+      return `<details><summary>${d.name}<small>${count(rows.length, 'link', 'links')}</small></summary><div class="inner"><ul class="links">${rows
+        .map((e) => `<li class="${e.d}">${inSentence(e)}</li>`)
+        .join('')}</ul></div></details>`;
     }).join('');
   }
-  return `<div class="relcols">
-    <div class="relbox out"><header><h4>References</h4><small>${out.length} FK${out.length===1?'':'s'} held here</small></header>${outHtml}</div>
-    <div class="relbox in"><header><h4>Referenced by</h4><small>${inc.length} FK${inc.length===1?'':'s'} from ${new Set(inc.map(e=>e.from)).size} tables</small></header>${inHtml}</div>
-  </div>`;
+  return `${legend()}
+    <h2>This table points to</h2><div class="block" style="margin-top:12px">${outHtml}</div>
+    ${self.length ? `<p class="hint">It also points to itself through <code>${self.map((e) => e.col).join(', ')}</code> (replies to comments).</p>` : ''}
+    <h2 class="block">Tables that point here</h2><div style="margin-top:12px">${inHtml}</div>`;
 }
 
-/* ---------- full FK table ---------- */
-let fkRule = 'all';
-function renderFkTable(){
-  const q = document.getElementById('fk-q').value.trim().toLowerCase();
-  const rows = EDGES.filter(e=>(fkRule==='all'||e.d===fkRule) &&
-    (!q || e.from.includes(q) || e.to.includes(q) || e.col.includes(q)));
-  const targets = [...new Set(rows.map(e=>e.to))].sort((a,b)=>into(b).length-into(a).length || a.localeCompare(b));
-  let body = '';
-  targets.forEach(to=>{
-    const group = rows.filter(e=>e.to===to);
-    body += `<tr class="group"><td colspan="4">→ ${to} · ${group.length}</td></tr>`;
-    body += group.map(e=>`<tr><td>${jump(e.from)}</td><td class="mono">${e.col}</td><td>${jump(e.to)}</td><td>${rulePill(e.d)}</td></tr>`).join('');
+function panelIndexes(t, idx) {
+  if (!idx.length) return `<p class="empty">Only its primary key and unique columns are indexed. That is enough for how it is read.</p>`;
+  return `<ul class="cols">${idx
+    .map((i) => `<li><div class="col-head"><b>${i.purpose}</b>${i.isNew ? '<span class="pill new">new</span>' : ''}</div><p><code>${esc(i.idx)}</code></p></li>`)
+    .join('')}</ul>`;
+}
+
+/* ============================================================
+   Reference: one topic per page
+   ============================================================ */
+const REF = [
+  ['conventions', 'Conventions', 'The patterns almost every table follows'],
+  ['links', 'All links between tables', `Every foreign key (${EDGES.length}) and what deleting does`],
+  ['indexes', 'Indexes', 'What is indexed, and for which screen'],
+  ['rules', 'Rules the database enforces', 'Checks on values, and the errors the API returns'],
+  ['lifecycle', 'How data changes and expires', 'Status flows, and what is cleaned up when'],
+  ['research', 'Research tab features', 'Each feature of the spec and the tables behind it (migration 005)'],
+  ['efficiency', 'Efficiency changes', 'Toggle rows and stored counts (migration 004)'],
+  ['migrations', 'Migrations', 'The six SQL files, in order'],
+  ['gaps', 'Known gaps', 'What is planned, and when'],
+];
+
+function viewRef(topic) {
+  if (!topic) {
+    return `<section>
+      <h1>Reference</h1>
+      <p class="lede">Detailed lists, one topic per page.</p>
+      <ul class="list block">${REF.map(([id, title, desc]) => `<li><a class="item" href="#ref/${id}"><b>${title}</b><span>${desc}</span></a></li>`).join('')}</ul>
+    </section>`;
+  }
+  const entry = REF.find(([id]) => id === topic);
+  if (!entry) return viewNotFound();
+  const body = REF_PAGES[topic]();
+  return `<section>${crumbs([['Reference', '#ref'], [entry[1]]])}<h1>${entry[1]}</h1><p class="lede">${entry[2]}.</p><div class="block">${body}</div></section>`;
+}
+
+const fold = (summary, inner, small = '') => `<details><summary>${summary}${small ? `<small>${small}</small>` : ''}</summary><div class="inner">${inner}</div></details>`;
+
+const REF_PAGES = {
+  conventions: () => CONVENTIONS.map(([term, text]) => fold(term, `<p>${text}</p>`)).join(''),
+
+  links: () => `${legend()}
+    <div class="filters" role="group" aria-label="Filter by what deleting does">
+      <button type="button" data-rule="all" aria-pressed="true">All</button>
+      <button type="button" data-rule="cascade" aria-pressed="false">Deleted too (${counts.cascade})</button>
+      <button type="button" data-rule="setnull" aria-pressed="false">Kept, link cleared (${counts.setnull})</button>
+      <button type="button" data-rule="restrict" aria-pressed="false">Delete refused (${counts.restrict})</button>
+    </div>
+    <p class="hint">Grouped by the table being pointed at. Open a group to see its links.</p>
+    <div id="link-groups">${linkGroups('all')}</div>`,
+
+  indexes: () => INDEXES.map((i) => fold(i.purpose, `<p><code>${esc(i.idx)}</code></p>${chips(i.t)}`, i.isNew ? 'new' : '')).join(''),
+
+  rules: () => `<h2>Checks on values</h2><div class="block" style="margin-top:12px">${CHECKS.map(([table, rule, text]) =>
+    fold(rule, `<p>${text}</p><p class="hint">On ${tlink(table)}</p>`),
+  ).join('')}</div>
+    <h2 class="block">Errors the API returns</h2>
+    <div class="demo block" style="margin-top:12px"><table><thead><tr><th>When the database refuses</th><th>The API answers</th></tr></thead><tbody>${ERRORS.map(
+      ([a, b]) => `<tr><td style="font-family:var(--font)">${a}</td><td>${b}</td></tr>`,
+    ).join('')}</tbody></table></div>`,
+
+  lifecycle: () => `<h2>Status flows</h2><div class="block" style="margin-top:12px">${FLOWS.map((f) =>
+    fold(f.title, `${flow(f.alt ? [...f.steps, `or ${f.alt}`] : f.steps)}<p style="margin-top:12px">${f.note}</p>`),
+  ).join('')}</div>
+    <h2 class="block">What is cleaned up, and when</h2><div class="block" style="margin-top:12px">${RETENTION.map(([what, rule]) => fold(what, `<p>${rule}</p>`)).join('')}</div>`,
+
+  research: () => `<p>Group A of the Research spec, feature by feature. Open one to see what existed and what was added.</p>
+    ${RESEARCH.map(([id, feature, had, added, tables]) =>
+      fold(`${id}: ${feature}`, `<p><b>Already there:</b> ${had}</p><p><b>Added:</b> ${added}</p>${chips(tables)}`),
+    ).join('')}
+    <h2 class="block">How the data flows</h2><div class="block" style="margin-top:12px">${RESEARCH_FLOWS.map((f) =>
+      fold(f.title, `${flow(f.steps)}<p style="margin-top:12px">${f.note}</p>`),
+    ).join('')}</div>
+    <h2 class="block">Decisions worth knowing</h2><div class="block" style="margin-top:12px">${RESEARCH_DECISIONS.map(([a, b]) => fold(a, `<p>${b}</p>`)).join('')}</div>`,
+
+  efficiency: () => `${CHANGES.map((c) =>
+    fold(c.title, `<div class="ba"><div class="before"><b>Before.</b> ${c.before}</div><div class="after"><b>After.</b> ${c.after}</div></div><p class="hint" style="margin-top:10px">Where: ${c.where}</p>${chips([c.tag])}`),
+  ).join('')}
+    <h2 class="block">Looked at and left as they are</h2><div class="block" style="margin-top:12px">${KEPT.map(([what, why]) => fold(what, `<p>${why}</p>`)).join('')}</div>`,
+
+  migrations: () => MIGRATIONS.map(([file, text], i) => fold(`${i + 1}. ${file.replace(/<[^>]+>.*$/, '').trim()}`, `<p>${text}</p>`)).join('') +
+    `<p class="hint block">Never edit a migration that has been applied: add a new one. After a schema change, regenerate <code>src/db/types.ts</code> with <code>pnpm db:types</code>.</p>`,
+
+  gaps: () => GAPS.map(([gap, plan, when]) => fold(gap, `<p>${plan}</p>`, when)).join(''),
+};
+
+function linkGroups(rule) {
+  const rows = EDGES.filter((e) => rule === 'all' || e.d === rule);
+  const targets = [...new Set(rows.map((e) => e.to))].sort((a, b) => into(b).length - into(a).length || a.localeCompare(b));
+  if (!targets.length) return `<p class="empty">No links of this kind.</p>`;
+  return targets
+    .map((to) => {
+      const group = rows.filter((e) => e.to === to);
+      return fold(`<span class="t">${to}</span>`, `<ul class="links">${group.map((e) => `<li class="${e.d}">${inSentence(e)}</li>`).join('')}</ul>`, count(group.length, 'link', 'links'));
+    })
+    .join('');
+}
+
+function viewNotFound() {
+  return `<section><h1>Nothing here</h1><p class="lede">This page doesn’t exist. Go back to <a href="#home">Home</a> or <a href="#explore">Explore</a>.</p></section>`;
+}
+
+/* ============================================================
+   Routing: #home, #tour/3, #explore, #explore/research,
+   #table/papers/links, #ref, #ref/indexes
+   ============================================================ */
+// Older links (the previous explorer, and links inside the data) still land somewhere useful.
+const ALIASES = { overview: 'home', map: 'ref/links', tables: 'explore', indexes: 'ref/indexes', rules: 'ref/rules', lifecycle: 'ref/lifecycle', research: 'ref/research', changes: 'ref/efficiency', migrations: 'ref/migrations', roadmap: 'ref/gaps' };
+
+function route() {
+  let hash = location.hash.replace(/^#/, '') || 'home';
+  if (ALIASES[hash]) {
+    history.replaceState(null, '', `#${ALIASES[hash]}`);
+    hash = ALIASES[hash];
+  }
+  const [view, a, b] = hash.split('/');
+  const html =
+    view === 'home' ? viewHome()
+    : view === 'tour' ? viewTour(a)
+    : view === 'explore' ? (a ? viewArea(a) : viewExplore())
+    : view === 'table' ? viewTable(a, b)
+    : view === 'ref' ? viewRef(a)
+    : viewNotFound();
+  app.innerHTML = html;
+
+  const section = { home: 'home', tour: 'tour', explore: 'explore', table: 'explore', ref: 'ref' }[view];
+  document.querySelectorAll('[data-nav]').forEach((link) => {
+    if (link.dataset.nav === section) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
   });
-  fill('fk-table', `<thead><tr><th>Child table</th><th>Column</th><th>References</th><th style="width:120px">On delete</th></tr></thead><tbody>${body || '<tr><td colspan="4" style="color:var(--muted)">No foreign key matches.</td></tr>'}</tbody>`);
+  document.title = `Doshomik schema guide: ${app.querySelector('h1')?.textContent || 'Home'}`;
+  window.scrollTo(0, 0);
+  wire();
 }
-document.getElementById('fk-q').addEventListener('input', renderFkTable);
-document.querySelectorAll('[data-rule]').forEach(b=>b.addEventListener('click',()=>{
-  fkRule = b.dataset.rule;
-  document.querySelectorAll('[data-rule]').forEach(x=>x.setAttribute('aria-pressed', String(x===b)));
-  renderFkTable();
-}));
 
-/* ---------- static tables ---------- */
-const newPill = '<span class="pill p-new">new</span>';
-fill('index-table','<thead><tr><th style="width:290px">What it is for</th><th>Index</th></tr></thead><tbody>'+
-  INDEXES.map(r=>`<tr><td>${r.purpose} ${r.isNew?newPill:''}<div style="margin-top:4px;display:flex;gap:4px 10px;flex-wrap:wrap">${r.t.map(jump).join('')}</div></td><td class="mono">${esc(r.idx)}</td></tr>`).join('')+'</tbody>');
-fill('checks-table','<thead><tr><th style="width:140px">Table</th><th style="width:180px">Rule</th><th>Constraint</th></tr></thead><tbody>'+
-  CHECKS.map(([t,n,d])=>`<tr><td>${jump(t)}</td><td><strong>${n}</strong></td><td>${d}</td></tr>`).join('')+'</tbody>');
-fill('errors-table','<thead><tr><th style="width:320px">Database error</th><th>API response</th></tr></thead><tbody>'+
-  ERRORS.map(([a,b])=>`<tr><td>${a}</td><td>${b}</td></tr>`).join('')+'</tbody>');
-fill('retention-table','<thead><tr><th style="width:210px">Data</th><th>Rule</th></tr></thead><tbody>'+
-  RETENTION.map(([a,b])=>`<tr><td><strong>${a}</strong></td><td>${b}</td></tr>`).join('')+'</tbody>');
-fill('migration-table','<thead><tr><th style="width:360px">File</th><th>What it does</th></tr></thead><tbody>'+
-  MIGRATIONS.map(([f,d])=>`<tr><td class="mono">${f}</td><td>${d}</td></tr>`).join('')+'</tbody>');
-fill('gap-table','<thead><tr><th style="width:290px">Gap today</th><th>Plan</th><th style="width:170px">When</th></tr></thead><tbody>'+
-  GAPS.map(([g,p,w])=>`<tr><td><strong>${g}</strong></td><td>${p}</td><td><span class="pill">${w}</span></td></tr>`).join('')+'</tbody>');
-fill('kept-table','<thead><tr><th style="width:230px">Table</th><th>Why it stays</th></tr></thead><tbody>'+
-  KEPT.map(([a,b])=>`<tr><td class="mono">${a}</td><td>${b}</td></tr>`).join('')+'</tbody>');
-fill('flows', FLOWS.map(f=>`<div class="card"><h3>${f.title}</h3>
-  <div class="flow" style="margin:8px 0">${f.steps.map(s=>`<b>${s}</b>`).join('<s>→</s>')}${f.alt?`<s>or</s><b>${f.alt}</b>`:''}</div>
-  <p>${f.note}</p></div>`).join(''));
-fill('changes', CHANGES.map((c,i)=>`<div class="card change"><h3><span class="pill p-accent">${i+1}</span> ${c.title} ${jump(c.tag)}</h3>
-  <div class="ba"><div class="before"><b>Before</b>${c.before}</div><div class="after"><b>After</b>${c.after}</div></div>
-  <div class="where">Where: <span class="mono">${c.where}</span></div></div>`).join(''));
-
-/* ---------- deleting a user ---------- */
-(function(){
-  const intoUsers = into('users');
-  const by = r => [...new Set(intoUsers.filter(e=>e.d===r).map(e=>e.from))];
-  const box = (r, title, text) => `<div class="card"><h3 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${title} ${rulePill(r)}</h3>
-    <div style="display:flex;flex-wrap:wrap;gap:6px 10px;margin:10px 0">${by(r).map(jump).join('')}</div><p>${text}</p></div>`;
-  fill('cascade-grid',
-    box('cascade','Deleted with the user','Their posts (and those posts\' likes, saves, comments and notifications), likes, saves, follows, blocks, sessions, sign-in links, codes, progress, attempts and notifications.') +
-    box('setnull','Kept, author forgotten','Comment threads keep a <code>[deleted]</code> placeholder; reports, media ownership, audit history and team content <code>created_by</code>/<code>updated_by</code> survive.'));
-})();
-
-/* ---------- table explorer ---------- */
-const listEl = document.getElementById('tablelist');
-const detailEl = document.getElementById('detail');
-const qEl = document.getElementById('q');
-let selected = 'users';
-
-function matches(t, q){
-  if(!q) return {hit:true, cols:[]};
-  const cols = t.columns.filter(c=>c.n.toLowerCase().includes(q) || (c.t||'').toLowerCase().includes(q)).map(c=>c.n);
-  const hit = t.name.includes(q) || t.purpose.toLowerCase().includes(q) || (t.badges||[]).some(b=>b.includes(q)) || cols.length>0;
-  return {hit, cols};
-}
-function renderList(){
-  const q = qEl.value.trim().toLowerCase();
-  let shown = 0, html = '';
-  DOMAINS.forEach(d=>{
-    const rows = TABLES.filter(t=>t.domain===d.id).map(t=>({t, m:matches(t,q)})).filter(x=>x.m.hit);
-    if(!rows.length) return;
-    html += `<div class="domain-h"><span>${d.name}</span><span>${rows.length}</span></div>`;
-    rows.forEach(({t,m})=>{
-      shown++;
-      html += `<button data-goto="${t.name}" aria-current="${t.name===selected}">${t.name}`+
-        (q && m.cols.length ? `<span class="hitcol">${m.cols.slice(0,4).join(', ')}${m.cols.length>4?' +'+(m.cols.length-4):''}</span>` : '')+`</button>`;
+/** Behaviour for the few interactive parts of the current view. */
+function wire() {
+  const find = document.getElementById('find');
+  if (find) {
+    find.addEventListener('input', () => {
+      const q = find.value.trim().toLowerCase();
+      document.getElementById('results').innerHTML = q ? searchResults(q) : areaList();
     });
-  });
-  listEl.innerHTML = html || '<div class="domain-h">No table or column matches</div>';
-  document.getElementById('q-count').textContent = q ? `${shown} of ${TABLES.length} tables` : `${TABLES.length} tables · ${EDGES.length} foreign keys`;
-}
-function keyBadges(k){
-  if(!k) return '';
-  return k.split('+').map(x=>({pk:'<span class="k k-pk">PK</span>',fk:'<span class="k k-fk">FK</span>',u:'<span class="k k-u">UNIQUE</span>'})[x]||'').join('');
-}
-function renderDetail(){
-  const t = byName[selected];
-  const idx = INDEXES.filter(i=>i.t.includes(t.name));
-  const inc = into(t.name);
-  const badges = [`<span class="pill p-accent">${domainOf(t.name).name}</span>`]
-    .concat((t.badges||[]).map(b=>`<span class="pill ${b==='toggle row'?'p-new':'p-key'}">${b}</span>`))
-    .concat([`<span class="pill">${t.columns.length} columns</span>`,`<span class="pill">↗ ${outOf(t.name).length} out</span>`,`<span class="pill">↙ ${inc.length} in</span>`]).join('');
-
-  const cols = `<div class="scroller card"><table class="grid">
-    <thead><tr><th style="width:190px">Column</th><th style="width:110px">Type</th><th style="width:100px">Key</th><th>Notes</th></tr></thead><tbody>`+
-    t.columns.map(c=>{
-      const fk = (t.fks||[]).find(f=>f.c===c.n);
-      const ref = fk ? `<div style="margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted)">→ ${jump(fk.to)} ${rulePill(fk.d)}</div>` : '';
-      return `<tr><td class="mono" style="color:var(--ink)">${c.n} ${c.isNew?newPill:''}</td><td class="mono" style="color:var(--ink-2)">${esc(c.t||'')}</td>`+
-             `<td><span class="keycell">${keyBadges(c.k)}</span></td><td>${c.note||''}${ref}</td></tr>`;
-    }).join('')+'</tbody></table></div>';
-
-  const idxHtml = idx.length
-    ? `<div class="scroller card"><table class="grid"><tbody>${idx.map(i=>`<tr><td style="width:260px">${i.purpose} ${i.isNew?newPill:''}</td><td class="mono">${esc(i.idx)}</td></tr>`).join('')}</tbody></table></div>`
-    : `<div class="card pad" style="color:var(--muted);font-size:13.8px">Only the primary key and unique constraints above.</div>`;
-  const rules = (t.checks||[]).concat(t.notes||[]);
-
-  detailEl.innerHTML = `
-    <div class="detail-head"><h2>${t.name}</h2><p>${t.purpose}</p><div class="badges">${badges}</div></div>
-    <div class="sub"><h3>Columns</h3>${cols}</div>
-    <div class="sub"><h3>Relationships</h3>${relBoxes(t.name)}</div>
-    <div class="sub"><h3>Indexes</h3>${idxHtml}</div>
-    ${rules.length?`<div class="sub"><h3>Constraints and things to know</h3><div class="card pad"><ul class="plain">${rules.map(x=>`<li>${x}</li>`).join('')}</ul></div></div>`:''}`;
-}
-function select(name){
-  if(!byName[name]) return;
-  selected = name;
-  renderList(); renderDetail();
-  show('tables');
-  detailEl.scrollIntoView({block:'start', behavior:'smooth'});
+  }
+  document.querySelectorAll('[data-rule]').forEach((button) =>
+    button.addEventListener('click', () => {
+      document.querySelectorAll('[data-rule]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+      document.getElementById('link-groups').innerHTML = linkGroups(button.dataset.rule);
+    }),
+  );
 }
 
-/* ---------- routing ---------- */
-const VIEWS = ['overview','map','tables','indexes','rules','lifecycle','changes','migrations','roadmap'];
-function show(v){
-  if(!VIEWS.includes(v)) v = 'overview';
-  VIEWS.forEach(x=>{ document.getElementById('view-'+x).hidden = (x!==v); });
-  document.querySelectorAll('#nav a').forEach(a=>{
-    if(a.getAttribute('href')==='#'+v) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
-  });
-  if(location.hash.slice(1) !== v) history.replaceState(null,'','#'+v);
-}
-window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
-document.addEventListener('click',e=>{
-  const f = e.target.closest('[data-focus]');
-  if(f){ e.preventDefault(); const n = f.getAttribute('data-focus'); focus = (n && n!==focus) ? n : null; renderLanes(); return; }
-  const g = e.target.closest('[data-goto]');
-  if(g){ e.preventDefault(); select(g.getAttribute('data-goto')); }
+// Arrow keys move through the tour.
+document.addEventListener('keydown', (event) => {
+  if (!location.hash.startsWith('#tour') || event.target.closest('input')) return;
+  const current = parseInt(location.hash.split('/')[1], 10) || 1;
+  if (event.key === 'ArrowRight' && current < TOUR.length) location.hash = `#tour/${current + 1}`;
+  if (event.key === 'ArrowLeft' && current > 1) location.hash = `#tour/${current - 1}`;
 });
-qEl.addEventListener('input', renderList);
-
-renderLanes(); renderFkTable(); renderList(); renderDetail();
-show(location.hash.slice(1) || 'overview');
+window.addEventListener('hashchange', route);
+route();
 </script>
 </body>
 </html>

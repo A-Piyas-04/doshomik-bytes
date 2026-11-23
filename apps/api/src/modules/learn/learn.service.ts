@@ -153,5 +153,54 @@ export async function saveProgress(viewerId: number, coursePublicId: string, las
     )
     .returning(['last_position', 'completed_at', 'updated_at'])
     .executeTakeFirstOrThrow();
+
+  // The steps reached count as completed lessons, for Learn before reading (they stay completed
+  // if the user later moves back in the course).
+  const reached = course.items.filter((item) => item.step <= lastPosition).map((item) => item.id);
+  if (reached.length) {
+    await sql`
+      INSERT INTO learn_item_completions (user_id, learn_item_id)
+      SELECT ${viewerId}, id FROM learn_items WHERE public_id IN (${sql.join(reached)})
+      ON CONFLICT DO NOTHING`.execute(db);
+  }
   return progress;
+}
+
+// ---------- Learn before reading (A13) ----------
+
+/** "I already know this": the topic counts as done in every paper's Learn first list. */
+export async function markTopicKnown(userId: number, topicSlug: string): Promise<void> {
+  const topic = found(await db.selectFrom('topics').select('id').where('slug', '=', topicSlug).executeTakeFirst(), 'Topic');
+  await db.insertInto('user_known_topics').values({ user_id: userId, topic_id: topic.id }).onConflict((oc) => oc.doNothing()).execute();
+}
+
+export async function unmarkTopicKnown(userId: number, topicSlug: string): Promise<void> {
+  await db
+    .deleteFrom('user_known_topics')
+    .where('user_id', '=', userId)
+    .where('topic_id', '=', (eb) => eb.selectFrom('topics').select('id').where('slug', '=', topicSlug))
+    .execute();
+}
+
+/** Marks a published lesson or note as completed, wherever it was opened. */
+export async function completeLearnItem(userId: number, itemPublicId: string) {
+  const item = found(
+    await db.selectFrom('learn_items as li').select('li.id').where('li.public_id', '=', itemPublicId).where(isPublished('li')).executeTakeFirst(),
+    'Learn item',
+  );
+  const row = await db
+    .insertInto('learn_item_completions')
+    .values({ user_id: userId, learn_item_id: item.id })
+    .onConflict((oc) => oc.columns(['user_id', 'learn_item_id']).doUpdateSet({ completed_at: sql`learn_item_completions.completed_at` }))
+    .returning('completed_at')
+    .executeTakeFirstOrThrow();
+  return { id: itemPublicId, completed_at: row.completed_at };
+}
+
+export async function uncompleteLearnItem(userId: number, itemPublicId: string): Promise<void> {
+  await db
+    .deleteFrom('learn_item_completions')
+    .where('user_id', '=', userId)
+    .where('learn_item_id', '=', (eb) => eb.selectFrom('learn_items').select('id').where('public_id', '=', itemPublicId))
+    .execute();
 }

@@ -1,6 +1,6 @@
 # Backend architecture
 
-Status as of Nov 22, 2026 (Prototype 2 backend, `apps/api`).
+Status as of Nov 23, 2026 (Prototype 2 backend plus the Research tab's Group A, `apps/api`).
 
 Related: [Database architecture](database-architecture.md) · [API reference and setup](../../apps/api/README.md) · [Implementation notes and decisions](../prototype-2-implementation-notes.md)
 
@@ -39,12 +39,14 @@ flowchart LR
     subgraph worker_proc["Worker process — pnpm worker"]
         media["media loop<br/>sharp + ffmpeg"]
         outbox["outbox loop<br/>counters, notifications,<br/>push, email"]
-        maint["maintenance loop<br/>hourly purge and repair"]
+        papers["papers loop<br/>paper ingestion,<br/>trend rank"]
+        maint["maintenance loop<br/>hourly purge, repair, re-rank"]
     end
 
-    pg[("PostgreSQL<br/>30 tables")]
+    pg[("PostgreSQL<br/>39 tables")]
     disk[("MEDIA_DIR<br/>raw/ processed/ work/")]
     ext["Email (SMTP or files)<br/>Push (log stand-in)<br/>Google ID token keys"]
+    scholar["OpenAlex · Semantic Scholar<br/>Hugging Face daily papers"]
 
     app -- HTTPS JSON --> api
     admin -- HTTPS JSON --> api
@@ -55,6 +57,8 @@ flowchart LR
     media --> disk
     outbox --> pg
     outbox --> ext
+    papers --> scholar
+    papers --> pg
     maint --> pg
     maint --> disk
 ```
@@ -63,7 +67,8 @@ The design rules:
 
 - **The request path stays fast.** Slow or failure-prone work (transcoding, notifications, push, email, counters) runs in the worker. A request writes its change plus an outbox event in one transaction and returns.
 - **File bytes never pass through API route handlers.** Clients upload to a signed storage URL and play media from signed or public storage URLs. In development the API process serves those URLs as a stand-in for S3/R2 and a CDN.
-- **Every outside dependency sits behind an interface** (storage, email, push, Google) with a local implementation, so the whole system runs on one machine with no accounts.
+- **Every outside dependency sits behind an interface** (storage, email, push, Google, scholarly sources) with a local implementation, so the whole system runs on one machine with no accounts.
+- **The app never calls a scholarly API.** Paper metadata, citations, lineage and trending data are ingested by the worker into Postgres (§7.1); requests read only our tables.
 
 ## 2. Tech stack
 
@@ -87,25 +92,26 @@ The design rules:
 ```
 apps/api/src/
   server.ts            API entry point: buildApp(), listen, graceful shutdown
-  worker.ts            Worker entry point: advisory lock, three loops, graceful shutdown
+  worker.ts            Worker entry point: advisory lock, four loops, graceful shutdown
   app.ts               Plugin registration, security headers, route tree
   config/env.ts        Environment variables, validated with zod at startup
   db/
     index.ts           Kysely instance (pool with statement timeout)
     types.ts           Generated table types
     visibility.ts      SQL conditions for blocks, privacy, drafts, deleted rows
-    search.ts          Full-text and trigram conditions (match the indexes)
+    search.ts          Full-text and trigram conditions (match the indexes), paper search refresh
     errors.ts          Postgres error codes
   lib/                 Cross-cutting helpers
     auth.ts            authenticate / requireRole hooks, AuthContext
     crypto.ts          HKDF-derived keys, signed tokens, AES-GCM, token hashing
-    pagination.ts      Keyset pagination with encrypted cursors
+    pagination.ts      Keyset pagination with encrypted cursors: by time (fetchPage) or by rank (fetchRankedPage)
     outbox.ts          emit() / emitSearchSync(): event catalogue and writer
     audit.ts           audit() writer for admin and security actions
     storage.ts         Storage interface + LocalDiskStorage
     rate-limits.ts     perIp() / perUser() route options
     errors.ts, error-handler.ts, validation.ts, totp.ts
   providers/index.ts   Email, push, Google sign-in (interfaces + implementations)
+  providers/scholarly.ts  OpenAlex, Semantic Scholar, Hugging Face clients (throttled; worker only)
   modules/<area>/
     <area>.routes.ts   HTTP: path, zod schemas, rate limits, role hooks, response mapping
     <area>.service.ts  Queries and business rules; takes a Db (pool or transaction)
@@ -113,11 +119,12 @@ apps/api/src/
     media.ts           Image and video processing
     outbox.ts          One handler per event type
     notify.ts          Creates notification rows and returns push side effects
-    maintenance.ts     Purges, counter repair, clean-up
+    papers.ts          Paper ingestion: due papers, trending, lineage edges, trend rank
+    maintenance.ts     Purges, counter repair, re-rank, clean-up
   scripts/seed.ts      First admin + starter content
 ```
 
-**Modules:** `auth`, `users`, `posts`, `comments`, `media`, `learn`, `practice`, `research`, `notifications`, `search`, `reports`, `app` (app config, deep links) and `admin` (content, learn, practice, research, moderation, staff).
+**Modules:** `auth`, `users`, `posts`, `comments`, `media`, `learn`, `practice`, `research`, `trails`, `notifications`, `search`, `reports`, `app` (app config, deep links) and `admin` (content, learn, practice, research, moderation, staff).
 
 **Layering rules:**
 
@@ -258,11 +265,38 @@ A change and its event are committed together ([`lib/outbox.ts`](../../apps/api/
 | --- | --- | --- |
 | media | 2 s | Takes the oldest `media_assets` row with `status = 'processing'` and processes it (§8). It has its own loop so a long transcode doesn't delay notifications |
 | outbox | 1 s | Up to 50 pending events per batch (§6) |
-| maintenance | 1 h | Purge deleted accounts and posts after 30 days, repair counters, delete abandoned uploads, old sessions, used codes and old events ([database §7](database-architecture.md#7-data-lifecycle-and-retention)) |
+| papers | 60 s | Paper ingestion (§7.1): up to 10 due papers, Hugging Face trending every 6 h, then the trend rank. Off with `PAPER_SYNC_ENABLED=false` |
+| maintenance | 1 h | Purge deleted accounts and posts after 30 days, repair counters, re-rank the Research collection, delete abandoned uploads, old sessions, used codes and old events ([database §9](database-architecture.md#9-data-lifecycle-and-retention)) |
 
 - **Only one worker can run.** It takes a Postgres advisory lock at start-up, and a second copy exits.
 - **Graceful shutdown.** SIGINT or SIGTERM lets the current work finish, then releases the lock and closes the pool.
 - A loop error is logged and the loop carries on.
+
+### 7.1 Paper ingestion (Research tab)
+
+[`worker/papers.ts`](../../apps/api/src/worker/papers.ts) fills our tables; the API only reads them. Sources are in [`providers/scholarly.ts`](../../apps/api/src/providers/scholarly.ts), each throttled.
+
+```mermaid
+flowchart LR
+    import["Admin: import arXiv id or DOI<br/>or 'sync now'"] -->|"synced_at = NULL"| due
+    stale["synced_at older than 7 days"] --> due
+    due["Due papers<br/>(papers_sync_idx)"] --> oa["OpenAlex work<br/>title, authors, year, venue,<br/>abstract, topics, referenced works"]
+    oa --> s2["Semantic Scholar paper<br/>citations, TLDR, PDF, ids"]
+    s2 --> refs["Semantic Scholar references<br/>intents, influential"]
+    refs --> tx["One transaction:<br/>papers row, paper_edges,<br/>search_vector"]
+    hf["Hugging Face daily papers<br/>(last 7 days, every 6 h)"] --> trend["hf_upvotes, hf_trending_at,<br/>code_url"]
+    tx --> rank["trend_rank 1..n"]
+    trend --> rank
+```
+
+| Rule | Detail |
+| --- | --- |
+| Which papers | Papers with a DOI or arXiv id whose `synced_at` is NULL (new imports and "sync now" first) or older than 7 days, 10 per round |
+| What is overwritten | Citation count, TLDR, OpenAlex and S2 ids, OpenAlex topics: refreshed every sync. Title, authors, year, venue, abstract, publication date, PDF link: only filled when empty, so staff edits win (an import's empty title is filled on its first sync) |
+| Lineage | Each paper's references (Semantic Scholar, then OpenAlex `referenced_works`) matched to papers in our collection become `paper_edges`. Intent: S2 `methodology` → supporting, `background` → background, `result` alone → unknown. Staff edges (the only `contrasting` ones) are never overwritten |
+| Trend rank | Papers on Hugging Face daily papers in the last 14 days first (most upvoted first), then by citations, then newest. Dense 1..n over published papers; maintenance re-ranks hourly too |
+| Failures | A rate limit (`429`) stops the round and the paper is tried again next minute. Any other error is stored in `sync_error` and retried after 7 days, or at once with "sync now" |
+| Keys | All keyless. `SEMANTIC_SCHOLAR_API_KEY` raises its limit (the keyless pool is often busy); `OPENALEX_MAILTO` joins OpenAlex's polite pool with a team address. Requests carry a generic user agent |
 
 ## 8. Media pipeline
 
@@ -304,7 +338,8 @@ The `Storage` interface ([`lib/storage.ts`](../../apps/api/src/lib/storage.ts)) 
 Search runs on Postgres for now ([`modules/search`](../../apps/api/src/modules/search/), [`db/search.ts`](../../apps/api/src/db/search.ts)):
 
 - **Users and topics:** `pg_trgm` similarity (`%`) or a plain substring match, ranked by `similarity()`.
-- **Posts, learn items, courses and papers:** `websearch_to_tsquery('english', q)` against GIN `tsvector` indexes.
+- **Posts, learn items and courses:** `websearch_to_tsquery('english', q)` against GIN `tsvector` expression indexes.
+- **Papers:** the stored `papers.search_vector` (title, authors, main idea and both Paper Card questions), matched with `websearch_to_tsquery('english', q) || websearch_to_tsquery('bangla', q)` and ranked with `ts_rank`. A Bangla query finds an English paper through its Bangla card. The vector is rebuilt by the SQL function `refresh_paper_search()` in the same transaction as every change to a paper or its cards. `bangla` is the `simple` configuration (no stemming) until a Bangla dictionary exists.
 - `GET /v1/search` returns results grouped by type, with the same visibility rules as the rest of the API. `GET /v1/search/suggest` gives autocomplete from 2 characters.
 - `GET /v1/papers/:id/related` ranks papers by shared "Learn first" topics, then by field.
 
@@ -318,6 +353,7 @@ Search runs on Postgres for now ([`modules/search`](../../apps/api/src/modules/s
 | Push | `PushSender` | Writes to `.dev-mail/push.log` (never logs device tokens) | `FcmPush` with `firebase-admin` |
 | Google sign-in | `GoogleVerifier` | `jose` against Google's public keys | Add an Apple verifier for iOS |
 | Storage | `Storage` | `LocalDiskStorage` | `S3Storage` + CDN, or a managed video provider |
+| Scholarly sources | `ScholarlySources` | OpenAlex, Semantic Scholar and Hugging Face over HTTPS, used only by the worker | Add sources (e.g. OpenReview reviews) behind the same interface |
 
 ## 11. Configuration
 
@@ -331,7 +367,8 @@ All variables are validated at start-up ([`config/env.ts`](../../apps/api/src/co
 | Sign-in | `GOOGLE_CLIENT_IDS` |
 | Media | `MEDIA_DIR`, `FFMPEG_PATH`, `FFPROBE_PATH` |
 | Email | `SMTP_URL`, `EMAIL_FROM`, `DEV_MAIL_DIR` |
-| Rules | `ACCOUNT_PURGE_DAYS` (30), `APP_TIMEZONE` (Asia/Dhaka, for practice streaks) |
+| Rules | `ACCOUNT_PURGE_DAYS` (30), `APP_TIMEZONE` (Asia/Dhaka, for practice streaks and monthly reading counts) |
+| Paper ingestion | `PAPER_SYNC_ENABLED` (true), `OPENALEX_MAILTO`, `SEMANTIC_SCHOLAR_API_KEY` (both optional) |
 | App | `MIN_APP_VERSION_ANDROID`, `MIN_APP_VERSION_IOS`, `ANDROID_PACKAGE_NAME`, `ANDROID_CERT_FINGERPRINTS` |
 | Seed | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` |
 
@@ -339,7 +376,7 @@ All variables are validated at start-up ([`config/env.ts`](../../apps/api/src/co
 
 - `pnpm test` runs Vitest against `doshomik_test`, which the global setup creates, wipes and migrates.
 - Tests call routes through `fastify.inject` (no network) and run worker functions in-process, including the real sharp and FFmpeg pipeline.
-- Suites: `auth`, `account`, `social`, `content`, `media` (34 tests).
+- Suites: `auth`, `account`, `social`, `content`, `media`, `research` (44 tests). `research` runs ingestion against fake scholarly sources; tests never reach the network.
 - Rate limiting is switched off in tests; providers are replaced with fakes.
 
 ## 13. What is not built yet
@@ -357,3 +394,5 @@ Full reasons and step-by-step plans: [implementation notes §3–5](../prototype
 | Monitoring, PgBouncer, separate DB roles, backups, secrets manager | Deployment work |
 | Docker Compose, Caddy, admin dashboard UI | Not part of the local prototype |
 | 2FA recovery codes, Apple sign-in, Play Integrity, Bangla notification text, account restore, change username | Product and hardening follow-ups |
+| Research Group B and C (AI-prepared cards and prerequisites; maps, roadmaps, comparisons, claim checks) | Their tables exist (`paper_cards.source`, `paper_prerequisites.suggested_by`, `research_outputs`); nothing writes AI results yet |
+| Paper discovery queue, comment upvotes (A15), a Bangla stemmer | Papers are imported by hand; comments are oldest-first; Bangla search is unstemmed |

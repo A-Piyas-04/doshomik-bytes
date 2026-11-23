@@ -36,6 +36,15 @@ const EnvSchema = z.object({
   EMAIL_FROM: z.string().default('Doshomik Bytes <no-reply@localhost>'),
   DEV_MAIL_DIR: z.string().default('.dev-mail'),
 
+  /**
+   * Paper ingestion (worker only; the API never calls a scholarly service). OpenAlex asks clients
+   * to send a contact address for its polite pool: use a team address, never a user's. A free
+   * Semantic Scholar key raises its rate limit; without one, requests share a busy public pool.
+   */
+  PAPER_SYNC_ENABLED: z.stringbool().default(true),
+  OPENALEX_MAILTO: z.string().default(''),
+  SEMANTIC_SCHOLAR_API_KEY: z.string().default(''),
+
   ACCOUNT_PURGE_DAYS: z.coerce.number().int().positive().default(30),
   /** Used to count practice streaks in the users' local days. */
   APP_TIMEZONE: z.string().default('Asia/Dhaka'),

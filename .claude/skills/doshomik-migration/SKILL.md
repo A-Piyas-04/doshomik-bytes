@@ -14,6 +14,7 @@ description: How to change the Doshomik Bytes database schema with node-pg-migra
 | `…002_prototype-2-backfill.sql` | Slugs `NOT NULL`, post media moved into `media_assets`, `posts.media_url` and `duration_seconds` dropped, learn-item media check |
 | `…003_sessions-public-id-and-2fa.sql` | Additions: `sessions.public_id`, `users.totp_*`, indexes |
 | `…004_toggles-and-stored-counts.sql` | Toggle rows (`post_likes.is_active`, `follows.status = 'inactive'`), stored `users.follower_count`/`following_count`, unread and suggestion indexes, drops the redundant Prototype 1 reels index |
+| `…005_research-collection.sql` | Research tab Group A: paper metadata, `paper_cards`, `bangla` search config and `refresh_paper_search()`, `paper_saves`, `reading_passes`, `research_outputs`, `paper_edges`, `trails`, Learn before reading links, `user_known_topics`, `learn_item_completions` |
 
 Never edit the Prototype v1 doc or the Prototype 2 doc.
 
@@ -38,5 +39,8 @@ Never edit the Prototype v1 doc or the Prototype 2 doc.
 4. Regenerate types with `pnpm --filter @doshomik/api db:types`. Never hand-edit `src/db/types.ts`. `.kysely-codegenrc.json` maps `int8` to `number` and leaves out `pgmigrations`.
 5. Run `typecheck` and `test`. The test setup wipes `doshomik_test` and replays every migration.
 6. Record the decision in `docs/prototype-2-implementation-notes.md`.
+
+If the dev database is unreachable, run migrations and tests on a throwaway cluster instead of editing types by hand:
+`initdb -D <scratch>/data -U dev --auth=trust --encoding=UTF8 --locale=C`, `pg_ctl -D <scratch>/data -o "-p 55432" start`, then `TEST_DATABASE_URL=postgresql://dev@localhost:55432/doshomik_test pnpm test`, and `kysely-codegen --url postgresql://dev@localhost:55432/<db>` for the types. Stop it with `pg_ctl stop` afterwards.
 
 Never run `DROP DATABASE` or wipe the dev database. Only the test database gets reset.

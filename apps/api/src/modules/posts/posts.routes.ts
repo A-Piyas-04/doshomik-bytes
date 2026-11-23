@@ -3,13 +3,14 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { pageQuery } from '../../lib/pagination';
 import { perUser } from '../../lib/rate-limits';
-import { idParams, optionalText, publicId } from '../../lib/validation';
+import { idParams, optionalText, publicId, slug } from '../../lib/validation';
 import * as posts from './posts.service';
 
 const CreatePostBody = z.object({
   type: z.enum(POST_TYPES),
   caption: optionalText(2200),
   media_id: publicId.optional(), // from POST /v1/media/uploads, after /complete
+  topic: slug.optional(), // concept tag (a topic slug), used to link reels from Learn before reading
 });
 
 export const postRoutes: FastifyPluginAsyncZod = async (app) => {

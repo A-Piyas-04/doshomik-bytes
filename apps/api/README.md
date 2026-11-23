@@ -1,6 +1,6 @@
 # Doshomik Bytes API (Prototype 2)
 
-The backend: a Fastify API and a background worker on PostgreSQL (30 tables, via Kysely).
+The backend: a Fastify API and a background worker on PostgreSQL (39 tables, via Kysely).
 
 - **Scope:** `docs/Prototype 2 — Features, Database, Security & Efficiency.md`, on top of `docs/Prototype v1 — Features, User Flows & Database Schema.md`.
 - **Decisions, and what is deferred (Redis, Elasticsearch, S3/CDN, FCM…):** `docs/prototype-2-implementation-notes.md`.
@@ -21,7 +21,7 @@ createdb -U dev -h localhost doshomik
 pnpm db:migrate                   # Prototype 1 schema, Prototype 2 migration, backfill, additions
 pnpm db:seed                      # first admin + starter content
 pnpm dev                          # API on http://localhost:3000
-pnpm worker                       # in a second terminal: media, notifications, email, maintenance
+pnpm worker                       # in a second terminal: media, notifications, email, paper ingestion, maintenance
 ```
 
 The seeded admin must turn on two-factor sign-in before the admin API opens:
@@ -48,14 +48,16 @@ migrations/              SQL migrations (node-pg-migrate). Never edit one that h
 src/
   app.ts                 Fastify app: plugins, /v1, the auth boundary, route modules
   server.ts              API process
-  worker.ts              Worker process: media loop, outbox loop, hourly maintenance
+  worker.ts              Worker process: media loop, outbox loop, papers loop, hourly maintenance
   config/env.ts          Environment variables, validated with zod
   db/                    Kysely instance, generated types, visibility rules, search expressions, pg error codes
   lib/                   auth hooks, crypto (derived keys, signed tokens), errors, pagination, outbox, audit,
                          rate limits, storage, TOTP, validation
-  providers/             Email, push and Google sign-in, each behind an interface with a local stand-in
+  providers/             Email, push, Google sign-in and scholarly sources (OpenAlex, Semantic Scholar,
+                         Hugging Face), each behind an interface; tests swap in fakes
   modules/<area>/        <area>.routes.ts (HTTP + validation) and <area>.service.ts (queries and rules)
-  worker/                media.ts (sharp + ffmpeg), outbox.ts (event handlers), notify.ts, maintenance.ts
+  worker/                media.ts (sharp + ffmpeg), outbox.ts (event handlers), notify.ts, papers.ts
+                         (paper ingestion and trend rank), maintenance.ts
 test/                    Route tests through fastify.inject, worker run in-process
 ```
 
@@ -121,7 +123,7 @@ What the worker does:
 | GET | `/users/suggestions`, `/users/:id`, `/users/:id/posts`, `/users/:id/papers` | Profile has `follow_status`: `none`, `pending` or `accepted` |
 | PUT / DELETE | `/users/:id/follow` | Returns `{ status: accepted }`, or `pending` for a private account |
 | PUT / DELETE | `/users/:id/block` | Hides both users from each other everywhere, ends follows |
-| POST | `/reports` | `{ target_type: user, post or comment; target_id; reason; details? }` |
+| POST | `/reports` | `{ target_type: user, post, comment or trail; target_id; reason; details? }` |
 
 **Media and social**
 
@@ -129,7 +131,7 @@ What the worker does:
 | --- | --- | --- |
 | POST | `/media/uploads`, `/media/:id/complete` | See *Uploading media* |
 | GET | `/media/:id` | Your upload's status |
-| POST | `/posts` | `{ type, caption?, media_id? }` |
+| POST | `/posts` | `{ type, caption?, media_id?, topic? }`. `topic` (a topic slug) tags a reel with a concept, so Learn before reading can link it |
 | GET / DELETE | `/posts/:id` | Delete is a soft delete, purged after 30 days |
 | GET | `/feed`, `/reels` | Home (accepted follows) and Reels, newest first |
 | PUT / DELETE | `/posts/:id/like`, `/posts/:id/save` | |
@@ -141,17 +143,31 @@ What the worker does:
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/topics`, `/topics/:slug` | |
+| PUT / DELETE | `/topics/:slug/known` | "I already know this" |
 | GET | `/learn-items?topic=`, `/learn-items/:id` | |
+| PUT / DELETE | `/learn-items/:id/complete` | Completed lessons and notes (course progress also marks the steps it reaches) |
 | GET | `/courses`, `/courses/:id` | With `my_progress` |
 | PUT | `/courses/:id/progress` | `{ last_position }`; the last step marks the course completed |
 | GET | `/practice/questions?topic=&limit=` | Random; no answers |
 | POST | `/practice/questions/:id/answer` | `{ answer }` → `{ correct, correct_answer, explanation }`; recorded |
 | GET | `/me/practice/history`, `/me/practice/stats` | Stats give accuracy per topic and `streak_days` |
 | GET | `/quizzes?topic=`, `/quizzes/:id` | |
-| GET | `/fields`, `/fields/:slug/roadmap` | |
-| GET | `/papers?field=&q=&interests=true`, `/papers/:id` | |
-| GET | `/papers/:id/learn-first`, `/papers/:id/related` | |
-| PUT / DELETE | `/papers/:id/status` | `saved`, `reading` or `completed` |
+| GET | `/fields`, `/fields/:slug/roadmap` | Fields are the topic chips, in `position` order |
+| GET | `/papers?field=&q=&interests=true&sort=trend\|newest` | Default order is the trend rank kept by the worker. `q` searches title, authors and the card question in English and Bangla |
+| GET | `/papers/:id` | Adds `cards` (`en`, `bn`), `links` (`open_url`, `pdf_url`, `code_url`), metadata, and `my_reading` (step and private note) |
+| GET | `/papers/:id/learn-first` | `ready` / `total`, `ai_suggested`, and per topic `label`, `why`, `link` (lesson, note, quiz or reel), `known`, `done` |
+| GET | `/papers/:id/related`, `/papers/:id/lineage?limit=3` | Related by shared topics; lineage = `builds_on` and `built_on_by` with citation `intent` |
+| PUT / DELETE | `/papers/:id/save` | Bookmark |
+| PUT | `/papers/:id/reading` | `{ step: 0–3 }` (Explored, Studied, Reproduced); lowering clears the later steps |
+| POST | `/papers/:id/mark-read` | Step 1, never lowering a higher step |
+| PUT | `/papers/:id/note` | `{ note }`, at most 400 characters, private |
+| GET | `/me/papers/up-next`, `/me/papers?list=saved\|read` | Up next = the earliest saved paper not yet read |
+| GET | `/me/reading/stats`, `/users/:id/reading` | Explored / studied / reproduced, this month and in total |
+| GET / DELETE | `/me/research-outputs`, `/research-outputs/:id` | Saved AI maps and roadmaps, reopened from the stored row |
+| GET | `/trails?field=&lang=`, `/trails/:id`, `/users/:id/trails` | Reading paths users made |
+| POST · PATCH · DELETE | `/trails`, `/trails/:id` | `{ title, description?, lang, field?, items?, publish? }` |
+| PUT | `/trails/:id/items`, `/trails/:id/status` | `{ items: [{ paper_id, note? }] }`; `{ status: draft or published }` (at least 2 papers) |
+| PUT / DELETE | `/papers/:id/status` | Prototype 2 tracker (`saved`, `reading`, `completed`), kept as it was |
 
 **Across the app**
 
@@ -172,7 +188,10 @@ What the worker does:
 | admin | GET · POST · PATCH | `/admin/papers`, `/admin/courses`, `/admin/learn-items`, `/admin/questions`, `/admin/quizzes` (lists take `?status=`), and `GET /admin/<type>/:id` for the preview |
 | admin | PUT · DELETE | `/admin/<type>/:id/status { status: draft, published or archived }`, `/admin/<type>/:id` |
 | admin | POST · PATCH · DELETE | `/admin/topics[/:slug]`, `/admin/fields[/:slug]` |
-| admin | PUT | `/admin/courses/:id/items { item_ids }`, `/admin/quizzes/:id/questions { question_ids }`, `/admin/papers/:id/prerequisites { topics }`, `/admin/fields/:slug/roadmap { steps }` |
+| admin | PUT | `/admin/courses/:id/items { item_ids }`, `/admin/quizzes/:id/questions { question_ids }`, `/admin/papers/:id/prerequisites { topics }` or `{ items: [{ topic, label?, why?, link?, suggested_by? }] }`, `/admin/fields/:slug/roadmap { steps }` |
+| admin | POST | `/admin/papers/import { field, arxiv_id or doi }` (draft; the worker fills metadata), `/admin/papers/:id/sync` (queue a refresh) |
+| admin | GET · PUT · DELETE | `/admin/papers/:id/cards`, `/admin/papers/:id/cards/:lang` (`en` or `bn`) |
+| admin | PUT · DELETE | `/admin/paper-edges { citing_paper_id, cited_paper_id, intent }`: the only way to mark a citation `contrasting` |
 | admin | GET · PUT | `/admin/users?q=`, `/admin/users/:id/status`, `/admin/users/:id/role` |
 | admin | GET | `/admin/audit-log` |
 

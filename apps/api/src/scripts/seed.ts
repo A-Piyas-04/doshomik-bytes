@@ -2,6 +2,7 @@
 // Usage: pnpm db:seed   (reads SEED_ADMIN_EMAIL, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD)
 
 import argon2 from 'argon2';
+import { sql } from 'kysely';
 import { db, type Db } from '../db';
 import { slugify } from '../lib/validation';
 import * as data from './seed-data';
@@ -92,6 +93,11 @@ async function seedContent(trx: Db, adminId: number) {
       .execute(),
     'title',
   );
+  // English Paper Cards from the summaries, then each paper's search document (migration 005).
+  await sql`
+    INSERT INTO paper_cards (paper_id, lang, question, key_idea, method_steps, findings, limitations)
+    SELECT id, 'en', research_questions[1], main_idea, method_steps, results, limitations FROM papers`.execute(trx);
+  await sql`SELECT refresh_paper_search(id) FROM papers`.execute(trx);
   await trx
     .insertInto('paper_prerequisites')
     .values(

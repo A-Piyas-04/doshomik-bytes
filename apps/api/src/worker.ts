@@ -1,6 +1,6 @@
 // The background worker: `pnpm worker`. Runs next to the API and does everything slow, so user
 // requests never wait on it: media processing, outbox events (counters, notifications, push,
-// email) and hourly maintenance.
+// email), paper ingestion from scholarly sources, and hourly maintenance.
 
 import { setTimeout as sleep } from 'node:timers/promises';
 import pg from 'pg';
@@ -10,6 +10,7 @@ import { db } from './db';
 import { runMaintenance } from './worker/maintenance';
 import { processNextMedia } from './worker/media';
 import { processOutboxBatch } from './worker/outbox';
+import { runPaperSync } from './worker/papers';
 
 const log = pino({ name: 'worker' });
 
@@ -44,6 +45,8 @@ async function loop(name: string, work: () => Promise<boolean>, idleMs: number):
 const loops = Promise.all([
   loop('media', () => processNextMedia(log), 2_000),
   loop('outbox', async () => (await processOutboxBatch(log)) > 0, 1_000),
+  // Paper ingestion has its own loop too: outside APIs are slow and rate limited.
+  loop('papers', () => runPaperSync(log), 60_000),
   loop('maintenance', async () => (await runMaintenance(log), false), 60 * 60_000),
 ]);
 log.info('Worker started');

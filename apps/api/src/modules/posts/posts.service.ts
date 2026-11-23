@@ -6,6 +6,7 @@ import { isVisiblePost } from '../../db/visibility';
 import { badRequest, conflict, forbidden, found, notFound } from '../../lib/errors';
 import { emit, emitSearchSync } from '../../lib/outbox';
 import { fetchPage, mapPage, type PageQuery } from '../../lib/pagination';
+import { topicRef } from '../learn/learn.service';
 import { MEDIA_COLUMNS, mediaView, type MediaColumns } from '../media/media.service';
 import { userSummary, type UserSummary } from '../users/user-summary';
 import { visibleUserId } from '../users/users.service';
@@ -16,11 +17,13 @@ export function selectPosts(viewerId: number) {
     .selectFrom('posts as p')
     .innerJoin('users as u', 'u.id', 'p.user_id')
     .leftJoin('media_assets as m', 'm.id', 'p.media_id')
+    .leftJoin('topics as pt', 'pt.id', 'p.topic_id')
     .where(isVisiblePost(viewerId, 'p', 'u'))
     .select((eb) => [
       'p.public_id as id',
       'p.type',
       'p.caption',
+      topicRef('pt').as('topic'),
       'p.status',
       'p.like_count',
       'p.comment_count',
@@ -50,6 +53,7 @@ type PostRow = MediaColumns & {
   id: string;
   type: string;
   caption: string | null;
+  topic: { slug: string; name: string } | null;
   status: string;
   like_count: number;
   comment_count: number;
@@ -66,6 +70,7 @@ export function toPost(row: PostRow) {
     id: row.id,
     type: row.type,
     caption: row.caption,
+    topic: row.topic,
     status: row.status,
     media: mediaView(row, { private: row.author_is_private }),
     like_count: row.like_count,
@@ -113,7 +118,7 @@ export async function listSavedPosts(userId: number, page: PageQuery) {
  * (POST /v1/media/:id/complete). If that upload is still processing, the post waits as
  * "processing" and the worker publishes it, with a "your post is live" notification.
  */
-export async function createPost(userId: number, input: { type: PostType; caption: string | null; media_id?: string }) {
+export async function createPost(userId: number, input: { type: PostType; caption: string | null; media_id?: string; topic?: string }) {
   const { type, caption } = input;
   if (type === 'text' && !caption) throw badRequest('Text posts need a caption');
   if (type === 'text' && input.media_id) throw badRequest('Text posts cannot have media');
@@ -140,12 +145,21 @@ export async function createPost(userId: number, input: { type: PostType; captio
       media = asset;
     }
 
+    // An optional concept tag, so a reel can be the link for a paper's Learn first topic.
+    let topicId: number | null = null;
+    if (input.topic) {
+      const topic = await trx.selectFrom('topics').select('id').where('slug', '=', input.topic).executeTakeFirst();
+      if (!topic) throw badRequest(`Unknown topic: ${input.topic}`, 'UNKNOWN_REFERENCE');
+      topicId = topic.id;
+    }
+
     const post = await trx
       .insertInto('posts')
       .values({
         user_id: userId,
         type,
         caption,
+        topic_id: topicId,
         media_id: media?.id ?? null,
         status: media && media.status !== 'ready' ? 'processing' : 'published',
       })

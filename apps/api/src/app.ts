@@ -28,6 +28,7 @@ import { practiceRoutes } from './modules/practice/practice.routes';
 import { reportRoutes } from './modules/reports/reports.routes';
 import { researchRoutes } from './modules/research/research.routes';
 import { searchRoutes } from './modules/search/search.routes';
+import { trailRoutes } from './modules/trails/trails.routes';
 import { userRoutes } from './modules/users/users.routes';
 
 /** Signed upload and media URLs carry their token in the path; keep it out of the logs. */
@@ -91,6 +92,7 @@ export async function buildApp() {
         await api.register(learnRoutes);
         await api.register(practiceRoutes);
         await api.register(researchRoutes);
+        await api.register(trailRoutes);
         await api.register(notificationRoutes);
         await api.register(searchRoutes);
         await api.register(reportRoutes);

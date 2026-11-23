@@ -33,4 +33,24 @@ export const learnRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get('/me/courses', { schema: { querystring: pageQuery } }, async (request) =>
     learn.listMyCourses(request.auth.userId, request.query),
   );
+
+  // ----- Learn before reading (A13) -----
+  app.put('/topics/:slug/known', { schema: { params: slugParams } }, async (request, reply) => {
+    await learn.markTopicKnown(request.auth.userId, request.params.slug);
+    return reply.status(204).send();
+  });
+
+  app.delete('/topics/:slug/known', { schema: { params: slugParams } }, async (request, reply) => {
+    await learn.unmarkTopicKnown(request.auth.userId, request.params.slug);
+    return reply.status(204).send();
+  });
+
+  app.put('/learn-items/:id/complete', { schema: { params: idParams } }, async (request) =>
+    learn.completeLearnItem(request.auth.userId, request.params.id),
+  );
+
+  app.delete('/learn-items/:id/complete', { schema: { params: idParams } }, async (request, reply) => {
+    await learn.uncompleteLearnItem(request.auth.userId, request.params.id);
+    return reply.status(204).send();
+  });
 };

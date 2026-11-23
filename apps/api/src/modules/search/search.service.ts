@@ -1,6 +1,6 @@
 import { sql } from 'kysely';
 import { db } from '../../db';
-import { containsPattern, fullText, fuzzy, similarity, startsWithPattern } from '../../db/search';
+import { containsPattern, fullText, fuzzy, paperRank, similarity, startsWithPattern } from '../../db/search';
 import { canSeeProfile, isPublished, isSearchablePost } from '../../db/visibility';
 import { topicRef } from '../learn/learn.service';
 import { selectPosts, toPost } from '../posts/posts.service';
@@ -67,7 +67,8 @@ const searchers: Record<SearchType, Searcher> = {
       .execute(),
 
   papers: (q, viewerId, limit) =>
-    selectPaperCards(viewerId).where(fullText.paper('p', q)).orderBy('p.created_at', 'desc').limit(limit).execute(),
+    // Title, authors and the card question in English and Bangla (papers.search_vector), best match first.
+    selectPaperCards(viewerId).where(fullText.paper('p', q)).orderBy(paperRank('p', q), 'desc').orderBy('p.id', 'desc').limit(limit).execute(),
 };
 
 /** One search box: the top matches of each type, grouped. Pass `types` to fetch only some ("See all"). */

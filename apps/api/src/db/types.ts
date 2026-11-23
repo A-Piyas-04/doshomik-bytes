@@ -102,6 +102,7 @@ export interface Fields {
   description: string | null;
   id: Generated<number>;
   name: string;
+  position: Generated<number>;
   slug: string;
 }
 
@@ -111,6 +112,12 @@ export interface Follows {
   following_id: number;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
+}
+
+export interface LearnItemCompletions {
+  completed_at: Generated<Timestamp>;
+  learn_item_id: number;
+  user_id: number;
 }
 
 export interface LearnItems {
@@ -176,34 +183,92 @@ export interface OutboxEvents {
   processed_at: Timestamp | null;
 }
 
+export interface PaperCards {
+  created_at: Generated<Timestamp>;
+  findings: string | null;
+  glossary: Generated<Json>;
+  key_idea: string | null;
+  lang: string;
+  limitations: string | null;
+  method_steps: Generated<string[]>;
+  paper_id: number;
+  problem: string | null;
+  question: string | null;
+  source: Generated<string>;
+  takeaway: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: number | null;
+}
+
+export interface PaperEdges {
+  cited_paper_id: number;
+  citing_paper_id: number;
+  created_at: Generated<Timestamp>;
+  intent: string | null;
+  is_influential: Generated<boolean>;
+  s2_intents: Generated<string[]>;
+  source: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface PaperPrerequisites {
+  label: string | null;
+  learn_item_id: number | null;
   paper_id: number;
   position: Generated<number>;
+  quiz_id: number | null;
+  reel_post_id: number | null;
+  suggested_by: Generated<string>;
   topic_id: number;
+  why: string | null;
 }
 
 export interface Papers {
+  abstract: string | null;
+  arxiv_id: string | null;
   authors: string | null;
+  citation_count: number | null;
+  code_url: string | null;
   created_at: Generated<Timestamp>;
   created_by: number | null;
   data_source: string | null;
+  doi: string | null;
   evaluation: string | null;
   field_id: number;
   figures: Generated<Json>;
+  hf_trending_at: Timestamp | null;
+  hf_upvotes: number | null;
   id: Generated<number>;
   limitations: string | null;
   main_idea: string | null;
   method_steps: Generated<string[]>;
+  openalex_id: string | null;
+  openalex_topics: Generated<Json>;
   paper_url: string;
+  pdf_url: string | null;
   public_id: Generated<string>;
   published_at: Timestamp | null;
+  published_on: Timestamp | null;
   research_questions: Generated<string[]>;
   results: string | null;
+  s2_id: string | null;
+  search_vector: string | null;
   status: Generated<string>;
+  sync_error: string | null;
+  synced_at: Timestamp | null;
   title: string;
+  tldr: string | null;
+  trend_rank: number | null;
   updated_at: Generated<Timestamp>;
   updated_by: number | null;
+  venue: string | null;
   year: number | null;
+}
+
+export interface PaperSaves {
+  created_at: Generated<Timestamp>;
+  paper_id: number;
+  user_id: number;
 }
 
 export interface PostLikes {
@@ -224,6 +289,7 @@ export interface Posts {
   media_id: number | null;
   public_id: Generated<string>;
   status: Generated<string>;
+  topic_id: number | null;
   type: string;
   updated_at: Generated<Timestamp>;
   user_id: number;
@@ -271,6 +337,18 @@ export interface Quizzes {
   updated_at: Generated<Timestamp>;
 }
 
+export interface ReadingPasses {
+  created_at: Generated<Timestamp>;
+  explored_at: Timestamp | null;
+  note: string | null;
+  paper_id: number;
+  reproduced_at: Timestamp | null;
+  step: Generated<number>;
+  studied_at: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+  user_id: number;
+}
+
 export interface Reports {
   created_at: Generated<Timestamp>;
   details: string | null;
@@ -282,6 +360,17 @@ export interface Reports {
   status: Generated<string>;
   target_id: number;
   target_type: string;
+}
+
+export interface ResearchOutputs {
+  created_at: Generated<Timestamp>;
+  id: Generated<number>;
+  kind: string;
+  params: Generated<Json>;
+  public_id: Generated<string>;
+  result: Json;
+  title: string;
+  user_id: number;
 }
 
 export interface RoadmapSteps {
@@ -318,8 +407,35 @@ export interface Topics {
   summary: string | null;
 }
 
+export interface TrailItems {
+  note: string | null;
+  paper_id: number;
+  position: number;
+  trail_id: number;
+}
+
+export interface Trails {
+  created_at: Generated<Timestamp>;
+  creator_id: number;
+  description: string | null;
+  field_id: number | null;
+  id: Generated<number>;
+  lang: Generated<string>;
+  public_id: Generated<string>;
+  published_at: Timestamp | null;
+  status: Generated<string>;
+  title: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface UserFields {
   field_id: number;
+  user_id: number;
+}
+
+export interface UserKnownTopics {
+  created_at: Generated<Timestamp>;
+  topic_id: number;
   user_id: number;
 }
 
@@ -363,11 +479,15 @@ export interface DB {
   courses: Courses;
   fields: Fields;
   follows: Follows;
+  learn_item_completions: LearnItemCompletions;
   learn_items: LearnItems;
   media_assets: MediaAssets;
   notifications: Notifications;
   outbox_events: OutboxEvents;
+  paper_cards: PaperCards;
+  paper_edges: PaperEdges;
   paper_prerequisites: PaperPrerequisites;
+  paper_saves: PaperSaves;
   papers: Papers;
   post_likes: PostLikes;
   posts: Posts;
@@ -375,12 +495,17 @@ export interface DB {
   questions: Questions;
   quiz_questions: QuizQuestions;
   quizzes: Quizzes;
+  reading_passes: ReadingPasses;
   reports: Reports;
+  research_outputs: ResearchOutputs;
   roadmap_steps: RoadmapSteps;
   saved_posts: SavedPosts;
   sessions: Sessions;
   topics: Topics;
+  trail_items: TrailItems;
+  trails: Trails;
   user_fields: UserFields;
+  user_known_topics: UserKnownTopics;
   user_papers: UserPapers;
   users: Users;
 }

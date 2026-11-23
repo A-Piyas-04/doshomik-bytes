@@ -118,7 +118,46 @@ Review of every table for rows that are deleted and recreated, and for work repe
 | `notifications_unread_idx (user_id) WHERE NOT is_read` | The unread badge runs on every app open and scanned all of a user's notifications | The query is written as the literal `NOT n.is_read` so it matches the index predicate |
 | Dropped the Prototype 1 index `posts (created_at DESC) WHERE type = 'reel'` | `posts_reels_idx` covers the same order with the filters the reels query uses; the old one was only a write cost | — |
 | **Not** turned into toggle rows: `saved_posts`, `blocks`; `user_papers` and `course_progress` already upsert | Re-creating them has no side effects, so a toggle would only add a filter to every read. A re-save must move the post to the top of the list, which rewrites the indexed `created_at` anyway | Revisit if saving gains a side effect (e.g. "X saved your post") |
-| `src/db/types.ts` was edited by hand for the new columns | The local database rejected the `.env` credentials, so `pnpm db:types` could not run | Run `db:migrate`, the down/up round trip, `db:types` and `test` once the database is reachable; the generated types should match |
+| Verified on a throwaway cluster | The local database rejects the `.env` credentials, so migrations `…004`–`…005` were run on a temporary PostgreSQL 18 cluster (`E:\PostgreSQL\bin`, port 55432, scratch directory) | Up, down and up again pass; all tests pass; `src/db/types.ts` is the real `kysely-codegen` output. Still run `db:migrate` on the dev database once its password is fixed |
+
+### 2.7 Research tab, Group A (migration `…005`, 23 Nov 2026)
+
+What was checked against the Group A spec (A1–A7, A9, A10, A13), and what was added. Everything is additive: the Prototype 2 research tables, columns and endpoints stay as they were.
+
+| Feature | Already there | Added |
+| --- | --- | --- |
+| A1 collection, chips, trend order | Papers in a field; newest-first list | Scholarly metadata on `papers`, `fields.position` (chip order), the ingestion worker, `trend_rank` and `?sort=trend` (default) |
+| A2 search | English full text on title + main idea | `paper_cards` (EN and BN), `papers.search_vector` over title, authors and both card questions, a `bangla` search configuration |
+| A3 save, Up next | `saved` was a tracker status | `paper_saves`; `GET /me/papers/up-next` |
+| A4 three steps, private note | saved / reading / completed | `reading_passes` (step 0–3, per-step times, 400-character note); monthly counts |
+| A5 My papers | — | `GET /me/papers?list=saved\|read`; `research_outputs` and its read endpoints |
+| A6 lineage | "Related" by shared topics | `paper_edges` with intent, filled from Semantic Scholar and OpenAlex; `GET /papers/:id/lineage` |
+| A7 reading paths | Staff roadmap, one per field | `trails`, `trail_items`; reports and moderation cover them |
+| A9 discussion | **Complete**: `comments.paper_id`, reports, blocks, rate limits, cursors, moderation queue | Nothing |
+| A10 open the original | `paper_url` | `pdf_url`, `arxiv_id`; `links.open_url` on the paper |
+| A13 Learn before reading | Prerequisite topics with their learn items | Label, why, typed link, AI-suggested flag on `paper_prerequisites`; `user_known_topics`; `learn_item_completions`; `posts.topic_id`; computed `done`, `ready`/`total` |
+
+| Decision | Why | Consequence / later |
+| --- | --- | --- |
+| **Ingestion runs only in the worker** (`src/worker/papers.ts`, sources in `src/providers/scholarly.ts`) | The spec's hard rule: the app never calls a scholarly API | A `papers` loop syncs up to 10 due papers a minute (new, queued, or older than 7 days), reads Hugging Face daily papers every 6 hours, then re-ranks. `PAPER_SYNC_ENABLED=false` turns it off; maintenance still re-ranks hourly |
+| Staff edits win over sources | A curated collection: the team's title or venue must not be overwritten | Descriptive fields are filled only when empty; citation count, TLDR and ids are refreshed every time. An import starts with an empty title, which the first sync fills |
+| Papers are added by `POST /admin/papers/import { arxiv_id or doi }` as drafts | Curation stays with the team; no network call in the request | Auto-discovering new papers from Hugging Face into a review queue is deferred (§4) |
+| **Semantic Scholar has no "supporting" or "contrasting" intent** | Its labels are `background`, `methodology` and `result` (checked against the live API). The spec's three values can't be filled from it without guessing | We store S2's labels in `s2_intents` and map without inference: methodology → supporting, background → background, result alone → unknown (`NULL`). **Contrasting is set only by staff** (`PUT /admin/paper-edges`); the worker never overwrites a staff edge's intent |
+| Edges only between papers in our collection | Every lineage row must be tappable | Built from each paper's own references (S2, then OpenAlex `referenced_works`), so every pair in the collection is found without fetching citation lists. Notable citing papers outside the collection are not shown |
+| Trend rank: Hugging Face trending (last 14 days, by upvotes) first, then citations, then newest | The spec takes trend from HF, but classics are never on HF daily papers and still need an order | One dense rank 1..n, stored, so the list is a cheap keyset page (`fetchRankedPage`) on `papers_trend_idx` |
+| "New" = published within 30 days (`PAPER_NEW_DAYS`) | A derived flag needs no clean-up job | Uses `published_on` from OpenAlex, or staff |
+| One field per paper | The demo filters by a single `paper.topic`; fields already are the chips | Multi-chip membership waits until a paper really needs two chips |
+| `paper_cards` per language; the Prototype 2 summary columns stay on `papers` | The spec searches `question.en` and `question.bn`; existing columns must stay | The English card was backfilled from those columns. New content goes into cards; the old columns are left as they are |
+| Search document is a stored `tsvector` maintained by the SQL function `refresh_paper_search` | It combines two tables (paper and cards), which an expression index can't | Called in the same transaction as every paper or card change, and after each sync. The old title + main idea expression index was dropped |
+| **`bangla` = PostgreSQL's `simple` configuration** | PostgreSQL ships no Bangla stemmer | Lower-casing only, no stemming. How Bangla words split depends on the server's locale; with a C locale every Bangla letter and sign is kept in the word. Swap in a real Bangla dictionary later without changing queries |
+| Separate `paper_saves` and `reading_passes`; `user_papers` kept unchanged | Save and reading progress are independent in the spec; the old tracker endpoints stay | Both new tables were backfilled from `user_papers` (all saved; reading → Explored, completed → Studied). Writes to the old endpoints don't reach the new tables: the app should use the new ones, and `user_papers` can be dropped once no client calls `/papers/:id/status` |
+| Lowering a step clears the later step times | "14 explored this month" must not count steps the user took back | CHECK constraints keep step and times consistent |
+| Concepts are our `topics` | `topics` already link learn items, questions, quizzes and prerequisites | `user_known_topics` is the spec's `user_known_concepts`; reels get `posts.topic_id` |
+| Prerequisite links are three nullable FKs (learn item, quiz, reel), at most one set | Typed links with real foreign keys instead of a polymorphic id | Lesson vs note is the learn item's kind (video vs text/image). A deleted target sets the link to NULL |
+| Done is computed, never stored | The spec | Lesson or note: in `learn_item_completions` (course progress also writes it). Quiz: every published question has an attempt. Or "I already know this" |
+| `research_outputs` holds Group C results; only read, list and delete exist | Group C tools aren't specified yet | Reopening reads the row: no AI, no allowance |
+| Trails: any user can make one; publishing needs at least 2 papers; visibility follows the author like posts | Gives creators something to make; a one-paper path isn't a path | Reports and the moderation queue cover trails (`remove_content` sets `removed`) |
+| A9 comment upvotes not built | The spec puts them with Paper Clubs (A15) | Add with A15 |
 
 ### 2.5 API shape
 
@@ -233,6 +272,10 @@ The code is done. Create OAuth client ids (Android with the app's SHA-1, iOS lat
 | Feed precomputed timelines | Only once the feed's p95 latency passes about 100 ms | As in the doc |
 | Automated nudity and violence screening | Doc: "Later" | A worker step before `media.ready` |
 | Change username | Not in the doc | `PATCH /v1/me { username }` with the same lowercase and unique rules |
+| Paper discovery queue | Group A curates by hand (`/admin/papers/import`) | A `paper_candidates` table filled from Hugging Face daily papers above an upvote threshold, reviewed in the admin panel |
+| Comment upvotes on papers (A9 → A15) | Belongs to Paper Clubs | `comment_votes (user_id, comment_id)` plus a stored `comments.upvote_count` moved by outbox events, and `?sort=top` |
+| A real Bangla text search dictionary | PostgreSQL has none built in | Replace the `bangla` configuration's mapping with a Hunspell or custom dictionary; queries stay the same |
+| Group B (cards and prerequisites suggested by AI) and Group C (maps, roadmaps, comparisons, claim checks) | Not specified yet | They write `paper_cards` (`source = 'ai'`), `paper_prerequisites` (`suggested_by = 'ai'`) and `research_outputs` |
 
 ## 5. Known limitations to keep in mind
 

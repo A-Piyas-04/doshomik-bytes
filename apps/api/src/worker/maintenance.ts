@@ -4,6 +4,7 @@ import { env } from '../config/env';
 import { db } from '../db';
 import { storage } from '../lib/storage';
 import { processedPrefix } from './media';
+import { rankPapers } from './papers';
 
 // Periodic jobs. The worker runs them about once an hour; each is safe to run any number of times.
 
@@ -123,8 +124,13 @@ export async function cleanUp(log: Logger): Promise<void> {
   if (abandoned.length) log.info({ count: abandoned.length }, 'Removed abandoned uploads');
 }
 
+/** Keeps the Research order current for newly published papers, even with ingestion switched off. */
+async function rankCollection(): Promise<void> {
+  await rankPapers();
+}
+
 export async function runMaintenance(log: Logger): Promise<void> {
-  for (const job of [purgeDeletedAccounts, purgeDeletedPosts, repairCounters, cleanUp]) {
+  for (const job of [purgeDeletedAccounts, purgeDeletedPosts, repairCounters, rankCollection, cleanUp]) {
     try {
       await job(log);
     } catch (error) {

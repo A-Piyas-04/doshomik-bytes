@@ -3,10 +3,12 @@ import { db } from '../../db';
 import { isActiveUser } from '../../db/visibility';
 import { notFound } from '../../lib/errors';
 import { visiblePost } from '../posts/posts.service';
+import { visibleTrailId } from '../trails/trails.service';
 
-/** Resolves what a user may report: an active user, a post they can see, or a live comment. */
+/** Resolves what a user may report: an active user, a post or trail they can see, or a live comment. */
 async function targetId(reporterId: number, type: ReportTargetType, publicId: string): Promise<number> {
   if (type === 'post') return (await visiblePost(reporterId, publicId)).id;
+  if (type === 'trail') return visibleTrailId(reporterId, publicId);
 
   const row =
     type === 'user'

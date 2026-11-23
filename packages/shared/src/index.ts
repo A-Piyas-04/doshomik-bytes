@@ -31,7 +31,32 @@ export const LEARN_ITEM_KINDS = ['video', 'image', 'text'] as const;
 export const QUESTION_KINDS = ['mcq', 'short'] as const;
 export const PAPER_STATUSES = ['saved', 'reading', 'completed'] as const;
 
-export const REPORT_TARGET_TYPES = ['user', 'post', 'comment'] as const;
+// Research tab (migration 005)
+/** Languages a Paper Card, a trail or other content can be written in. */
+export const CONTENT_LANGS = ['en', 'bn'] as const;
+/** Reading tracker steps: 0 = not read yet. */
+export const READING_STEPS = [0, 1, 2, 3] as const;
+export const READING_STEP_LABELS = {
+  1: { en: 'Explored', bn: 'দেখা হয়েছে' },
+  2: { en: 'Studied', bn: 'পড়া হয়েছে' },
+  3: { en: 'Reproduced', bn: 'রিপ্রোডিউস' },
+} as const;
+export const PAPER_NOTE_MAX_LENGTH = 400;
+/** A paper shows the "New" badge for this many days after its publication date. */
+export const PAPER_NEW_DAYS = 30;
+/** A paper counts as trending while it was on Hugging Face daily papers within this many days. */
+export const PAPER_TRENDING_DAYS = 14;
+export const PAPER_CARD_SOURCES = ['staff', 'ai'] as const;
+export const PAPER_EDGE_INTENTS = ['background', 'supporting', 'contrasting'] as const;
+export const PAPER_EDGE_SOURCES = ['semantic_scholar', 'openalex', 'staff'] as const;
+export const RESEARCH_OUTPUT_KINDS = ['reading_map', 'landscape_map', 'roadmap', 'comparison', 'claim_check'] as const;
+export const TRAIL_STATUSES = ['draft', 'published', 'removed'] as const;
+export const TRAIL_MAX_ITEMS = 30;
+export const PREREQUISITE_SOURCES = ['staff', 'ai'] as const;
+/** What a Learn before reading row links to: lesson and note are learn items (video, or text and image). */
+export const PREREQUISITE_LINK_KINDS = ['lesson', 'note', 'quiz', 'reel'] as const;
+
+export const REPORT_TARGET_TYPES = ['user', 'post', 'comment', 'trail'] as const;
 export const REPORT_REASONS = ['spam', 'harassment', 'nudity', 'violence', 'misinformation', 'other'] as const;
 export const REPORT_STATUSES = ['open', 'actioned', 'dismissed'] as const;
 
@@ -49,6 +74,15 @@ export type ContentStatus = (typeof CONTENT_STATUSES)[number];
 export type LearnItemKind = (typeof LEARN_ITEM_KINDS)[number];
 export type QuestionKind = (typeof QUESTION_KINDS)[number];
 export type PaperStatus = (typeof PAPER_STATUSES)[number];
+export type ContentLang = (typeof CONTENT_LANGS)[number];
+export type ReadingStep = (typeof READING_STEPS)[number];
+export type PaperCardSource = (typeof PAPER_CARD_SOURCES)[number];
+export type PaperEdgeIntent = (typeof PAPER_EDGE_INTENTS)[number];
+export type PaperEdgeSource = (typeof PAPER_EDGE_SOURCES)[number];
+export type ResearchOutputKind = (typeof RESEARCH_OUTPUT_KINDS)[number];
+export type TrailStatus = (typeof TRAIL_STATUSES)[number];
+export type PrerequisiteSource = (typeof PREREQUISITE_SOURCES)[number];
+export type PrerequisiteLinkKind = (typeof PREREQUISITE_LINK_KINDS)[number];
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 export type ReportReason = (typeof REPORT_REASONS)[number];
 export type ReportStatus = (typeof REPORT_STATUSES)[number];

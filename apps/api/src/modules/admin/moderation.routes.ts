@@ -11,7 +11,7 @@ import { userSummary } from '../users/user-summary';
 import { suspendUser } from '../users/users.service';
 
 const ResolveBody = z.object({
-  // dismiss: no action. remove_content: hide the post or comment. suspend_user: suspend the user, or the author.
+  // dismiss: no action. remove_content: hide the post, comment or trail. suspend_user: suspend the user, or the author.
   action: z.enum(['dismiss', 'remove_content', 'suspend_user']),
 });
 
@@ -28,6 +28,14 @@ async function targetPreview(type: string, targetId: number) {
       .where('p.id', '=', targetId)
       .executeTakeFirst();
   }
+  if (type === 'trail') {
+    return db
+      .selectFrom('trails as tr')
+      .innerJoin('users as u', 'u.id', 'tr.creator_id')
+      .select(['tr.public_id as id', 'tr.title', 'tr.description', 'tr.status', userSummary('u').as('author')])
+      .where('tr.id', '=', targetId)
+      .executeTakeFirst();
+  }
   return db
     .selectFrom('comments as c')
     .leftJoin('users as u', 'u.id', 'c.user_id')
@@ -39,6 +47,10 @@ async function targetPreview(type: string, targetId: number) {
 /** The account behind a report's target: the user itself, or the author of the post or comment. */
 async function responsibleUserId(trx: Db, type: string, targetId: number): Promise<number | null> {
   if (type === 'user') return targetId;
+  if (type === 'trail') {
+    const trail = await trx.selectFrom('trails').select('creator_id').where('id', '=', targetId).executeTakeFirst();
+    return trail?.creator_id ?? null;
+  }
   const table = type === 'post' ? 'posts' : 'comments';
   const row = await trx.selectFrom(table).select('user_id').where('id', '=', targetId).executeTakeFirst();
   return row?.user_id ?? null;
@@ -88,6 +100,8 @@ export const moderationRoutes: FastifyPluginAsyncZod = async (app) => {
         if (report.target_type === 'post') {
           await trx.updateTable('posts').set({ status: 'removed', updated_at: new Date() }).where('id', '=', report.target_id).execute();
           await emitSearchSync(trx, 'post', report.target_id);
+        } else if (report.target_type === 'trail') {
+          await trx.updateTable('trails').set({ status: 'removed', updated_at: new Date() }).where('id', '=', report.target_id).execute();
         } else {
           // Only a live comment emits the event, so the worker takes it off the count exactly once.
           const removed = await trx

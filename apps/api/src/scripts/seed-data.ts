@@ -2,10 +2,10 @@
 // learn items, a course, practice questions and one roadmap per field.
 
 export const fields = [
-  { name: 'Machine Learning', description: 'Core methods for learning from data.' },
-  { name: 'Deep Learning', description: 'Training many-layered neural networks.' },
-  { name: 'Computer Vision', description: 'Models that understand images and video.' },
-  { name: 'Large Language Models', description: 'Models that read and generate text.' },
+  { name: 'Machine Learning', description: 'Core methods for learning from data.', position: 1 },
+  { name: 'Deep Learning', description: 'Training many-layered neural networks.', position: 2 },
+  { name: 'Computer Vision', description: 'Models that understand images and video.', position: 3 },
+  { name: 'Large Language Models', description: 'Models that read and generate text.', position: 6 },
 ];
 
 export const topics = [
@@ -94,6 +94,7 @@ export const papers = [
     authors: 'Diederik P. Kingma, Jimmy Ba',
     year: 2014,
     paper_url: 'https://arxiv.org/abs/1412.6980',
+    arxiv_id: '1412.6980',
     research_questions: [
       'Can one optimiser give every parameter its own step size using only first-order gradients?',
       'Can it stay efficient on large, noisy and sparse problems?',
@@ -121,6 +122,7 @@ export const papers = [
     authors: 'Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun',
     year: 2015,
     paper_url: 'https://arxiv.org/abs/1512.03385',
+    arxiv_id: '1512.03385',
     research_questions: [
       'Why do deeper plain networks reach worse training error than shallower ones?',
       'Can very deep networks be trained by learning residual functions instead?',
@@ -147,6 +149,7 @@ export const papers = [
     authors: 'Tomas Mikolov, Kai Chen, Greg Corrado, Jeffrey Dean',
     year: 2013,
     paper_url: 'https://arxiv.org/abs/1301.3781',
+    arxiv_id: '1301.3781',
     research_questions: [
       'Can high-quality word vectors be learned cheaply from billions of words?',
       'Do simple models capture syntactic and semantic relationships between words?',
@@ -173,6 +176,7 @@ export const papers = [
     authors: 'Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, Illia Polosukhin',
     year: 2017,
     paper_url: 'https://arxiv.org/abs/1706.03762',
+    arxiv_id: '1706.03762',
     research_questions: [
       'Can a sequence model rely on attention alone, without recurrence or convolution?',
       'Does that train faster and translate better?',
@@ -200,6 +204,7 @@ export const papers = [
     authors: 'Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova',
     year: 2018,
     paper_url: 'https://arxiv.org/abs/1810.04805',
+    arxiv_id: '1810.04805',
     research_questions: [
       'Can a language model be pre-trained to use context from both sides of a word?',
       'Can one pre-trained model be fine-tuned for many tasks with little change?',

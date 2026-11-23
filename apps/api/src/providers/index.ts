@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import nodemailer from 'nodemailer';
 import { env } from '../config/env';
+import { scholarlySources, type ScholarlySources } from './scholarly';
 
 // Outside services, each behind a small interface. The local stand-ins let everything run
 // without accounts; tests swap them for fakes through `providers`.
@@ -74,8 +75,10 @@ class GoogleIdTokens implements GoogleVerifier {
   }
 }
 
-export const providers: { email: EmailSender; push: PushSender; google: GoogleVerifier } = {
+export const providers: { email: EmailSender; push: PushSender; google: GoogleVerifier; scholarly: ScholarlySources } = {
   email: env.SMTP_URL ? new SmtpEmail() : new DevMailbox(),
   push: new DevPush(),
   google: new GoogleIdTokens(),
+  /** Paper ingestion sources; only the worker calls them. */
+  scholarly: scholarlySources(),
 };
