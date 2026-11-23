@@ -4,9 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Doshomik Schema Guide</title>
+<script>
+  // Apply a saved light or dark choice before the page draws, so it doesn't flash.
+  try { const saved = localStorage.getItem('schema-guide-theme'); if (saved) document.documentElement.dataset.theme = saved; } catch (e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Mono:wght@400;500&family=Atkinson+Hyperlegible+Next:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* One idea per screen: Home → Tour (step by step), Explore (area → table → one tab), Reference (one topic per page). */
 :root{
@@ -62,6 +66,9 @@ nav.main{display:flex;gap:4px;flex-wrap:wrap}
 nav.main a{color:var(--ink-2);text-decoration:none;padding:6px 12px;border-radius:999px;font-weight:600;font-size:.95rem}
 nav.main a:hover{background:var(--accent-soft);color:var(--ink)}
 nav.main a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+.theme-toggle{display:inline-flex;align-items:center;gap:6px;font:inherit;font-weight:600;font-size:.95rem;color:var(--ink-2);background:transparent;border:1.5px solid var(--line);border-radius:999px;padding:5px 12px;margin-left:6px;cursor:pointer}
+.theme-toggle:hover{border-color:var(--accent);color:var(--ink)}
+.theme-toggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 
 main{max-width:760px;margin:0 auto;padding:36px 20px 80px}
 .lede{font-size:1.15rem;color:var(--ink-2)}
@@ -233,6 +240,287 @@ footer{max-width:760px;margin:0 auto;padding:0 20px 48px;color:var(--muted);font
 .map.focusing .node.on{opacity:1}
 .areakey{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.9rem;color:var(--muted);margin:0 0 8px}
 .areakey span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px;background:var(--c)}
+/* ================================================================
+   Skin: ink on paper, hairline structure, one cobalt accent.
+   Overrides the look above; layout, markup and behaviour are unchanged.
+   ================================================================ */
+:root{
+  --bg:#FAFAF8; --surface:#FFFFFF; --ink:#15181C; --ink-2:#434A53; --muted:#737A83; --line:#E2E4E7; --line-2:#CDD1D6;
+  --accent:#2547C4; --accent-ink:#FFFFFF; --accent-soft:#EEF1FB;
+  --cascade:#B3402D; --cascade-soft:#FBEEEB; --setnull:#8F6000; --setnull-soft:#FAF3E2; --restrict:#58626E; --restrict-soft:#EFF1F3;
+  --code-bg:rgba(21,24,28,.055);
+  --font:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1114; --surface:#15181D; --ink:#E7E9EC; --ink-2:#B2B8C0; --muted:#7F868F; --line:#252A31; --line-2:#363C45;
+    --accent:#8EA5FF; --accent-ink:#0F1114; --accent-soft:#1A2140;
+    --cascade:#E8907E; --cascade-soft:#2C1C19; --setnull:#DDB45C; --setnull-soft:#2A2314; --restrict:#A3ADB8; --restrict-soft:#1D2229;
+    --code-bg:rgba(231,233,236,.07);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1114; --surface:#15181D; --ink:#E7E9EC; --ink-2:#B2B8C0; --muted:#7F868F; --line:#252A31; --line-2:#363C45;
+  --accent:#8EA5FF; --accent-ink:#0F1114; --accent-soft:#1A2140;
+  --cascade:#E8907E; --cascade-soft:#2C1C19; --setnull:#DDB45C; --setnull-soft:#2A2314; --restrict:#A3ADB8; --restrict-soft:#1D2229;
+  --code-bg:rgba(231,233,236,.07);
+}
+
+body{font-size:16.5px;line-height:1.65;font-feature-settings:"ss01" 1}
+::selection{background:var(--accent);color:var(--accent-ink)}
+h1{font-size:2.3rem;letter-spacing:-.025em;font-weight:700;line-height:1.15}
+h2{font-size:1.15rem;letter-spacing:-.01em}
+a{text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{text-decoration-thickness:2px}
+code{background:var(--code-bg);color:var(--ink);border-radius:3px;padding:.08em .32em;font-size:.86em}
+.t{font-size:.9em}
+main{max-width:740px;padding-top:48px}
+.lede{font-size:1.1rem;line-height:1.6;color:var(--ink-2)}
+.hint{font-size:.92rem}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+
+/* top bar: text navigation with an underline marker instead of pills */
+.bar{background:var(--bg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.bar-in{max-width:740px;padding:0 20px;min-height:58px}
+.brand{display:inline-flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em}
+.brand::before{content:"";width:14px;height:14px;border:2px solid var(--ink);border-radius:2px;box-shadow:3px 3px 0 var(--accent)}
+nav.main{gap:2px;align-items:center}
+nav.main a{border-radius:0;padding:18px 9px 16px;font-weight:500;color:var(--muted);box-shadow:inset 0 -2px 0 transparent}
+nav.main a:hover{background:none;color:var(--ink)}
+nav.main a[aria-current="page"]{background:none;color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.theme-toggle{border-radius:4px;border:1px solid var(--line-2);padding:4px 10px;font-weight:500;color:var(--ink-2);margin-left:10px}
+.theme-toggle:hover{border-color:var(--ink)}
+
+.crumbs{font-size:.88rem}
+.crumbs a{text-decoration-color:var(--line-2)}
+
+/* home: three ruled rows, not cards */
+.paths{gap:0;margin-top:36px;border-bottom:1px solid var(--line)}
+.path,.path.primary{background:none;border:0;border-top:1px solid var(--line);border-radius:0;color:var(--ink);padding:22px 0 22px 18px;position:relative}
+.path b{font-size:1.3rem;letter-spacing:-.015em;margin-bottom:4px}
+.path span,.path.primary span{color:var(--ink-2);opacity:1}
+.path.primary b{color:var(--accent)}
+.path::before{content:"";position:absolute;left:0;top:24px;bottom:24px;width:3px;background:var(--line-2)}
+.path.primary::before{background:var(--accent)}
+.path:hover::before{background:var(--ink)}
+.path:hover b{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+
+/* tour: a thin segmented row */
+.row-progress{border:0;border-radius:0;gap:3px;margin-bottom:12px}
+.row-progress a,.row-progress a:first-child{height:6px;border:0;background:var(--line);border-radius:1px}
+.row-progress a:hover{background:var(--line-2)}
+.row-progress a.done{background:var(--ink)}
+.row-progress a.now{background:var(--accent);box-shadow:none}
+.step-count{font-family:var(--mono);font-size:.8rem;letter-spacing:.02em}
+.tour h1{font-size:2.1rem}
+.tour-nav{border-top:1px solid var(--line)}
+.btn{border-radius:4px;border:1px solid var(--line-2);padding:9px 18px;font-weight:600}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.primary:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+/* small pieces */
+.chips{gap:6px}
+.chip{border-radius:3px;font-size:.84rem;padding:3px 9px;border-color:var(--line-2)}
+.chip:hover{border-color:var(--ink);color:var(--ink);background:var(--surface)}
+.flow b{border-radius:3px;font-weight:500;border-color:var(--line-2)}
+.demo{border-radius:4px}
+.demo th{font-weight:500}
+.rule{border-left-width:3px;border-radius:0 4px 4px 0}
+.areas li{padding:10px 0}
+
+/* lists: a ruled index with a marker on hover */
+.list a.item{padding:16px 14px;position:relative}
+.list a.item:hover{background:var(--surface);box-shadow:inset 3px 0 0 var(--accent)}
+.list a.item b{font-size:1.05rem;letter-spacing:-.01em}
+.list a.item:hover b{color:var(--accent)}
+.search{border-radius:4px;border:1px solid var(--line-2);padding:11px 14px}
+.search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+/* table pages */
+.table-title{font-size:2.1rem;letter-spacing:-.02em}
+.tabs{gap:2px}
+.tabs a{font-weight:500;padding:9px 12px}
+.tabs a[aria-current="page"]{font-weight:600;border-bottom-width:2px}
+.facts{gap:6px 0}
+.facts li{padding-right:18px;margin-right:18px;border-right:1px solid var(--line)}
+.facts li:last-child{border-right:0}
+.col-head .t{font-size:.98rem}
+.pill{border-radius:3px;font-size:.72rem;font-weight:600;letter-spacing:.01em;padding:1px 7px;border-color:var(--line-2)}
+.pill.key{border-color:var(--accent);color:var(--accent)}
+.links li{border-left-width:3px;border-radius:0 4px 4px 0;padding:11px 14px}
+summary:hover{color:var(--accent)}
+details > .inner{padding-left:19px}
+.ba div{border-radius:4px}
+.filters button{border-radius:4px;border:1px solid var(--line-2)}
+.filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.next a{font-weight:600}
+
+/* diagrams: engineering-paper canvas, tighter boxes */
+.map-wrap{border-radius:6px;border-color:var(--line);
+  background-color:var(--surface);
+  background-image:radial-gradient(var(--line-2) 1px, transparent 1.2px);background-size:22px 22px}
+.map .node rect{rx:4px;stroke-width:1.4}
+.map .node:hover rect{stroke-width:2.4}
+.map .edge line,.map .edge path{stroke-width:1.4}
+.map .node text.mono{font-size:12.5px}
+.areakey{font-size:.86rem}
+.legend{font-size:.86rem}
+.legend span::before{border-radius:1px}
+
+footer{max-width:740px;font-size:.85rem;padding-top:0}
+footer::before{content:"";display:block;border-top:1px solid var(--line);margin-bottom:20px}
+/* ---- Tools (added) ---- */
+.doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:30px}
+.door{display:block;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:4px;padding:24px 22px 26px}
+.door b{display:block;font-size:1.6rem;letter-spacing:-.02em;line-height:1.15}
+.door span{display:block;margin-top:8px;color:var(--ink-2);font-size:1.05rem}
+.door:hover{border-color:var(--line-2);border-top-color:var(--c);box-shadow:0 10px 24px -18px rgba(0,0,0,.35)}
+.door:hover b{color:var(--c)}
+
+.tool h1{margin-bottom:6px}
+.ask{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:22px 0 30px;font-size:1.6rem;font-weight:600;letter-spacing:-.02em;line-height:1.3}
+.big-select{font-family:var(--mono);font-size:1.25rem;font-weight:500;color:var(--accent);background:var(--surface);border:0;border-bottom:2px solid var(--accent);border-radius:4px 4px 0 0;padding:4px 8px;max-width:100%;cursor:pointer}
+.big-select:hover{background:var(--accent-soft)}
+.ask .big-select{width:min(300px,100%);font-size:1.08rem}
+.big-select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.swap{font:inherit;font-size:1.3rem;line-height:1;width:44px;height:44px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface);color:var(--ink);cursor:pointer}
+.swap:hover{border-color:var(--ink);transform:rotate(180deg)}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.stats.two{grid-template-columns:repeat(2,minmax(0,220px))}
+.stat{border-top:3px solid var(--c);padding-top:12px}
+.stat b{display:block;font-size:2.8rem;font-weight:700;letter-spacing:-.04em;line-height:1}
+.stat span{display:block;margin-top:6px;color:var(--ink-2);font-size:.98rem;font-weight:500}
+
+.flags{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}
+.flag{display:inline-flex;align-items:center;font-size:.85rem;font-weight:600;padding:5px 11px;border-radius:3px;color:var(--c);background:var(--cs, var(--accent-soft));cursor:help}
+
+.tsec{margin-top:42px}
+.tsec h2{display:flex;align-items:center;gap:10px;font-size:1.3rem;letter-spacing:-.015em;padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.tsec h2::before{content:"";width:12px;height:12px;border-radius:2px;background:var(--c);flex:none}
+.tsec h2 small{margin-left:auto;font-size:1rem;font-weight:600;color:var(--muted)}
+.none{color:var(--muted);font-size:1.05rem;margin:0}
+.none.big{font-size:1.6rem;font-weight:600;color:var(--ink-2);margin-top:8px}
+.fine{color:var(--muted);font-size:.88rem;margin:12px 0 0}
+
+.tree ul{list-style:none;margin:0;padding:0}
+.tree ul ul{margin:4px 0 4px 10px;padding-left:22px;border-left:2px solid var(--line)}
+.tree li{padding:6px 0}
+.node-name a,.pairs a{font-family:var(--mono);font-size:1.05rem;font-weight:500;text-decoration:none;color:var(--ink)}
+.node-name a:hover,.pairs a:hover{color:var(--accent);text-decoration:underline}
+.tree li::marker{content:none}
+.tree .via,.pairs .via{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-left:10px}
+.tree .tag{font-size:.78rem;font-weight:600;color:var(--muted);margin-left:10px;padding:1px 7px;border:1px solid var(--line-2);border-radius:3px}
+.tree li.also .node-name a{color:var(--muted)}
+.pairs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.pairs li{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--c);border-radius:0 4px 4px 0;padding:10px 12px}
+.pairs .via{display:block;margin:2px 0 0}
+
+.ways{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px}
+.way{font:inherit;text-align:left;min-width:140px;padding:10px 14px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface);color:var(--ink);cursor:pointer}
+.way b{display:block;font-size:1rem}
+.way small{display:block;margin-top:2px;font-family:var(--mono);font-size:.74rem;color:var(--muted)}
+.way:hover{border-color:var(--ink)}
+.way[aria-selected="true"]{border-color:var(--ink);box-shadow:inset 0 -3px 0 var(--accent)}
+
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:10px 0;margin:4px 0 16px}
+.chain .box{font-family:var(--mono);font-size:1.02rem;font-weight:500;border:1.5px solid var(--ink);border-radius:4px;padding:7px 13px;background:var(--surface)}
+.chain .link{display:inline-flex;flex-direction:column;align-items:center;padding:0 10px;line-height:1.1}
+.chain .link small{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.chain .link i{font-style:normal;font-size:1.3rem;color:var(--accent)}
+
+.code-card{margin-top:16px;border:1px solid var(--line);border-radius:4px;background:var(--surface);overflow:hidden}
+.code-tabs{display:flex;align-items:stretch;border-bottom:1px solid var(--line);background:var(--bg)}
+.code-tabs button{font:inherit;font-size:.9rem;font-weight:600;padding:10px 16px;border:0;background:none;color:var(--muted);cursor:pointer;box-shadow:inset 0 -2px 0 transparent}
+.code-tabs button:hover{color:var(--ink)}
+.code-tabs button[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.code-tabs .copy{margin-left:auto;color:var(--ink-2);border-left:1px solid var(--line)}
+.code-tabs .copy.done{color:var(--accent)}
+.code-card pre.code{border:0;border-radius:0;margin:0;font-family:var(--mono);font-size:.88rem;line-height:1.65;padding:16px 18px;overflow-x:auto;color:var(--ink);background:var(--surface)}
+@media (max-width:560px){
+  .ask{font-size:1.3rem}
+  .stats{grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .stat b{font-size:2.1rem}
+}
+
+/* ---- Smooth transitions across the guide (added) ---- */
+@keyframes view-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fold-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+#app.view-in > *{animation:view-in .32s cubic-bezier(.2,.7,.2,1)}
+details[open] > .inner,.panel-in{animation:fold-in .22s ease-out}
+a,button,select,input,summary,.chip,.path,.list a.item,.tabs a,nav.main a,.links li,.btn,.way,.door,.swap,.pairs li,.flag{
+  transition:color .2s ease,background-color .2s ease,border-color .2s ease,box-shadow .2s ease,opacity .2s ease,transform .25s ease}
+body,.bar,.map-wrap,pre.code,.code-card,.search,.demo,.rule,.links li,.stat,.tsec h2{transition:background-color .3s ease,color .3s ease,border-color .3s ease}
+.row-progress a{transition:background-color .3s ease}
+summary::before{transition:transform .2s ease}
+/* Six nav items and the theme button on one line: the button shows only its icon (label kept for screen readers). */
+nav.main a{padding-left:7px;padding-right:7px}
+.theme-toggle{font-size:0;gap:0;padding:6px 8px;margin-left:8px}
+.theme-toggle svg{width:16px;height:16px}
+/* ================================================================
+   Depth instead of coloured edge bars: surfaces sit on a soft shadow
+   from every side and lift on hover. Colour shows as a small square.
+   ================================================================ */
+:root{
+  --lift-1:0 0 0 1px rgba(17,21,27,.07),0 1px 2px rgba(17,21,27,.05),0 3px 8px -4px rgba(17,21,27,.08);
+  --lift-2:0 0 0 1px rgba(17,21,27,.09),0 2px 4px rgba(17,21,27,.06),0 12px 24px -8px rgba(17,21,27,.18),0 28px 44px -28px rgba(17,21,27,.28);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --lift-1:0 0 0 1px rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.4),0 4px 10px -4px rgba(0,0,0,.5);
+    --lift-2:0 0 0 1px rgba(255,255,255,.1),0 2px 4px rgba(0,0,0,.45),0 14px 28px -8px rgba(0,0,0,.6),0 30px 48px -28px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --lift-1:0 0 0 1px rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.4),0 4px 10px -4px rgba(0,0,0,.5);
+  --lift-2:0 0 0 1px rgba(255,255,255,.1),0 2px 4px rgba(0,0,0,.45),0 14px 28px -8px rgba(0,0,0,.6),0 30px 48px -28px rgba(0,0,0,.7);
+}
+/* the colour marker used in place of edge bars */
+.rule.cascade,.links li.cascade{--c:var(--cascade)}
+.rule.setnull,.links li.setnull{--c:var(--setnull)}
+.rule.restrict,.links li.restrict{--c:var(--restrict)}
+
+/* Explore, Reference and area lists: separate cards that lift */
+.list{border-top:0}
+.list > li{border-bottom:0;margin-bottom:10px}
+.list a.item{background:var(--surface);border-radius:8px;box-shadow:var(--lift-1);padding:16px 20px}
+.list a.item:hover{background:var(--surface);box-shadow:var(--lift-2);transform:translateY(-2px)}
+
+/* Home: three ways in */
+.paths{border-bottom:0;gap:12px}
+.path,.path.primary{border:0;border-radius:8px;background:var(--surface);box-shadow:var(--lift-1);padding:22px 24px}
+.path::before{display:none}
+.path:hover{box-shadow:var(--lift-2);transform:translateY(-2px)}
+.path:hover b{text-decoration:none}
+
+/* Tour: the three delete answers */
+.rule{border-left:0;border-radius:8px;background:var(--surface);box-shadow:var(--lift-1);padding:14px 18px}
+.rule b::before,.door b::before{content:"";display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--c);margin-right:10px;vertical-align:1px}
+
+/* Link sentences on table pages and in Reference */
+.links li{border-left:0;border-radius:8px;box-shadow:var(--lift-1);padding:12px 16px 12px 38px;position:relative;margin-bottom:10px}
+.links li::before{content:"";position:absolute;left:15px;top:19px;width:10px;height:10px;border-radius:3px;background:var(--c)}
+
+/* Tools */
+.door{border:0;border-radius:8px;box-shadow:var(--lift-1)}
+.door:hover{box-shadow:var(--lift-2);transform:translateY(-3px)}
+.door:hover b{color:var(--ink)}
+.big-select,.ask .big-select{border:0;border-radius:8px;box-shadow:var(--lift-1);padding:7px 12px}
+.big-select:hover{background:var(--surface);box-shadow:var(--lift-2)}
+.stat{border-top:0;background:var(--surface);border-radius:8px;box-shadow:var(--lift-1);padding:16px 18px}
+.stat b{color:var(--c)}
+.pairs li{border:0;border-radius:8px;box-shadow:var(--lift-1);padding:11px 14px 11px 36px;position:relative}
+.pairs li::before{content:"";position:absolute;left:14px;top:17px;width:10px;height:10px;border-radius:3px;background:var(--c)}
+.way{border:0;border-radius:8px;box-shadow:var(--lift-1)}
+.way:hover{box-shadow:var(--lift-2);transform:translateY(-2px)}
+.way[aria-selected="true"]{background:var(--ink);color:var(--bg);box-shadow:var(--lift-2)}
+.way[aria-selected="true"] small{color:var(--bg);opacity:.7}
+.code-card,.map-wrap,.demo{border:0;border-radius:8px;box-shadow:var(--lift-1)}
+.chain .box{border:0;border-radius:6px;box-shadow:var(--lift-1)}
+.swap{border:0;border-radius:8px;box-shadow:var(--lift-1)}
+.swap:hover{box-shadow:var(--lift-2)}
 </style>
 </head>
 <body>
@@ -243,12 +531,46 @@ footer{max-width:760px;margin:0 auto;padding:0 20px 48px;color:var(--muted);font
       <a href="#home" data-nav="home">Home</a>
       <a href="#tour/1" data-nav="tour">Tour</a>
       <a href="#explore" data-nav="explore">Explore</a>
-      <a href="#diagram" data-nav="diagram">Map</a>
+      <a href="#tools" data-nav="tools">Tools</a>
       <a href="#ref" data-nav="ref">Reference</a>
+      <button type="button" class="theme-toggle" id="theme-toggle"></button>
+      <script>
+        // Light / dark toggle. Without a saved choice the page follows the system setting.
+        (function () {
+          const button = document.getElementById('theme-toggle');
+          const root = document.documentElement;
+          const system = () => (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          const current = () => root.dataset.theme || system();
+          const sun = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+          const moon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+          function show() {
+            const next = current() === 'dark' ? 'light' : 'dark';
+            button.innerHTML = next === 'dark' ? `${moon}Dark` : `${sun}Light`;
+            button.setAttribute('aria-label', `Switch to ${next} mode`);
+            button.title = `Switch to ${next} mode`;
+          }
+          button.addEventListener('click', () => {
+            const next = current() === 'dark' ? 'light' : 'dark';
+            root.dataset.theme = next;
+            try { localStorage.setItem('schema-guide-theme', next); } catch (e) {}
+            show();
+          });
+          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', show);
+          show();
+        })();
+      </script>
     </nav>
   </div>
 </header>
 <main id="app" tabindex="-1"></main>
+<script>
+  document.addEventListener('keydown', (event) => {
+    const find = document.getElementById('find');
+    if (!find) return;
+    if (event.key === '/' && document.activeElement !== find) { event.preventDefault(); find.focus(); }
+    if (event.key === 'Escape' && document.activeElement === find && find.value) { find.value = ''; find.dispatchEvent(new Event('input')); }
+  });
+</script>
 <footer>Source of truth: the SQL files in <code>apps/api/migrations/</code>. Tables, columns and delete rules here were checked against the migrated database on 23 Nov 2026 (migration 005).</footer>
 
 <script>
@@ -1283,7 +1605,7 @@ function viewExplore() {
     <h1>Explore the tables</h1>
     <p class="lede">The tables are grouped into ${DOMAINS.length} areas. Open one to see what it holds.</p>
     <label class="hint" for="find">Or find a table or column by name</label>
-    <input id="find" class="search" type="search" placeholder="For example: user_id, papers, note" autocomplete="off" spellcheck="false">
+    <input id="find" class="search" type="search" placeholder="For example: user_id, papers, note   (press / to search)" autocomplete="off" spellcheck="false">
     <div id="results">${areaList()}</div>
   </section>`;
 }
@@ -1812,6 +2134,7 @@ function mapAreas() {
     return { from: x, to: y, d: 'area', label: String(c), width: 1.4 + Math.sqrt(c) * 1.3, title: `${count(c, 'link', 'links')} between ${domainById[x].name} and ${domainById[y].name}` };
   });
   return `<section class="mapview">
+    ${crumbs([['Tools', '#tools'], ['Map']])}
     <h1>Map</h1>
     <p class="lede">How the parts of the database connect. Start with the areas, then open one.</p>
     ${mapTabs('areas')}
@@ -1872,7 +2195,7 @@ function mapArea(id) {
   const mixed = links.some((l) => l.d === 'mixed');
   const keyIds = [...new Set([id, ...outside.map((n) => byName[n].domain)])];
   return `<section class="mapview">
-    ${crumbs([['Map', '#diagram'], [d.name]])}
+    ${crumbs([['Tools', '#tools'], ['Map', '#diagram'], [d.name]])}
     <h1>${d.name}</h1>
     <p class="lede">The ${count(core.length, 'table', 'tables')} in this area are filled in; dashed boxes are tables elsewhere that ${grouped ? 'link to them, grouped by area' : 'they link to'}.</p>
     ${areaKey(keyIds)}
@@ -1920,7 +2243,7 @@ function mapTable(name) {
   }));
   const domains = [...new Set(nodes.map((n) => byName[n.id].domain))];
   return `<section class="mapview">
-    ${crumbs([['Map', '#diagram'], [domainById[t.domain].name, `#diagram/${t.domain}`], [name]])}
+    ${crumbs([['Tools', '#tools'], ['Map', '#diagram'], [domainById[t.domain].name, `#diagram/${t.domain}`], [name]])}
     <h1 class="table-title">${name}</h1>
     <p class="lede">${parents.length ? `Left: the ${count(parents.length, 'table', 'tables')} it points to.` : 'It points to no other table.'} ${
       children.length ? `Right: the ${count(children.length, 'table', 'tables')} that point to it.` : 'No other table points to it.'
@@ -1948,6 +2271,7 @@ function mapAll() {
     },
   });
   return `<section class="mapview">
+    ${crumbs([['Tools', '#tools'], ['Map']])}
     <h1>Map</h1>
     <p class="lede">All ${TABLES.length} tables and ${EDGES.length} links. It is busy on purpose: hover a table to see only its links.</p>
     ${mapTabs('all')}
@@ -1989,6 +2313,309 @@ function mapBlur(svg) {
 );
 
 /* ============================================================
+   Tools (added; the views above are unchanged)
+   #tools                  the two tools
+   #tools/impact/<table>   what one DELETE on that table does, all the way down
+   #tools/join/<a>/<b>     the shortest foreign-key paths between two tables, as SQL and Kysely
+   ============================================================ */
+const TOOLS = [
+  ['map', 'Map', 'See how tables connect', 'accent'],
+  ['impact', 'Delete impact', 'What goes when a row goes', 'cascade'],
+  ['join', 'Join path', 'How two tables connect', 'accent'],
+];
+
+// Foreign-key columns that allow NULL, read from the migrated schema (migration 005).
+// A step over one of these becomes a LEFT JOIN.
+const NULLABLE_FKS = new Set(["reports.reporter_id","reports.reviewed_by","posts.media_id","posts.topic_id","comments.user_id","comments.post_id","comments.paper_id","comments.parent_id","notifications.post_id","notifications.comment_id","media_assets.owner_id","learn_items.topic_id","learn_items.media_id","learn_items.created_by","learn_items.updated_by","courses.created_by","courses.updated_by","questions.created_by","questions.updated_by","quizzes.topic_id","quizzes.created_by","papers.created_by","papers.updated_by","paper_prerequisites.learn_item_id","paper_prerequisites.quiz_id","paper_prerequisites.reel_post_id","paper_cards.updated_by","trails.field_id","audit_log.actor_id"]);
+const isNullable = (table, column) => NULLABLE_FKS.has(`${table}.${column}`);
+const SOFT_DELETE = TABLES.filter((t) => (t.badges || []).includes('soft delete')).map((t) => t.name);
+
+function bigSelect(id, selected) {
+  return `<select id="${id}" class="big-select" data-tool-input aria-label="Table">${DOMAINS.map(
+    (d) => `<optgroup label="${d.name}">${tablesIn(d.id).map((t) => `<option value="${t.name}"${t.name === selected ? ' selected' : ''}>${t.name}</option>`).join('')}</optgroup>`,
+  ).join('')}</select>`;
+}
+
+const stat = (n, label, color) => `<div class="stat" style="--c:var(--${color})"><b>${n}</b><span>${label}</span></div>`;
+const section = (title, n, color, body) =>
+  `<section class="tsec" style="--c:var(--${color})"><h2>${title}<small>${n}</small></h2>${body}</section>`;
+const flag = (text, color, why) => `<span class="flag" style="--c:var(--${color});--cs:var(--${color}-soft)" title="${esc(why)}">${text}</span>`;
+
+function viewTools() {
+  const [, tool, a, b] = location.hash.replace(/^#/, '').split('/');
+  if (!tool) {
+    return `<section>
+      <h1>Tools</h1>
+      <p class="lede">See the schema, and answer two everyday questions.</p>
+      <div class="doors">${TOOLS.map(
+        ([id, title, phrase, color]) => `<a class="door" href="${id === 'map' ? '#diagram' : `#tools/${id}`}" style="--c:var(--${color})"><b>${title}</b><span>${phrase}</span></a>`,
+      ).join('')}</div>
+    </section>`;
+  }
+  if (tool === 'impact') return toolImpact(byName[a] ? a : 'users');
+  if (tool === 'join') return toolJoin(byName[a] ? a : 'reading_passes', byName[b] ? b : 'fields');
+  return viewNotFound();
+}
+
+/* ---------- Delete impact ---------- */
+
+/**
+ * What one DELETE on `start` does. Walks incoming links breadth first: cascade links recurse into
+ * the child table, set-null links clear a column, restrict (NO ACTION) links can stop the delete.
+ * Each table is expanded once, at its shallowest point; later arrivals are marked "also".
+ */
+function deleteImpact(start) {
+  const deleted = new Set([start]);
+  const root = { name: start, children: [] };
+  const queue = [root];
+  const cleared = [];
+  const blocking = [];
+  while (queue.length) {
+    const node = queue.shift();
+    for (const e of into(node.name)) {
+      if (e.from === node.name) {
+        node.self = e; // comments.parent_id: replies go too, at every depth
+        continue;
+      }
+      if (e.d === 'cascade') {
+        if (deleted.has(e.from)) {
+          node.children.push({ name: e.from, e, also: true });
+          continue;
+        }
+        deleted.add(e.from);
+        const child = { name: e.from, e, children: [] };
+        node.children.push(child);
+        queue.push(child);
+      } else {
+        (e.d === 'setnull' ? cleared : blocking).push(e);
+      }
+    }
+  }
+  return { root, deleted: [...deleted], cleared, blocking };
+}
+
+function impactTree(node) {
+  const rows = [];
+  if (node.self) rows.push(`<li><span class="node-name">${tlink(node.name)}</span><span class="via">${node.self.col}</span><span class="tag">replies, every depth</span></li>`);
+  for (const c of node.children) {
+    if (c.also) {
+      rows.push(`<li class="also"><span class="node-name">${tlink(c.name)}</span><span class="via">${c.e.col}</span><span class="tag">also above</span></li>`);
+      continue;
+    }
+    const sub = c.children.length || c.self ? impactTree(c) : '';
+    rows.push(`<li><span class="node-name">${tlink(c.name)}</span><span class="via">${c.e.col}</span>${sub}</li>`);
+  }
+  return rows.length ? `<ul>${rows.join('')}</ul>` : '';
+}
+
+function toolImpact(start) {
+  const r = deleteImpact(start);
+  const lost = r.deleted.length - 1;
+  const flags = [
+    SOFT_DELETE.includes(start) ? flag('Soft delete in the app', 'restrict', 'The app sets deleted_at. This real DELETE runs when the purge job removes the row after 30 days.') : '',
+    r.blocking.length ? flag('Can fail: 409 IN_USE', 'cascade', 'A NO ACTION link refuses the delete if matching rows still exist at the end of the statement.') : '',
+  ].join('');
+  const linkRows = (list) =>
+    `<ul class="pairs">${list.map((e) => `<li>${tlink(e.from)}<span class="via">${e.col}</span></li>`).join('')}</ul>`;
+  return `<section class="tool">
+    ${crumbs([['Tools', '#tools'], ['Delete impact']])}
+    <h1>Delete impact</h1>
+    <div class="ask"><span>Delete one row from</span>${bigSelect('impact-table', start)}</div>
+    <div class="stats">
+      ${stat(lost, lost === 1 ? 'table loses rows' : 'tables lose rows', 'cascade')}
+      ${stat(r.cleared.length, r.cleared.length === 1 ? 'column set to NULL' : 'columns set to NULL', 'setnull')}
+      ${stat(r.blocking.length, r.blocking.length === 1 ? 'link can block it' : 'links can block it', 'restrict')}
+    </div>
+    ${flags ? `<div class="flags">${flags}</div>` : ''}
+    ${section('Deleted with it', lost, 'cascade', lost || r.root.self ? `<div class="tree">${impactTree(r.root)}</div>` : '<p class="none">Nothing else.</p>')}
+    ${section('Kept, column cleared', r.cleared.length, 'setnull', r.cleared.length ? `${linkRows(r.cleared)}<p class="fine">Only rows not already deleted above.</p>` : '<p class="none">Nothing.</p>')}
+    ${section('Can block the delete', r.blocking.length, 'restrict', r.blocking.length ? linkRows(r.blocking) : '<p class="none">Nothing. The delete always succeeds.</p>')}
+  </section>`;
+}
+
+/* ---------- Join path ---------- */
+
+/** All shortest foreign-key paths between two tables (links walked either way), up to `limit`. */
+function joinPaths(a, b, limit = 6) {
+  if (a === b) return [[]];
+  const dist = new Map([[a, 0]]);
+  const preds = new Map();
+  let frontier = [a];
+  while (frontier.length && !dist.has(b)) {
+    const next = [];
+    for (const n of frontier) {
+      for (const e of EDGES) {
+        const other = e.from === n ? e.to : e.to === n ? e.from : null;
+        if (!other || other === n) continue;
+        if (!dist.has(other)) {
+          dist.set(other, dist.get(n) + 1);
+          preds.set(other, []);
+          next.push(other);
+        }
+        if (dist.get(other) === dist.get(n) + 1) preds.get(other).push({ prev: n, e });
+      }
+    }
+    frontier = next;
+  }
+  if (!dist.has(b)) return [];
+  const paths = [];
+  const walk = (node, acc) => {
+    if (paths.length >= limit) return;
+    if (node === a) return void paths.push(acc.slice().reverse());
+    for (const p of preds.get(node)) {
+      acc.push({ e: p.e, from: p.prev, to: node });
+      walk(p.prev, acc);
+      acc.pop();
+    }
+  };
+  walk(b, []);
+  return paths;
+}
+
+function aliasesFor(names) {
+  const used = new Set();
+  const out = {};
+  for (const n of names) {
+    if (out[n]) continue;
+    const base = n.split('_').map((w) => w[0]).join('');
+    let alias = base;
+    for (let i = 2; used.has(alias); i++) alias = `${base}${i}`;
+    used.add(alias);
+    out[n] = alias;
+  }
+  return out;
+}
+
+/**
+ * SQL and Kysely for one path. Towards a parent: parent.id = child.col (a LEFT JOIN when that
+ * column allows NULL). Towards a child: child.col = parent.id (one row can match many).
+ */
+function joinCode(a, path) {
+  const al = aliasesFor([a, ...path.map((s) => s.to)]);
+  const sql = [`SELECT ${al[a]}.*`, `FROM ${a} AS ${al[a]}`];
+  const ky = [`db.selectFrom('${a} as ${al[a]}')`];
+  for (const s of path) {
+    const toParent = s.e.to === s.to;
+    const left = toParent && isNullable(s.e.from, s.e.col);
+    const lhs = toParent ? `${al[s.to]}.id` : `${al[s.to]}.${s.e.col}`;
+    const rhs = toParent ? `${al[s.from]}.${s.e.col}` : `${al[s.from]}.id`;
+    sql.push(`${left ? 'LEFT JOIN' : 'JOIN'} ${s.to} AS ${al[s.to]} ON ${lhs} = ${rhs}`);
+    ky.push(`  .${left ? 'leftJoin' : 'innerJoin'}('${s.to} as ${al[s.to]}', '${lhs}', '${rhs}')`);
+  }
+  sql[sql.length - 1] += ';';
+  ky.push(`  .selectAll('${al[a]}')`);
+  return { sql: sql.join('\n'), kysely: ky.join('\n') };
+}
+
+function pathFlags(path) {
+  const flags = [];
+  if (path.some((s) => s.e.to !== s.to)) flags.push(flag('One row → many', 'setnull', 'A step goes from a parent to its children, so one starting row can return several result rows. Use EXISTS or aggregate if you only filter.'));
+  if (path.some((s) => s.e.to === s.to && isNullable(s.e.from, s.e.col))) flags.push(flag('LEFT JOIN', 'restrict', 'A link column can be NULL. LEFT JOIN keeps rows without a match; switch to JOIN to drop them.'));
+  if (path.slice(0, -1).some((s) => s.to === 'users')) flags.push(flag('Through users', 'cascade', 'Rows connect only because the same person is involved. Usually not what a query means.'));
+  return flags.join('');
+}
+
+function chain(a, path) {
+  return `<div class="chain"><span class="box">${a}</span>${path
+    .map((s) => `<span class="link"><small>${s.e.col}</small><i aria-hidden="true">${s.e.to === s.to ? '⟶' : '⟵'}</i></span><span class="box">${s.to}</span>`)
+    .join('')}</div>`;
+}
+
+function toolJoin(a, b) {
+  const viaHub = (path) => path.slice(0, -1).filter((s) => s.to === 'users').length;
+  const paths = a === b ? [] : joinPaths(a, b, 12).sort((x, y) => viaHub(x) - viaHub(y)).slice(0, 6);
+  let result;
+  if (a === b) result = '<p class="none big">Pick two different tables.</p>';
+  else if (!paths.length) result = `<p class="none big">Not connected.</p><p class="fine">No chain of foreign keys links ${a} and ${b}.</p>`;
+  else {
+    const len = paths[0].length;
+    const ways = paths.length > 1
+      ? `<div class="ways" role="tablist">${paths
+          .map((p, i) => `<button type="button" class="way" role="tab" data-way="${i}" aria-selected="${i === 0}"><b>Way ${i + 1}</b><small>${p.map((s) => s.e.col).join(' · ')}</small></button>`)
+          .join('')}</div>`
+      : '';
+    const panels = paths
+      .map((path, i) => {
+        const code = joinCode(a, path);
+        return `<div class="way-panel" data-panel="${i}"${i ? ' hidden' : ''}>
+          ${chain(a, path)}
+          <div class="flags">${pathFlags(path) || flag('Plain join', 'restrict', 'Every step goes to a parent through a NOT NULL column: one result row per starting row.')}</div>
+          <div class="code-card">
+            <div class="code-tabs" role="tablist">
+              <button type="button" role="tab" data-code="sql" aria-selected="true">SQL</button>
+              <button type="button" role="tab" data-code="kysely" aria-selected="false">Kysely</button>
+              <button type="button" class="copy" data-copy>Copy</button>
+            </div>
+            <pre class="code" data-lang="sql">${esc(code.sql)}</pre>
+            <pre class="code" data-lang="kysely" hidden>${esc(code.kysely)}</pre>
+          </div>
+        </div>`;
+      })
+      .join('');
+    result = `<div class="stats two">
+        ${stat(len, len === 1 ? 'join' : 'joins', 'accent')}
+        ${stat(paths.length, paths.length === 1 ? 'way to do it' : 'ways to do it', 'restrict')}
+      </div>
+      <section class="tsec" style="--c:var(--accent)"><h2>${paths.length > 1 ? 'Pick a way' : 'The path'}</h2>${ways}${panels}</section>`;
+  }
+  return `<section class="tool">
+    ${crumbs([['Tools', '#tools'], ['Join path']])}
+    <h1>Join path</h1>
+    <div class="ask"><span>Join</span>${bigSelect('join-a', a)}<span>to</span>${bigSelect('join-b', b)}<button type="button" class="swap" data-swap aria-label="Swap the two tables" title="Swap">⇄</button></div>
+    ${result}
+  </section>`;
+}
+
+/* Selects navigate; Swap swaps; way and code tabs switch in place; Copy copies. */
+document.addEventListener('change', (event) => {
+  if (!event.target.matches('[data-tool-input]')) return;
+  const v = (id) => document.getElementById(id)?.value;
+  if (event.target.id === 'impact-table') location.hash = `#tools/impact/${v('impact-table')}`;
+  if (event.target.id.startsWith('join-')) location.hash = `#tools/join/${v('join-a')}/${v('join-b')}`;
+});
+document.addEventListener('click', (event) => {
+  if (event.target.closest('[data-swap]')) {
+    location.hash = `#tools/join/${document.getElementById('join-b').value}/${document.getElementById('join-a').value}`;
+    return;
+  }
+  const way = event.target.closest('[data-way]');
+  if (way) {
+    const box = way.closest('.tsec');
+    box.querySelectorAll('[data-way]').forEach((b) => b.setAttribute('aria-selected', String(b === way)));
+    box.querySelectorAll('[data-panel]').forEach((p) => {
+      p.hidden = p.dataset.panel !== way.dataset.way;
+      if (!p.hidden) {
+        p.classList.remove('panel-in');
+        void p.offsetWidth;
+        p.classList.add('panel-in');
+      }
+    });
+    return;
+  }
+  const tab = event.target.closest('[data-code]');
+  if (tab) {
+    const card = tab.closest('.code-card');
+    card.querySelectorAll('[data-code]').forEach((b) => b.setAttribute('aria-selected', String(b === tab)));
+    card.querySelectorAll('pre[data-lang]').forEach((pre) => (pre.hidden = pre.dataset.lang !== tab.dataset.code));
+    return;
+  }
+  const copy = event.target.closest('[data-copy]');
+  if (copy) {
+    const pre = [...copy.closest('.code-card').querySelectorAll('pre[data-lang]')].find((p) => !p.hidden);
+    const done = () => {
+      copy.textContent = 'Copied';
+      copy.classList.add('done');
+      setTimeout(() => {
+        copy.textContent = 'Copy';
+        copy.classList.remove('done');
+      }, 1400);
+    };
+    if (navigator.clipboard) navigator.clipboard.writeText(pre.textContent).then(done, () => (copy.textContent = 'Select to copy'));
+    else copy.textContent = 'Select to copy';
+  }
+});
+
+/* ============================================================
    Routing: #home, #tour/3, #explore, #explore/research,
    #table/papers/links, #ref, #ref/indexes
    ============================================================ */
@@ -2009,10 +2636,11 @@ function route() {
     : view === 'table' ? viewTable(a, b)
     : view === 'ref' ? viewRef(a)
     : view === 'diagram' ? viewDiagram(a, b)
+    : view === 'tools' ? viewTools()
     : viewNotFound();
   app.innerHTML = html;
 
-  const section = { home: 'home', tour: 'tour', explore: 'explore', table: 'explore', ref: 'ref', diagram: 'diagram' }[view];
+  const section = { home: 'home', tour: 'tour', explore: 'explore', table: 'explore', ref: 'ref', diagram: 'tools', tools: 'tools' }[view];
   document.querySelectorAll('[data-nav]').forEach((link) => {
     if (link.dataset.nav === section) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
@@ -2048,6 +2676,18 @@ document.addEventListener('keydown', (event) => {
 });
 window.addEventListener('hashchange', route);
 route();
+</script>
+<script>
+  // Fade each new view in. Watches #app, so the router itself is untouched.
+  (function () {
+    const app = document.getElementById('app');
+    new MutationObserver(() => {
+      app.classList.remove('view-in');
+      void app.offsetWidth;
+      app.classList.add('view-in');
+    }).observe(app, { childList: true });
+    app.classList.add('view-in');
+  })();
 </script>
 </body>
 </html>
