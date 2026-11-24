@@ -131,8 +131,27 @@ async function seedContent(trx: Db, adminId: number) {
   );
 }
 
+/** Ordinary accounts for testing social flows (follow, like, comment) between users. Never in production. */
+const DEV_USERS = ['learner1', 'learner2'];
+const DEV_USER_PASSWORD = 'devpassword';
+
+async function seedDevUsers() {
+  if (process.env.NODE_ENV === 'production') return;
+  const passwordHash = await argon2.hash(DEV_USER_PASSWORD);
+  const created = await db
+    .insertInto('users')
+    .values(DEV_USERS.map((username) => ({ username, email: `${username}@doshomik.local`, password_hash: passwordHash, email_verified_at: new Date() })))
+    .onConflict((oc) => oc.doNothing())
+    .returning('username')
+    .execute();
+  if (created.length) {
+    console.log(`Created dev users ${created.map((u) => u.username).join(', ')} (password "${DEV_USER_PASSWORD}").`);
+  }
+}
+
 async function main() {
   const adminId = await seedAdmin();
+  await seedDevUsers();
 
   const hasContent = await db.selectFrom('fields').select('id').limit(1).executeTakeFirst();
   if (hasContent) {

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { db } from '../src/db';
+import { env } from '../src/config/env';
 import { call, createUser, currentCode, googleAccounts, runWorker, sent, tokenFromLastEmail, useTestApp } from './helpers';
 
 const ctx = useTestApp();
@@ -163,5 +164,51 @@ describe('two-factor sign-in', () => {
 
     const regular = await createUser(ctx.app, 'ali');
     expect((await call(ctx.app, regular, 'GET', '/v1/admin/papers')).status).toBe(403);
+  });
+});
+
+describe('dev auth bypass (DEV_AUTH_BYPASS)', () => {
+  const asDev = (url: string, user?: string) =>
+    ctx.app.inject({ method: 'GET', url, headers: user ? { 'x-dev-user': user } : {} });
+
+  afterEach(() => {
+    env.DEV_AUTH_BYPASS = false;
+    env.DEV_AUTH_USER = 'admin';
+  });
+
+  it('is off by default: no token is 401', async () => {
+    await createUser(ctx.app, 'admin', { role: 'admin' });
+    expect((await asDev('/v1/me')).statusCode).toBe(401);
+  });
+
+  it('acts as DEV_AUTH_USER or x-dev-user without a token, reusing one session', async () => {
+    env.DEV_AUTH_BYPASS = true;
+    const admin = await createUser(ctx.app, 'admin');
+    const other = await createUser(ctx.app, 'learner1');
+
+    expect((await asDev('/v1/me')).json().id).toBe(admin.id);
+    expect((await asDev('/v1/me', 'Learner1')).json().id).toBe(other.id);
+    await asDev('/v1/me');
+    const sessions = await db.selectFrom('sessions').select('user_id').where('app_version', '=', 'dev-bypass').execute();
+    expect(sessions).toHaveLength(2);
+
+    expect((await asDev('/v1/me', 'nobody')).statusCode).toBe(401);
+  });
+
+  it('opens staff routes for an admin without two-factor, but not for a regular user', async () => {
+    env.DEV_AUTH_BYPASS = true;
+    await createUser(ctx.app, 'admin');
+    await db.updateTable('users').set({ role: 'admin' }).where('username', '=', 'admin').execute();
+    await createUser(ctx.app, 'learner1');
+
+    expect((await asDev('/v1/admin/papers')).statusCode).toBe(200);
+    expect((await asDev('/v1/admin/papers', 'learner1')).statusCode).toBe(403);
+  });
+
+  it('still checks a token when one is sent', async () => {
+    env.DEV_AUTH_BYPASS = true;
+    await createUser(ctx.app, 'admin');
+    const response = await ctx.app.inject({ method: 'GET', url: '/v1/me', headers: { authorization: 'Bearer not-a-token' } });
+    expect(response.statusCode).toBe(401);
   });
 });

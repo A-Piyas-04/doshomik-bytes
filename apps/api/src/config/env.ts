@@ -25,6 +25,14 @@ const EnvSchema = z.object({
   /** Google OAuth client ids whose ID tokens are accepted. Empty disables Google sign-in. */
   GOOGLE_CLIENT_IDS: list,
 
+  /**
+   * Development only: requests without an Authorization header act as DEV_AUTH_USER (or the
+   * username in an `x-dev-user` header), with no sign-in and no two-factor step. Requests that do
+   * send a token still go through real auth. Refused when NODE_ENV=production.
+   */
+  DEV_AUTH_BYPASS: z.stringbool().default(false),
+  DEV_AUTH_USER: z.string().default('admin'),
+
   CORS_ORIGINS: list,
 
   MEDIA_DIR: z.string().default('media'),
@@ -59,6 +67,10 @@ const EnvSchema = z.object({
 const parsed = EnvSchema.safeParse(process.env);
 if (!parsed.success) {
   throw new Error(`Invalid environment variables:\n${z.prettifyError(parsed.error)}`);
+}
+
+if (parsed.data.DEV_AUTH_BYPASS && parsed.data.NODE_ENV === 'production') {
+  throw new Error('DEV_AUTH_BYPASS must not be set in production');
 }
 
 export const env = parsed.data;
