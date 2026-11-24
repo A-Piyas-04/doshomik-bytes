@@ -24,7 +24,16 @@ pnpm dev                          # API on http://localhost:3000
 pnpm worker                       # in a second terminal: media, notifications, email, paper ingestion, maintenance
 ```
 
-The seeded admin must turn on two-factor sign-in before the admin API opens:
+### Auth is off during development (`DEV_AUTH_BYPASS`)
+
+While the app and admin panel are being built, `DEV_AUTH_BYPASS=true` (the `.env.example` default) skips sign-in:
+
+- A request **without** an `Authorization` header acts as `DEV_AUTH_USER` (default `admin`), with no token and no two-factor step, so the admin API opens at once.
+- Send `x-dev-user: learner1` (or `learner2`, both created by `pnpm db:seed`, password `devpassword`) to act as an ordinary user, e.g. to test follows and likes between two accounts.
+- A request **with** a token still goes through real auth, so the sign-in flows can be tested at any time.
+- The API refuses to start with the bypass on when `NODE_ENV=production`.
+
+Turning auth back on (planned for the end of development) means setting `DEV_AUTH_BYPASS=false`. The clients must then sign in, and the seeded admin must turn on two-factor sign-in before the admin API opens:
 
 1. `POST /v1/me/2fa/setup` → add the `otpauth_url` to an authenticator app.
 2. `POST /v1/me/2fa/enable { code }`.

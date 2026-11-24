@@ -159,6 +159,21 @@ What was checked against the Group A spec (A1–A7, A9, A10, A13), and what was 
 | Trails: any user can make one; publishing needs at least 2 papers; visibility follows the author like posts | Gives creators something to make; a one-paper path isn't a path | Reports and the moderation queue cover trails (`remove_content` sets `removed`) |
 | A9 comment upvotes not built | The spec puts them with Paper Clubs (A15) | Add with A15 |
 
+### 2.8 Auth switched off during development (24 Nov 2026)
+
+The owner's call: sign-in, permissions and password flows are tested **last**, so building and testing the mobile app and admin panel isn't slowed by tokens and two-factor codes. The auth code stays built and tested; it is bypassed, not removed.
+
+| Decision | Why | Consequence / later |
+| --- | --- | --- |
+| `DEV_AUTH_BYPASS=true` makes a token-less request act as `DEV_AUTH_USER` (default `admin`) or the `x-dev-user` username, counted as two-factor signed in (`lib/auth.ts`) | One switch on the server instead of auth-free code paths in every route; staff checks, visibility rules and rate limits still run as that user | Clients can skip the sign-in screens and token refresh until the end |
+| A request **with** a token still uses real auth | Sign-in flows stay testable at any time | — |
+| One long-lived session per dev user (`sessions.app_version = 'dev-bypass'`, platform `web`) | Routes that need a session (sign out, push token, device list) keep working | These rows show up in the device list; the hourly clean-up removes them a year after creation, or when revoked |
+| The API refuses to start with the bypass on in production (`config/env.ts`) | A forgotten flag must not ship | — |
+| The seed adds `learner1` and `learner2` (password `devpassword`) outside production | Social flows need two ordinary accounts | — |
+| Off in tests by default; `test/auth.test.ts` covers it switched on | The existing tests keep testing real auth | — |
+
+**Turning auth back on (end of development):** set `DEV_AUTH_BYPASS=false`; build the mobile sign-up, sign-in, refresh (one at a time, §2.2), password reset, email verification and Google screens, and the admin panel's sign-in plus 2FA setup; run the `security-review` pass; then delete the bypass (`devAuthContext` in `lib/auth.ts`, the two env vars, the test block and the seeded dev users) before the first release build.
+
 ### 2.5 API shape
 
 | Decision | Why |
