@@ -1,0 +1,703 @@
+{
+  "project": {
+    "name": "Doshomik",
+    "source": "the SQL migrations in `apps/api/migrations/` (read from a database migrated with all six)",
+    "code": ["sql", "kysely"]
+  },
+  "areas": [
+    {
+      "id": "accounts",
+      "name": "Accounts and sign-in",
+      "desc": "Who people are, their devices, outside sign-ins and one-time email codes.",
+      "tables": ["users", "sessions", "auth_identities", "auth_tokens"]
+    },
+    {
+      "id": "safety",
+      "name": "Social graph and safety",
+      "desc": "Follows, blocks and reports.",
+      "tables": ["follows", "blocks", "reports"]
+    },
+    {
+      "id": "media",
+      "name": "Media",
+      "desc": "Every uploaded image or video, whatever it is used for.",
+      "tables": ["media_assets"]
+    },
+    {
+      "id": "posts",
+      "name": "Posts, comments and notifications",
+      "desc": "The feed: posts, likes, saves, comment threads and the notifications they cause.",
+      "tables": ["posts", "post_likes", "saved_posts", "comments", "notifications"]
+    },
+    {
+      "id": "learn",
+      "name": "Learn",
+      "desc": "Topics (concepts), learn items, courses and what each user has completed.",
+      "tables": ["topics", "learn_items", "courses", "course_items", "course_progress", "learn_item_completions", "user_known_topics"]
+    },
+    {
+      "id": "practice",
+      "name": "Practice",
+      "desc": "Questions, quizzes and every answer a user gives.",
+      "tables": ["questions", "question_attempts", "quizzes", "quiz_questions"]
+    },
+    {
+      "id": "research",
+      "name": "Research",
+      "desc": "The curated paper collection, Paper Cards, lineage, Learn first, saves, the reading tracker, roadmaps and trails.",
+      "tables": ["fields", "papers", "paper_cards", "paper_edges", "paper_prerequisites", "paper_saves", "reading_passes", "research_outputs", "trails", "trail_items", "roadmap_steps", "user_papers", "user_fields"]
+    },
+    {
+      "id": "system",
+      "name": "System",
+      "desc": "The worker's job queue and the audit trail.",
+      "tables": ["outbox_events", "audit_log"]
+    }
+  ],
+  "tables": {
+    "users": {
+      "purpose": "One row per account.",
+      "columns": {
+        "public_id": "Exposed as `id` in the API. The numeric `id` never leaves the server",
+        "username": "Also unique on `lower(username)`. Pattern `^[a-z0-9_.]{3,30}$` is enforced in the app",
+        "email": "Also unique on `lower(email)`",
+        "password_hash": "Argon2id. NULL for Google-only accounts",
+        "avatar_url": "Set by the worker when an avatar upload is ready",
+        "role": "user · moderator · admin",
+        "status": "active · suspended · deleted",
+        "is_private": "Private accounts need accepted follow requests",
+        "deleted_at": "Starts the 30-day purge clock",
+        "totp_secret": "AES-256-GCM encrypted by the API",
+        "totp_enabled_at": "Two-factor sign-in is on. Required for staff routes",
+        "follower_count": "Stored count of **accepted** follows. Moved ±1 by the worker on `follow.changed`; repaired hourly",
+        "following_count": "Stored count of **accepted** follows. Moved ±1 by the worker on `follow.changed`; repaired hourly"
+      },
+      "notes": [
+        "Deleting a user removes their posts, likes, saves, follows, blocks, sessions, progress, attempts, notifications, reading passes, saved outputs and trails.",
+        "Their comments, reports, media ownership, audit entries and `created_by` / `updated_by` are set to NULL instead, so threads and history survive."
+      ]
+    },
+    "sessions": {
+      "purpose": "One row per signed-in device.",
+      "columns": {
+        "public_id": "The `sid` claim in access tokens; the first part of the refresh token",
+        "refresh_token_hash": "SHA-256 of the secret part; replaced on every refresh",
+        "push_token": "The device's FCM token",
+        "app_version": "`dev-bypass` marks the long-lived sessions made by the development auth bypass",
+        "expires_at": "Sliding 30-day expiry"
+      },
+      "notes": ["Expired or revoked sessions are deleted 30 days later by the hourly clean-up."]
+    },
+    "auth_identities": {
+      "purpose": "One row per outside sign-in (Google, later Apple) linked to an account.",
+      "columns": { "provider_subject": "The provider's own user id (`sub`)" }
+    },
+    "auth_tokens": {
+      "purpose": "One row per one-time email code.",
+      "columns": {
+        "purpose": "verify_email (24 h) · reset_password (1 h)",
+        "token_hash": "The plain code is only in the email"
+      },
+      "notes": ["Expired or used codes are deleted 7 days later."]
+    },
+    "follows": {
+      "purpose": "One row per follower and followed pair, kept for ever and toggled.",
+      "columns": {
+        "status": "accepted · pending (a request to a private account) · inactive (unfollowed, withdrawn, declined, or ended by a block)",
+        "created_at": "The first follow ever",
+        "updated_at": "When the current status began. Follow requests are listed by it"
+      },
+      "notes": [
+        "A toggle row: unfollowing sets `inactive` instead of deleting, so only the first follow ever notifies.",
+        "The API reports `inactive` as `follow_status: \"none\"`. Every privacy check tests `status = 'accepted'`."
+      ],
+      "badges": ["composite PK", "toggle row"]
+    },
+    "blocks": {
+      "purpose": "One row per user who blocked another.",
+      "notes": [
+        "Applies both ways in every visibility check.",
+        "Blocking also sets follows in both directions to `inactive`."
+      ]
+    },
+    "reports": {
+      "purpose": "One row per report of a user, post, comment or trail.",
+      "columns": {
+        "target_id": "Internal id of the row named by `target_type`. No foreign key on purpose: the report outlives its target",
+        "reviewed_by": "The moderator who resolved it"
+      },
+      "notes": ["Resolving a report can dismiss it, remove the content, or suspend the responsible user."]
+    },
+    "media_assets": {
+      "purpose": "One row per uploaded image or video.",
+      "columns": {
+        "status": "uploading → processing → ready, or failed",
+        "provider": "`self` (FFmpeg worker) or `legacy` (Prototype 1 files); later a managed provider",
+        "raw_key": "Original upload in private raw storage. Deleted after processing, success or failure",
+        "playback_key": "HLS master playlist (video) or base key of the WebP variants (image)",
+        "thumbnail_key": "Poster frame or small image",
+        "duration_ms": "Measured by the worker, never taken from the client. Reels are capped at 90 s here, not in a CHECK",
+        "error": "Message shown to the user when `failed`"
+      },
+      "notes": [
+        "Stores storage keys, not URLs. URLs are built at read time, so changing storage provider changes no data.",
+        "Rows with `status = 'processing'` are the worker's media queue.",
+        "Abandoned `uploading` or `failed` assets older than 1 day, used by no post or learn item, are deleted hourly."
+      ]
+    },
+    "posts": {
+      "purpose": "One row per post: text, one image, or one reel.",
+      "columns": {
+        "caption": "Required for `text` posts",
+        "media_id": "Required unless `type = 'text'`. The asset can't be deleted while a post uses it",
+        "status": "processing (media not ready) · published · removed (by a moderator)",
+        "like_count": "Stored counter, moved ±1 by the worker",
+        "comment_count": "Stored counter, moved ±1 by the worker",
+        "deleted_at": "Hidden at once; the row and its media are purged after 30 days",
+        "topic_id": "Optional concept tag, so a reel can be the link of a paper's Learn first topic"
+      }
+    },
+    "post_likes": {
+      "purpose": "One row per user and post, kept for ever and toggled.",
+      "columns": {
+        "is_active": "`false` after an unlike; a re-like sets it back. Deliberately in no index",
+        "created_at": "The first like ever",
+        "updated_at": "Last toggle"
+      },
+      "notes": [
+        "A toggle row: only the first like ever sends a notification.",
+        "Because `is_active` is in no index, a toggle is a HOT update with no index writes."
+      ],
+      "badges": ["composite PK", "toggle row"]
+    },
+    "saved_posts": {
+      "purpose": "One row per post a user bookmarked.",
+      "notes": ["Plain delete and insert on purpose: no side effects, and a re-save must move the post to the top."]
+    },
+    "comments": {
+      "purpose": "One row per comment or reply, on a post or in a paper's discussion.",
+      "columns": {
+        "user_id": "NULL once the author's account is purged; the thread survives",
+        "post_id": "Exactly one of `post_id` and `paper_id` is set",
+        "paper_id": "The paper's discussion thread. Shares reports, blocks, rate limits and moderation with post comments",
+        "parent_id": "The comment this one replies to",
+        "deleted_at": "Leaves a `[deleted]` placeholder"
+      },
+      "notes": ["No `updated_at`: comments are not edited."]
+    },
+    "notifications": {
+      "purpose": "One row per notification shown to a user.",
+      "columns": {
+        "user_id": "Who receives it",
+        "actor_id": "Who caused it"
+      },
+      "notes": ["Written only by the worker, from outbox events."]
+    },
+    "topics": {
+      "purpose": "One row per concept: the unit that links lessons, quizzes, reels and paper prerequisites.",
+      "columns": { "summary": "Shown in Learn first when the topic has no learn items yet" }
+    },
+    "learn_items": {
+      "purpose": "One row per short video, figure or text explanation.",
+      "columns": {
+        "kind": "video (a *lesson*) · image · text (both *notes*)",
+        "media_url": "An outside link. Either this or `media_id` is needed unless `kind = 'text'`",
+        "media_id": "Uploaded media. The asset can't be deleted while an item uses it",
+        "status": "draft → published → archived"
+      }
+    },
+    "courses": {
+      "purpose": "One row per course: an ordered set of learn items, or a card linking to a free outside course.",
+      "columns": {
+        "external_url": "Set for an outside course, which has no items",
+        "status": "draft → published → archived"
+      }
+    },
+    "course_items": {
+      "purpose": "One row per step of a course.",
+      "notes": ["The primary key is deferrable, so a whole course can be reordered in one transaction.", "Steps are renumbered 1..n over the **published** items in the API."]
+    },
+    "course_progress": {
+      "purpose": "One row per user and course they started.",
+      "columns": {
+        "completed_at": "The first completion is kept"
+      },
+      "notes": ["Written with one upsert, which also marks the steps reached in [[learn_item_completions]]."]
+    },
+    "learn_item_completions": {
+      "purpose": "One row per learn item a user completed, wherever they opened it.",
+      "notes": ["Feeds \"done\" in Learn before reading."]
+    },
+    "user_known_topics": {
+      "purpose": "One row per topic a user marked \"I already know this\".",
+      "notes": ["The spec's `user_known_concepts`. Counts every Learn first link of that topic as done."]
+    },
+    "questions": {
+      "purpose": "One row per practice question.",
+      "columns": {
+        "options": "At least 2 for an MCQ",
+        "status": "draft → published → archived"
+      },
+      "notes": ["No `created_at` (inherited from Prototype 1)."]
+    },
+    "question_attempts": {
+      "purpose": "One row per answer a user gave.",
+      "notes": ["Append-only history. Powers accuracy per topic, streak days (in `APP_TIMEZONE`) and \"quiz done\" in Learn before reading."]
+    },
+    "quizzes": {
+      "purpose": "One row per named set of questions in a fixed order.",
+      "notes": ["Has no `published_at` or `updated_by`, unlike the other team content."]
+    },
+    "quiz_questions": {
+      "purpose": "One row per question in a quiz, at its position."
+    },
+    "fields": {
+      "purpose": "One row per research field, shown as a chip on the Research tab.",
+      "columns": { "position": "Chip order, smallest first" },
+      "notes": ["Can't be deleted while it has papers."]
+    },
+    "papers": {
+      "purpose": "One row per paper in the curated collection.",
+      "columns": {
+        "field_id": "Its one chip",
+        "title": "Empty for an import until the first sync",
+        "paper_url": "The original's abstract page: the main **Open** action. We never host a PDF",
+        "research_questions": "Part of the Prototype 2 structured summary. The English Paper Card was backfilled from it",
+        "status": "draft → published → archived",
+        "abstract": "From OpenAlex, or staff",
+        "venue": "From OpenAlex, or staff",
+        "published_on": "Drives the \"New\" badge (within 30 days)",
+        "doi": "Lower case, without the resolver",
+        "arxiv_id": "Without the version",
+        "pdf_url": "Open-access PDF from Semantic Scholar",
+        "code_url": "Linked code repository from Hugging Face",
+        "tldr": "Semantic Scholar's one-line TLDR (English)",
+        "citation_count": "Semantic Scholar, else OpenAlex. Refreshed every sync",
+        "hf_upvotes": "Hugging Face daily papers upvotes",
+        "hf_trending_at": "The last day the paper was on Hugging Face daily papers",
+        "trend_rank": "1..n over published papers: the default order. Recomputed hourly and after each sync",
+        "openalex_topics": "`[{id, name, score}]`, for staff choosing the field",
+        "synced_at": "Last ingestion attempt. NULL = queued",
+        "sync_error": "The last ingestion error",
+        "search_vector": "Title, authors, main idea and both card questions. Built only by `refresh_paper_search(paper_id)`"
+      },
+      "notes": [
+        "Ingested fields are written only by the worker. Descriptive fields are filled only when empty, so staff edits win.",
+        "The app never calls a scholarly API; requests read only this table and its neighbours."
+      ]
+    },
+    "paper_cards": {
+      "purpose": "One row per paper and language: its Paper Card.",
+      "columns": {
+        "question": "Searched, in both languages",
+        "glossary": "`[{term, definition}]`",
+        "source": "staff · ai"
+      }
+    },
+    "paper_edges": {
+      "purpose": "One row per citation between two papers in the collection.",
+      "columns": {
+        "intent": "background · supporting · contrasting. NULL = unknown. `contrasting` is set only by staff",
+        "s2_intents": "Semantic Scholar's own labels, kept as they came",
+        "source": "semantic_scholar · openalex · staff"
+      },
+      "notes": ["Built from each paper's own references. The worker never changes a staff edge's intent."]
+    },
+    "paper_prerequisites": {
+      "purpose": "One row per concept to learn before reading a paper (Learn first).",
+      "columns": {
+        "label": "Shown instead of the topic name when set",
+        "why": "One line on why it is needed",
+        "learn_item_id": "At most one of the three links is set",
+        "quiz_id": "At most one of the three links is set",
+        "reel_post_id": "At most one of the three links is set",
+        "suggested_by": "staff · ai. Any `ai` row shows the disclosure footnote"
+      },
+      "notes": ["\"Done\" is always computed, never stored."]
+    },
+    "paper_saves": {
+      "purpose": "One row per paper a user bookmarked.",
+      "columns": { "created_at": "Orders Saved and picks Up next" }
+    },
+    "reading_passes": {
+      "purpose": "One row per user and paper they started reading: the three-step tracker.",
+      "columns": {
+        "step": "0 (not read) → 1 Explored → 2 Studied → 3 Reproduced",
+        "note": "Private, at most 400 characters. Returned only to its owner",
+        "explored_at": "Set exactly while `step >= 1`",
+        "studied_at": "Set exactly while `step >= 2`",
+        "reproduced_at": "Set exactly while `step >= 3`"
+      },
+      "notes": [
+        "Steps are cumulative: setting step 3 also stamps steps 1 and 2.",
+        "Lowering the step clears the later times, so monthly counts never include a step the user took back."
+      ]
+    },
+    "research_outputs": {
+      "purpose": "One row per saved result of a Research tool (map, roadmap, comparison, claim check).",
+      "notes": ["Reopening one reads the stored `result`: no AI call. Nothing writes these rows yet (Group C)."]
+    },
+    "trails": {
+      "purpose": "One row per reading path a user made.",
+      "columns": {
+        "status": "draft · published · removed (by a moderator)"
+      },
+      "notes": [
+        "Publishing needs at least 2 papers.",
+        "A published trail follows its author's visibility like a post, and can be reported."
+      ]
+    },
+    "trail_items": {
+      "purpose": "One row per paper in a trail, at its position.",
+      "columns": { "note": "One line per step, at most 280 characters" }
+    },
+    "roadmap_steps": {
+      "purpose": "One row per paper in a field's starting roadmap, made by the team.",
+      "columns": { "note": "Why the paper comes at that point" }
+    },
+    "user_papers": {
+      "purpose": "One row per user and paper in the old Prototype 2 tracker.",
+      "notes": [
+        "Superseded by [[paper_saves]] and [[reading_passes]], which were backfilled from it.",
+        "Writes to the old endpoints don't reach the new tables. Drop it once no client calls `/papers/:id/status`."
+      ]
+    },
+    "user_fields": {
+      "purpose": "One row per field a user picked as an interest at onboarding.",
+      "notes": ["Saving writes only the difference."]
+    },
+    "outbox_events": {
+      "purpose": "One row per piece of work for the background worker, written in the same transaction as the change.",
+      "columns": {
+        "entity_id": "Internal id of the row named by `entity_type`. No foreign key on purpose: the event outlives its target",
+        "attempts": "Events failing 10 times stay unprocessed for inspection",
+        "processed_at": "The worker claims an event by setting this only while it is still NULL"
+      },
+      "notes": [
+        "Each event is applied exactly once, so stored counters can move by ±1.",
+        "Processed events are deleted after 30 days."
+      ]
+    },
+    "audit_log": {
+      "purpose": "One row per admin or security action.",
+      "columns": {
+        "action": "e.g. `paper.publish`, `paper.import`, `user.suspend`, `user.purge`",
+        "entity_id": "Internal id of the row named by `entity_type`. No foreign key on purpose: the entry outlives its target"
+      }
+    }
+  },
+  "badges": {
+    "toggle row": "One row per pair for ever. Its state flips instead of being deleted and re-inserted, so only the first activation notifies."
+  },
+  "values": {
+    "papers.status": { "values": ["draft", "published", "archived"], "flow": true, "hints": { "published": "visible in the app" } }
+  },
+  "indexes": {
+    "posts_user_feed_idx": "Profile pages and home feed (keyset on `created_at, id`)",
+    "posts_user_id_created_at_idx": "A user's posts in any status; the user cascade",
+    "posts_reels_idx": "The Reels list",
+    "posts_media_id_idx": "Posts waiting on a media asset",
+    "posts_topic_idx": "Reels by concept",
+    "posts_to_tsvector_idx": "Full-text search on captions. The query must match the expression exactly",
+    "users_suggest_idx": "People to follow, in index order",
+    "users_username_idx": "Fuzzy (trigram) username search",
+    "users_email_lower_key": "Case-insensitive login and uniqueness",
+    "users_username_lower_key": "Case-insensitive login and uniqueness",
+    "follows_following_id_idx": "Who follows me; the user cascade",
+    "follows_pending_idx": "Pending follow requests, newest first",
+    "blocks_blocked_id_idx": "Block checks from the blocked side",
+    "post_likes_post_id_idx": "Likes per post: the repair job and the post cascade",
+    "comments_post_id_created_at_idx": "A post's comments in order",
+    "comments_paper_id_created_at_idx": "A paper's discussion in order",
+    "comments_parent_id_idx": "Replies to a comment",
+    "notifications_user_id_created_at_idx": "The notifications inbox",
+    "notifications_unread_idx": "The unread badge on every app open. The query writes `NOT n.is_read` to match it",
+    "saved_posts_user_id_created_at_idx": "Saved posts, newest first",
+    "papers_trend_idx": "The Research list in trend order (keyset page)",
+    "papers_search_idx": "Paper search (GIN on `search_vector`)",
+    "papers_sync_idx": "Papers due for ingestion",
+    "papers_field_id_idx": "Papers by field (the chip filter)",
+    "learn_items_topic_id_idx": "Learn items by topic",
+    "learn_items_to_tsvector_idx": "Full-text search on title and body",
+    "courses_to_tsvector_idx": "Full-text search on title and description",
+    "questions_topic_id_idx": "Questions by topic",
+    "topics_name_idx": "Fuzzy (trigram) topic search",
+    "paper_edges_cited_idx": "\"Built on by\": papers citing this one",
+    "paper_saves_user_idx": "Saved papers and Up next",
+    "reading_passes_read_idx": "The Read list",
+    "research_outputs_user_idx": "A user's saved outputs, newest first",
+    "trails_creator_idx": "A creator's trails",
+    "trails_published_idx": "The public list of trails",
+    "trail_items_paper_idx": "Trails that contain a paper",
+    "question_attempts_user_id_created_at_idx": "Practice history and stats",
+    "sessions_user_id_idx": "A user's live sessions",
+    "auth_identities_user_id_idx": "Lookups and the cascade by user",
+    "auth_tokens_user_id_idx": "Lookups and the cascade by user",
+    "media_assets_status_idx": "The worker's media queue",
+    "media_assets_owner_id_idx": "A user's uploads; purges",
+    "outbox_pending_idx": "The worker's outbox queue",
+    "reports_status_created_at_idx": "The moderation queue",
+    "reports_target_type_target_id_idx": "Earlier reports of the same target",
+    "audit_log_entity_type_entity_id_idx": "History of one row",
+    "audit_log_actor_id_created_at_idx": "What one staff member did"
+  },
+  "checks": {
+    "blocks_check": "No self-block",
+    "follows_check": "No self-follow",
+    "comments_check": "A comment is on exactly one of a post or a paper",
+    "posts_check": "A text post has a caption",
+    "posts_media_check": "An image or reel post has media",
+    "learn_items_check": "A video or image item has media (link or upload)",
+    "questions_check": "An MCQ has at least 2 options",
+    "media_assets_size_bytes_check": "Sizes are positive",
+    "paper_edges_check": "No self-citation",
+    "paper_prerequisites_one_link": "At most one link per prerequisite",
+    "papers_citation_count_check": "Citation counts are never negative",
+    "papers_hf_upvotes_check": "Upvotes are never negative",
+    "papers_trend_rank_check": "Trend ranks start at 1",
+    "reading_passes_check": "Explored time is set exactly while step ≥ 1",
+    "reading_passes_check1": "Studied time is set exactly while step ≥ 2",
+    "reading_passes_check2": "Reproduced time is set exactly while step ≥ 3",
+    "reading_passes_note_check": "Notes are at most 400 characters",
+    "reading_passes_step_check": "Steps run from 0 to 3",
+    "trail_items_note_check": "Step notes are at most 280 characters"
+  },
+  "joinExample": ["users", "papers"],
+  "highlight": {
+    "label": "new",
+    "short": "added in migration 005",
+    "note": "Added for the Research tab (Group A) in migration `…005`.",
+    "tables": ["paper_cards", "paper_edges", "paper_saves", "reading_passes", "research_outputs", "trails", "trail_items", "user_known_topics", "learn_item_completions"],
+    "columns": [
+      "fields.position",
+      "posts.topic_id",
+      "papers.abstract", "papers.venue", "papers.published_on", "papers.doi", "papers.arxiv_id", "papers.openalex_id", "papers.s2_id",
+      "papers.pdf_url", "papers.code_url", "papers.tldr", "papers.citation_count", "papers.hf_upvotes", "papers.hf_trending_at",
+      "papers.trend_rank", "papers.openalex_topics", "papers.synced_at", "papers.sync_error", "papers.search_vector",
+      "paper_prerequisites.label", "paper_prerequisites.why", "paper_prerequisites.learn_item_id", "paper_prerequisites.quiz_id",
+      "paper_prerequisites.reel_post_id", "paper_prerequisites.suggested_by"
+    ],
+    "indexes": ["papers_trend_idx", "papers_search_idx", "papers_sync_idx", "posts_topic_idx", "paper_edges_cited_idx", "paper_saves_user_idx", "reading_passes_read_idx", "research_outputs_user_idx", "trails_creator_idx", "trails_published_idx", "trail_items_paper_idx"]
+  },
+  "tour": [
+    {
+      "title": "Doshomik in {tables} tables",
+      "text": [
+        "Doshomik Bytes is a bilingual social-learning app for ML, AI and research. One PostgreSQL database holds everything.",
+        "The tables fall into {areas} areas, joined by {links} links."
+      ],
+      "visual": "areas"
+    },
+    {
+      "title": "Two ids on every row a client can name",
+      "text": [
+        "`id` is a `bigint` used for joins only. It is **never sent to clients**.",
+        "`public_id` is a random UUID, sent as `id` in the API. Topics and fields are named by `slug` instead."
+      ],
+      "tables": ["users", "posts", "papers", "topics"]
+    },
+    {
+      "title": "What happens when something is deleted",
+      "text": ["Every link says what happens to a row when the row it points to is deleted."],
+      "visual": {
+        "kind": "rules",
+        "cascade": "A user's posts, likes, sessions and progress go with them. {cascade} links work this way.",
+        "setnull": "Comments, reports, media ownership and `created_by` survive with the link cleared. {setnull} links work this way.",
+        "restrict": "A media asset used by a post, or a field that has papers, can't be deleted: the API answers `409 IN_USE`. {restrict} links work this way."
+      },
+      "tables": ["users", "posts", "comments", "media_assets", "fields"]
+    },
+    {
+      "title": "Users are the hub",
+      "text": [
+        "{inFrom:users} tables point at [[users]]. Most of them are what a user owns or did.",
+        "An account is soft-deleted first: `status = 'deleted'` hides it at once, and the hourly job purges it after 30 days."
+      ],
+      "tables": ["users", "sessions", "follows", "posts"]
+    },
+    {
+      "title": "Follows and likes are toggled, never re-created",
+      "text": [
+        "A follow or like keeps one row per pair for ever. Unfollowing sets `status = 'inactive'`; unliking sets `is_active = false`.",
+        "So only the first follow or like ever sends a notification."
+      ],
+      "visual": { "kind": "flow", "steps": ["pending", "accepted", "inactive"] },
+      "tables": ["follows", "post_likes"]
+    },
+    {
+      "title": "Uploads go through media_assets",
+      "text": [
+        "Every image or video is a [[media_assets]] row. The worker checks it, transcodes it and marks it ready.",
+        "A post with media waits in `processing` until its asset is ready, then goes live."
+      ],
+      "visual": { "kind": "flow", "steps": ["uploading", "processing", "ready"] },
+      "tables": ["media_assets", "posts", "learn_items"]
+    },
+    {
+      "title": "The worker does the slow work",
+      "text": [
+        "Every change that needs follow-up writes an [[outbox_events]] row in the same transaction.",
+        "The worker applies each event exactly once: counters move by ±1, notifications are written, push and email are sent."
+      ],
+      "tables": ["outbox_events", "notifications", "posts", "users"]
+    },
+    {
+      "title": "Team content is drafted, then published",
+      "text": [
+        "Papers, courses, learn items, questions and quizzes start as drafts. Only published rows reach the app.",
+        "`created_by` and `updated_by` credit the staff member, and [[audit_log]] records every admin action."
+      ],
+      "visual": { "kind": "flow", "steps": ["draft", "published", "archived"] },
+      "tables": ["papers", "courses", "learn_items", "questions", "quizzes", "audit_log"]
+    },
+    {
+      "title": "Topics tie Learn, Practice and Research together",
+      "text": [
+        "A topic is a concept. Learn items, questions and quizzes are tagged with one.",
+        "A paper's Learn first list is a set of topics, so a new video for a topic shows up in every paper that needs it."
+      ],
+      "tables": ["topics", "learn_items", "questions", "paper_prerequisites", "papers"]
+    },
+    {
+      "title": "The research collection",
+      "text": [
+        "Staff import a paper by arXiv id or DOI. The worker fills its metadata from OpenAlex, Semantic Scholar and Hugging Face, and ranks the list.",
+        "Each paper has a Paper Card per language, and citation lineage to other papers in the collection."
+      ],
+      "tables": ["fields", "papers", "paper_cards", "paper_edges"]
+    },
+    {
+      "title": "What a reader keeps",
+      "text": [
+        "Saving a paper is a [[paper_saves]] row. Reading progress is a separate [[reading_passes]] row with three steps.",
+        "Users can also build trails: ordered reading paths others can follow."
+      ],
+      "visual": { "kind": "flow", "steps": ["Explored", "Studied", "Reproduced"] },
+      "tables": ["paper_saves", "reading_passes", "trails", "trail_items"]
+    },
+    {
+      "title": "Where to go next",
+      "text": ["Explore every table and link, or read the reference pages on conventions, retention and migrations."],
+      "visual": "next"
+    }
+  ],
+  "reference": [
+    { "builtin": "links" },
+    { "builtin": "indexes" },
+    { "builtin": "checks" },
+    {
+      "id": "conventions",
+      "title": "Conventions",
+      "desc": "Ids, value lists, counters and ordering, the same in every table",
+      "sections": [
+        {
+          "items": [
+            { "title": "Value lists are CHECKs, not enums", "text": "Status-like columns are `text` with `CHECK (… IN (…))`, which is easier to change in a migration. The same lists live in `packages/shared/src/index.ts`, so change both together." },
+            { "title": "Timestamps", "text": "Always `timestamptz`. `updated_at` is set by the application, not by triggers." },
+            { "title": "Soft delete", "text": "`deleted_at` hides a row at once; the hourly job purges it later.", "tables": ["users", "posts", "comments"] },
+            { "title": "Stored counters", "text": "Moved ±1 by the worker, exactly once per outbox event, and recounted hourly by the repair job.", "tables": ["posts", "users"] },
+            { "title": "Ordered children", "text": "`position` is in the primary key and deferrable, so a whole list can be reordered in one transaction.", "tables": ["course_items", "quiz_questions", "roadmap_steps", "trail_items"] },
+            { "title": "References with no foreign key", "text": "`reports.target_id`, `outbox_events.entity_id` and `audit_log.entity_id` have no foreign key on purpose: these rows must outlive their targets.", "tables": ["reports", "outbox_events", "audit_log"] },
+            { "title": "Search expressions must match the indexes", "text": "The full-text expressions in `apps/api/src/db/search.ts` must match the index expressions exactly, or Postgres won't use the indexes. The same goes for partial-index predicates." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lifecycle",
+      "title": "How data changes and expires",
+      "desc": "Status flows, and what the hourly maintenance job cleans up",
+      "sections": [
+        {
+          "title": "Status flows",
+          "items": [
+            { "title": "A media asset", "steps": ["uploading", "processing", "ready"], "text": "`failed` is final; the app uploads again.", "on": "media_assets" },
+            { "title": "Team content", "steps": ["draft", "published", "archived"], "on": "papers" },
+            { "title": "A follow", "steps": ["pending", "accepted", "inactive"], "text": "A public account skips `pending`.", "on": "follows" },
+            { "title": "A report", "steps": ["open", "actioned"], "text": "Or `dismissed`.", "on": "reports" }
+          ]
+        },
+        {
+          "title": "What is cleaned up, and when",
+          "table": {
+            "head": ["Data", "Rule"],
+            "rows": [
+              ["Deleted accounts", "After 30 days: comments blanked to `[deleted]`, the user row deleted (cascading), their media removed"],
+              ["Deleted posts", "Hidden at once; row and media deleted after 30 days"],
+              ["Abandoned uploads", "`uploading` or `failed`, older than 1 day, used by nothing"],
+              ["Sessions", "Expired or revoked more than 30 days ago"],
+              ["Email codes", "Expired or used more than 7 days ago"],
+              ["Outbox events", "Processed more than 30 days ago. Events with 10 failed attempts stay for inspection"],
+              ["Inactive likes and follows", "Kept: they prevent re-notification"],
+              ["Raw uploads", "Deleted as soon as processing ends"]
+            ],
+            "prose": [1]
+          }
+        },
+        {
+          "title": "Errors the API returns",
+          "table": {
+            "head": ["Database error", "API answer"],
+            "rows": [
+              ["Unique violation", "`409 ALREADY_EXISTS`"],
+              ["Row still referenced (restrict)", "`409 IN_USE`"],
+              ["Missing foreign key target", "`400 INVALID_REFERENCE`"],
+              ["CHECK, NOT NULL or bad format", "`400 INVALID_DATA`"]
+            ],
+            "prose": [0]
+          }
+        }
+      ]
+    },
+    {
+      "id": "migrations",
+      "title": "Migrations",
+      "desc": "The six SQL files and the rules for adding more",
+      "sections": [
+        {
+          "table": {
+            "head": ["File", "What it does"],
+            "rows": [
+              ["`…000_prototype-v1-schema.sql`", "The Prototype 1 schema: 16 tables, `pg_trgm`, search indexes"],
+              ["`…001_prototype-2.sql`", "The Prototype 2 appendix: public ids, slugs, media, publishing, auth, safety, outbox and audit"],
+              ["`…002_prototype-2-backfill.sql`", "Slugs `NOT NULL`; post media moved into `media_assets`"],
+              ["`…003_sessions-public-id-and-2fa.sql`", "Session public ids, two-factor columns, four indexes"],
+              ["`…004_toggles-and-stored-counts.sql`", "Toggle rows for likes and follows, stored follow counts"],
+              ["`…005_research-collection.sql`", "Research tab Group A: 9 new tables, paper metadata and search"]
+            ],
+            "prose": [1]
+          }
+        },
+        {
+          "title": "Rules",
+          "items": [
+            { "title": "Never edit an applied migration", "text": "Add a new one. The checklist is in `.claude/skills/doshomik-migration`." },
+            { "title": "Every migration has a working down", "text": "Checked with up → down → up." },
+            { "title": "Regenerate types after a change", "text": "Run `pnpm db:types`, and update `packages/shared` if a value list changed." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gaps",
+      "title": "Known gaps",
+      "desc": "What the schema doesn't do yet, and the plan",
+      "sections": [
+        {
+          "table": {
+            "head": ["Gap", "Plan"],
+            "rows": [
+              ["`user_papers` duplicates the new tracker", "Drop it once no client calls `/papers/:id/status`"],
+              ["One worker only", "Add `locked_until` lease columns and claim rows with `FOR UPDATE SKIP LOCKED`"],
+              ["Bangla search is unstemmed", "Give the `bangla` configuration a real dictionary; queries stay the same"],
+              ["No user locale", "`users.locale` for Bangla push and email text"],
+              ["Research Groups B and C", "They will write `paper_cards` (`source = 'ai'`), `paper_prerequisites` (`suggested_by = 'ai'`) and `research_outputs`"],
+              ["One database role with full rights", "An app role with DML only, a migration role with DDL"]
+            ],
+            "prose": [0, 1]
+          }
+        }
+      ]
+    }
+  ]
+}
