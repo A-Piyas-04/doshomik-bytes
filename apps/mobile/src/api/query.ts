@@ -60,18 +60,33 @@ export const persistOptions = {
   },
 };
 
-/** Refetch on app focus (AppState), and pause queries while offline (expo-network). */
+/**
+ * Refetch on app focus (AppState), and pause queries while offline (expo-network). `onlineManager`
+ * is the app's one source for "online": the offline banner reads it too. On web, TanStack's own
+ * browser online/offline listener drives it.
+ */
 export function wireQueryManagers(): () => void {
   const appState = AppState.addEventListener('change', (status) => {
     if (Platform.OS !== 'web') focusManager.setFocused(status === 'active');
   });
-  const network =
-    Platform.OS === 'web'
-      ? null
-      : Network.addNetworkStateListener((state) => onlineManager.setOnline(state.isConnected !== false && state.isInternetReachable !== false));
+  if (Platform.OS === 'web') return () => appState.remove();
+
+  const apply = (state: Network.NetworkState) => onlineManager.setOnline(state.isConnected !== false && state.isInternetReachable !== false);
+  // The listener only reports changes, so read the state once: a cold start without a
+  // connection must count as offline.
+  let heard = false;
+  const network = Network.addNetworkStateListener((state) => {
+    heard = true;
+    apply(state);
+  });
+  Network.getNetworkStateAsync()
+    .then((state) => {
+      if (!heard) apply(state);
+    })
+    .catch(() => undefined);
   return () => {
     appState.remove();
-    network?.remove();
+    network.remove();
   };
 }
 

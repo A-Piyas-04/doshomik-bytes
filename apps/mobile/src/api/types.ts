@@ -305,6 +305,12 @@ export interface LearnItem {
   created_at: string;
 }
 
+/** `GET /learn-items/:id`: the item plus the viewer's own state. */
+export interface LearnItemDetail extends LearnItem {
+  /** Marked done, or reached as a course step. */
+  completed_by_me: boolean;
+}
+
 export interface TopicDetail extends Topic {
   learn_items: LearnItem[];
 }

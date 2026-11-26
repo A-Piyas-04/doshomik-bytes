@@ -173,7 +173,7 @@ What the worker does:
 | --- | --- | --- |
 | GET | `/topics?field=`, `/topics/:slug` | Each topic has its learn area, `field` (`{ slug, name }` or null; migration 007) |
 | PUT / DELETE | `/topics/:slug/known` | "I already know this" |
-| GET | `/learn-items?topic=&field=`, `/learn-items/:id` | `field` filters by learn area, through the item's topic |
+| GET | `/learn-items?topic=&field=`, `/learn-items/:id` | `field` filters by learn area, through the item's topic. The single item adds `completed_by_me` (marked done, or reached in a course) |
 | PUT / DELETE | `/learn-items/:id/complete` | Completed lessons and notes (course progress also marks the steps it reaches) |
 | GET | `/courses?field=`, `/courses/:id` | With `my_progress` and the course's learn area `field` |
 | PUT | `/courses/:id/progress` | `{ last_position }`; the last step marks the course completed |

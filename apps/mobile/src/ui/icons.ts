@@ -67,6 +67,7 @@ export { UserCircleIcon as UserCircle } from 'phosphor-react-native/src/icons/Us
 export { UserPlusIcon as UserPlus } from 'phosphor-react-native/src/icons/UserPlus';
 export { UsersIcon as Users } from 'phosphor-react-native/src/icons/Users';
 export { WarningIcon as Warning } from 'phosphor-react-native/src/icons/Warning';
+export { WifiHighIcon as WifiHigh } from 'phosphor-react-native/src/icons/WifiHigh';
 export { WifiSlashIcon as WifiSlash } from 'phosphor-react-native/src/icons/WifiSlash';
 export { XCircleIcon as XCircle } from 'phosphor-react-native/src/icons/XCircle';
 export { XIcon as X } from 'phosphor-react-native/src/icons/X';

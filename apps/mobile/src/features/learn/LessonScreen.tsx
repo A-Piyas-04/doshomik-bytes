@@ -1,7 +1,5 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { ApiError } from '@/api/client';
 import { useCompleteLearnItem, useCourse, useLearnItem, useSaveProgress } from '@/api/learn';
@@ -37,8 +35,6 @@ export function LessonScreen({ id, courseId, step }: { id: string; courseId?: st
   const colors = useColors();
   const item = useLearnItem(id);
   const complete = useCompleteLearnItem();
-  const queryClient = useQueryClient();
-  const [done, setDone] = useState(false);
   const course = useCourse(courseId ?? '', !!courseId);
   const progress = useSaveProgress(courseId ?? '');
 
@@ -64,16 +60,9 @@ export function LessonScreen({ id, courseId, step }: { id: string; courseId?: st
     );
   }
   const data = item.data;
-  const toggle = (value: boolean) =>
-    complete.mutate(
-      { id, done: value },
-      {
-        onSuccess: () => {
-          setDone(value);
-          void queryClient.invalidateQueries({ queryKey: ['learn-item', id] });
-        },
-      },
-    );
+  // Server state: opening a lesson finished earlier (or reached in a course) shows "Done".
+  const done = data.completed_by_me;
+  const toggle = (value: boolean) => complete.mutate({ id, done: value });
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
@@ -122,7 +111,7 @@ export function LessonScreen({ id, courseId, step }: { id: string; courseId?: st
         ) : done ? (
           <Button label={t('learn.done')} icon={Check} kind="secondary" block onPress={() => toggle(false)} accessibilityHint={t('learn.undoDone')} />
         ) : (
-          <Button label={t('learn.markDone')} block loading={complete.isPending} onPress={() => toggle(true)} />
+          <Button label={t('learn.markDone')} block onPress={() => toggle(true)} />
         )}
       </View>
     </View>

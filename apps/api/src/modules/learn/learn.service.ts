@@ -108,8 +108,30 @@ export async function listLearnItems(filter: { topic?: string; field?: string },
   return mapPage(await fetchPage(query, 'li', page), toLearnItem);
 }
 
-export async function getLearnItem(itemPublicId: string) {
-  return toLearnItem(found(await selectLearnItems().where('li.public_id', '=', itemPublicId).executeTakeFirst(), 'Learn item'));
+/**
+ * One learn item, with `completed_by_me`: whether the viewer marked it done or reached it in a
+ * course, so the lesson screen opens in the right state. Lists leave it out: they are the same
+ * for every viewer.
+ */
+export async function getLearnItem(viewerId: number, itemPublicId: string) {
+  const row = found(
+    await selectLearnItems()
+      .where('li.public_id', '=', itemPublicId)
+      .select((eb) =>
+        eb
+          .exists(
+            eb
+              .selectFrom('learn_item_completions as lic')
+              .select('lic.learn_item_id')
+              .whereRef('lic.learn_item_id', '=', 'li.id')
+              .where('lic.user_id', '=', viewerId),
+          )
+          .as('completed_by_me'),
+      )
+      .executeTakeFirst(),
+    'Learn item',
+  );
+  return { ...toLearnItem(row), completed_by_me: row.completed_by_me };
 }
 
 /** Published courses (ours and external cards), with the viewer's progress. */

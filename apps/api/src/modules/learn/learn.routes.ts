@@ -16,7 +16,9 @@ export const learnRoutes: FastifyPluginAsyncZod = async (app) => {
     return learn.listLearnItems({ topic, field }, page);
   });
 
-  app.get('/learn-items/:id', { schema: { params: idParams } }, async (request) => learn.getLearnItem(request.params.id));
+  app.get('/learn-items/:id', { schema: { params: idParams } }, async (request) =>
+    learn.getLearnItem(request.auth.userId, request.params.id),
+  );
 
   app.get('/courses', { schema: { querystring: pageQuery.extend({ field: slug.optional() }) } }, async (request) => {
     const { field, ...page } = request.query;

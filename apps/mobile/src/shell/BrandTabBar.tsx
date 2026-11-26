@@ -9,6 +9,7 @@ import { AppText } from '@/ui/AppText';
 import { Avatar } from '@/ui/Avatar';
 import { BookOpen, FilmSlate, House, MagnifyingGlass, type IconComponent } from '@/ui/icons';
 import { Tap } from '@/ui/Tap';
+import { OfflineBanner } from './OfflineBanner';
 
 const TABS: Record<string, { label: MessageKey; icon?: IconComponent }> = {
   '(home)': { label: 'tab.home', icon: House },
@@ -31,6 +32,7 @@ export function BrandTabBar({ state, emitter, navigateToTab, insets }: BottomTab
   return (
     <View>
     <UploadBanner />
+    <OfflineBanner />
     <View style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: insets.bottom }]}>
       {state.routes.map((route, index) => {
         const tab = TABS[route.name];

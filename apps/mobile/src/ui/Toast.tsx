@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
+import { useConnectionPhase } from '@/lib/connection';
 import { useColors } from '@/theme/theme';
 import { layout, radius, space } from '@/theme/tokens';
 import { AppText } from './AppText';
@@ -27,6 +28,8 @@ export function ToastHost() {
   const { message, tone, actionLabel, onAction, id } = useToastStore();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  // Sit above the offline strip while it shows: failed actions are most likely just then.
+  const strip = useConnectionPhase((s) => (s.phase === 'hidden' ? 0 : layout.offlineStripHeight));
 
   useEffect(() => {
     if (!message) return;
@@ -36,7 +39,7 @@ export function ToastHost() {
 
   if (!message) return null;
   return (
-    <View pointerEvents="box-none" style={[styles.host, { bottom: insets.bottom + layout.tabBarHeight + space.md }]}>
+    <View pointerEvents="box-none" style={[styles.host, { bottom: insets.bottom + layout.tabBarHeight + strip + space.md }]}>
       <Animated.View
         key={id}
         entering={FadeInDown.duration(180)}

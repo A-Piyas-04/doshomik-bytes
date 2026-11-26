@@ -5,7 +5,7 @@ import { toast } from '@/ui/Toast';
 import { api } from './client';
 import { useCursorList } from './paging';
 import { keys, queryClient } from './query';
-import type { AnswerResult, Course, CourseDetail, HistoryEntry, LearnItem, PracticeStats, Question, Quiz, QuizDetail, SearchResults, Suggestion2, Topic, TopicDetail } from './types';
+import type { AnswerResult, Course, CourseDetail, HistoryEntry, LearnItem, LearnItemDetail, PracticeStats, Question, Quiz, QuizDetail, SearchResults, Suggestion2, Topic, TopicDetail } from './types';
 
 const failed = () => toast(translate('common.actionFailed'), { tone: 'error' });
 
@@ -34,7 +34,7 @@ export function useCourse(id: string, enabled = true) {
 }
 
 export function useLearnItem(id: string) {
-  return useQuery({ queryKey: keys.learnItem(id), queryFn: ({ signal }) => api.get<LearnItem>(`/learn-items/${id}`, undefined, signal) });
+  return useQuery({ queryKey: keys.learnItem(id), queryFn: ({ signal }) => api.get<LearnItemDetail>(`/learn-items/${id}`, undefined, signal) });
 }
 
 /** Records the step reached in one of our courses. The server marks the steps' lessons as done. */
@@ -47,20 +47,32 @@ export function useSaveProgress(courseId: string) {
       );
       void queryClient.invalidateQueries({ queryKey: keys.myCourses });
       void queryClient.invalidateQueries({ queryKey: ['courses'] });
+      // The steps reached are now done lessons.
+      void queryClient.invalidateQueries({ queryKey: ['learn-item'] });
       void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'paper' && q.queryKey[2] === 'learn-first' });
     },
   });
 }
 
-/** Done / not done for a lesson or note: feeds every paper's Learn first. */
+/**
+ * Done / not done for a lesson or note: feeds every paper's Learn first. Optimistic: the lesson's
+ * cached `completed_by_me` flips at once and is restored if the request fails.
+ */
 export function useCompleteLearnItem() {
   return useMutation({
     mutationFn: ({ id, done }: { id: string; done: boolean }) => (done ? api.put(`/learn-items/${id}/complete`) : api.delete(`/learn-items/${id}/complete`)),
-    onMutate: ({ done }) => {
+    onMutate: async ({ id, done }) => {
       if (done) success();
+      await queryClient.cancelQueries({ queryKey: keys.learnItem(id) });
+      const previous = queryClient.getQueryData<LearnItemDetail>(keys.learnItem(id));
+      if (previous) queryClient.setQueryData<LearnItemDetail>(keys.learnItem(id), { ...previous, completed_by_me: done });
+      return { previous };
+    },
+    onError: (_error, { id }, context) => {
+      if (context?.previous) queryClient.setQueryData(keys.learnItem(id), context.previous);
+      failed();
     },
     onSettled: () => queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'paper' && q.queryKey[2] === 'learn-first' }),
-    onError: failed,
   });
 }
 

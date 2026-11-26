@@ -14,6 +14,7 @@ export const en = {
   'common.more': 'more',
   'common.showLess': 'Show less',
   'common.offline': 'You’re offline. Showing what was saved.',
+  'common.backOnline': 'Back online',
   'common.errorTitle': 'Couldn’t load this',
   'common.errorBody': 'Check your connection and try again.',
   'common.actionFailed': 'That didn’t go through. Try again.',

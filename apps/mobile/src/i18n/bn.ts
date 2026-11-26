@@ -13,6 +13,7 @@ export const bn: Record<MessageKey, string> = {
   'common.more': 'আরও',
   'common.showLess': 'কম দেখান',
   'common.offline': 'আপনি অফলাইনে আছেন। আগে সংরক্ষিত কনটেন্ট দেখানো হচ্ছে।',
+  'common.backOnline': 'আবার অনলাইনে ফিরেছেন',
   'common.errorTitle': 'এটি লোড করা যায়নি',
   'common.errorBody': 'ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।',
   'common.actionFailed': 'কাজটি হয়নি। আবার চেষ্টা করুন।',

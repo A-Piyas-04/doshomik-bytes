@@ -9,6 +9,7 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { persistOptions, queryClient, wireQueryManagers } from '@/api/query';
+import { wireConnectionPhase } from '@/lib/connection';
 import { loadPrefs, usePrefs } from '@/lib/prefs';
 import { AppLoader } from '@/shell/AppLoader';
 import { fontAssets } from '@/theme/fonts';
@@ -53,7 +54,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     void loadPrefs();
-    return wireQueryManagers();
+    const unwireConnection = wireConnectionPhase();
+    const unwireQueries = wireQueryManagers();
+    return () => {
+      unwireQueries();
+      unwireConnection();
+    };
   }, []);
 
   // A font that fails to load must not block the app: the system font stands in.

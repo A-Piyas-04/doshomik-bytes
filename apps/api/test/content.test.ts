@@ -122,6 +122,9 @@ describe('Learn', () => {
 
     await ok(user, 'PUT', `/v1/courses/${course.id}/progress`, { last_position: 1 });
     expect((await ok(user, 'GET', '/v1/me/courses')).items).toMatchObject([{ id: course.id, my_progress: { last_position: 1, completed_at: null } }]);
+    // Reaching a step marks its lesson done; the next one isn't yet.
+    expect((await ok(user, 'GET', `/v1/learn-items/${items[1].id}`)).completed_by_me).toBe(true);
+    expect((await ok(user, 'GET', `/v1/learn-items/${items[0].id}`)).completed_by_me).toBe(false);
     const done = await ok(user, 'PUT', `/v1/courses/${course.id}/progress`, { last_position: 2 });
     expect(done.completed_at).toEqual(expect.any(String));
     expect((await call(ctx.app, user, 'PUT', `/v1/courses/${course.id}/progress`, { last_position: 3 })).status).toBe(400);

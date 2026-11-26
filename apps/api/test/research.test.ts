@@ -247,7 +247,11 @@ describe('A13 Learn before reading', () => {
     expect(before.topics[0]).toMatchObject({ slug: 'softmax', why: 'Attention weights are a softmax.', link: { kind: 'note', id: lesson.id, minutes: 1 }, done: false });
     expect(before.topics[1]).toMatchObject({ label: 'What attention does', link: null, done: false });
 
+    expect((await ok(user, 'GET', `/v1/learn-items/${lesson.id}`)).completed_by_me).toBe(false);
     await ok(user, 'PUT', `/v1/learn-items/${lesson.id}/complete`);
+    expect((await ok(user, 'GET', `/v1/learn-items/${lesson.id}`)).completed_by_me).toBe(true);
+    // Another viewer's completion is their own.
+    expect((await ok(admin, 'GET', `/v1/learn-items/${lesson.id}`)).completed_by_me).toBe(false);
     await ok(user, 'PUT', '/v1/topics/attention-mechanism/known');
     const after = await ok(user, 'GET', `/v1/papers/${attention.id}/learn-first`);
     expect(after).toMatchObject({ ready: 2 });

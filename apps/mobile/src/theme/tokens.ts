@@ -188,6 +188,8 @@ export const layout = {
   screenPadding: 16,
   headerHeight: 52,
   tabBarHeight: 58,
+  /** The offline strip above the tab bar (toasts sit above it while it shows). */
+  offlineStripHeight: 30,
   /** Readable measure for long text (paper summaries, lessons). */
   maxTextWidth: 640,
 } as const;
