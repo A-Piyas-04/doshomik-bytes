@@ -50,7 +50,7 @@ export const CommentRow = memo(function CommentRow({ comment, onReply, onLongPre
         <View style={styles.body}>
           <AppText variant="caption" tone="textTertiary">
             {comment.author ? (
-              <AppText variant="label" weight="semibold" tone="text">{`${comment.author.username}  `}</AppText>
+              <AppText variant="label" weight="bold" tone="text">{`${comment.author.username}  `}</AppText>
             ) : null}
             {relativeTime(comment.created_at, lang)}
           </AppText>

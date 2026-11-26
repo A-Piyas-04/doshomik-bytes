@@ -122,17 +122,20 @@ The tab bar has labels; the active tab gets a filled icon, full-strength label a
 
 **Light-first**, in the owner's colour theme (mockups of 26 Nov 2026): a warm light-grey page, white surfaces, ink text, a deep teal primary, mint washes and amber as the second accent. Dark is a full first-class theme on the logo's ink. Every colour is a semantic token in `apps/mobile/src/theme/tokens.ts`, never a literal.
 
+**Energy comes from the five learn areas.** Each area owns one vivid colour, and that colour follows its content everywhere: area chips, the feed's area circles, text posts set on a colour block, Explore tiles, course covers, the paper screen's header, the roadmap header. The chrome stays calm (grey page, white cards, ink text); the content is what is colourful. This is the owner's "Instagram formula for education": the page should pull people in, never read like a dull professional network.
+
 #### Colour tokens
 
 ```ts
 // Light theme (default)
-bg            #F3F4F1   // page
-surface       #FFFFFF   // rows, sheets, inputs
-elevated      #ECEEEA   // pressed, skeletons, switch track
-border        #E2E4DF
+bg            #F1F2EE   // page
+surface       #FFFFFF   // cards, sheets, inputs
+elevated      #EAECE7   // pressed, skeletons, search field, progress track
+border        #DCDFD8   // card outlines: visible, so cards never run together
+divider       #E4E7E1   // hairlines inside a card
 text          #15181E
-textSecondary #50555C
-textTertiary  #7B8086
+textSecondary #4B5057
+textTertiary  #787D83
 accent        #12755E   // deep teal: primary actions, links, bookmarks, progress, reading dots
 accentWash    #DDF1E9   // mint wash behind accent badges
 highlight     #F2A20C   // amber: active-tab dot, New/Trending badges
@@ -146,7 +149,22 @@ text #F4F1E8 · accent #5BC9A1 (the logo's mint) · highlight #F5A524
 like #E5484D · danger #D33A40 · alert (unread dot) #EF5350
 ```
 
-Shapes: blocks 12, buttons and chips 8, badges 4; no pills. Lists are rows on one white surface with hairline dividers, not stacks of floating cards.
+#### Area colours
+
+Each area has four values (`AreaColor` in `tokens.ts`; read them with `useArea(slug)` from `src/theme/area.ts`): **solid** (fills: blocks, covers, selected chip), **on** (text and glyphs on solid), **tint** (badge and icon-tile wash) and **ink** (text on tint or on white).
+
+```
+area             solid    on       tint     ink
+ml-fundamentals  #0E9F7A  #FFFFFF  #DDF4EC  #0B6E55   glyph ChartLineUp
+deep-learning    #6A4CF5  #FFFFFF  #ECE8FF  #4A2FC9   glyph Brain
+computer-vision  #F0564A  #FFFFFF  #FFE6E2  #B9342A   glyph Eye
+transformers     #F5A70F  #1F1600  #FFF0CF  #8A5600   glyph Lightning
+llms             #2A78F0  #FFFFFF  #E2EDFF  #1956BB   glyph ChatsCircle
+```
+
+Dark has its own brighter set. An area added later takes one of two spare colours (by slug hash); content with no area (a post without a topic) is light grey `#E3E6E0` with ink text, at the owner's request. **Behind text, colour is always a wash:** every coloured box that holds words (text posts, the paper and roadmap headers, the Explore area spotlight, course covers, the Roadmaps and Trails tiles, the Up next and Start practice banners) uses its colour softened to 24% on the card (`useWash`, `useTextPostPaint` in `src/theme/area.ts`), with black words; the colour itself stays on glyphs, borders and progress fills. Full-strength fills behind words were too loud (owner, 26 Nov 2026). Solid colour remains for controls (buttons, the selected chip) and for boxes without text (the feed's area circles, avatars). People without a photo get a colour (`personColor`), so avatars are never grey.
+
+Shapes: cards and colour blocks 14, buttons and chips 8, badges 4; no pills. Papers, courses and posts are **separate white cards** with a visible 1dp border and a 12dp gap on the grey page, so two items never read as one; rows inside a card use hairline dividers. Feed posts are full-width white cards separated by an 8dp band of page grey.
 
 #### Typography
 
@@ -157,25 +175,34 @@ Two families, loaded together, selected per script:
 - **Labels and step numbers:** JetBrains Mono, upper-case for Latin only.
 - **Bangla:** Noto Sans Bengali (fallback: Hind Siliguri). Bangla conjuncts and matras need vertical room, so Bangla text gets **line-height 1.6–1.7**, compared with 1.4–1.5 for Latin. Never apply negative letter-spacing to Bangla. Never force uppercase on Bangla (it has no case). Pick Western Arabic numerals app-wide unless a string is explicitly localised otherwise, and be consistent.
 
+Compact, with clear steps between levels (the owner found equal sizes for names and post text flat). Bangla line heights are set per style (`bnLine`).
+
 ```
-display   28/34  bold      screen titles
-title     20/26  semibold  section heads, sheet titles
-body      15/22  regular   post text, captions, learn item text, paper sections
-bodyBold  15/22  semibold  usernames, labels
-caption   13/18  regular   timestamps, counts, metadata
-micro     11/14  medium    badges, chips, tab labels
-mono      14/20  regular   code (JetBrains Mono / Fira Code)
+display     26/32  bold      screen titles, area headers
+paperTitle  23/29  serif     the paper screen's title
+title       18/24  bold      section heads, sheet titles, short text posts on colour
+lead        17/24  semibold  the paper's question, big Explore tiles
+paperRow    16/21  serif     paper titles in lists
+reading     15/23  regular   long post text, paper sections, lessons
+body        14/20  regular   comments, descriptions
+bodyStrong  14/19  bold      usernames, row titles
+label       13/18  medium    buttons, chips, links
+caption     12/16  regular   time, topic line, counts, authors
+micro       11/14  semibold  badges, tile labels
+meta      10.5/13  mono      upper-case labels (Latin only)
 ```
+
+A feed post is three levels: the username (14 **bold**: account names are always bold, post text never is), then a line with the topic and the time (12, the topic's glyph in its area colour), then the post itself in regular weight and black (15 reading text, or 17 on the area's soft colour for short posts).
 
 Mixed-script lines are common (`Transformer-এর attention mechanism`). Test every text component with a Bangla + English + code-span string: nothing may clip, and nothing may reflow jarringly between languages.
 
 #### Shape, spacing, elevation
 
 - **Spacing scale:** 4dp base: `4, 8, 12, 16, 20, 24, 32, 40, 48`. Screen horizontal padding is 16dp. Nothing uses an off-scale value.
-- **Radii:** `sm 8` inputs and chips · `md 12` cards, thumbnails, images · `lg 20` bottom sheets (top corners only) · `full` pills, avatars, Follow buttons.
+- **Radii:** `xs 4` badges · `sm 8` inputs, chips, buttons · `md 12` thumbnails · `lg 14` cards and colour blocks · `sheet 18` bottom sheets (top corners only) · `full` avatars and the area circles only.
 - **Elevation:** show depth with surface colour and a 1dp subtle border, not drop shadows (dark-mode shadows are invisible anyway). Bottom sheets get a 60% black scrim.
 - **Icons:** one outline/filled set at 24dp (tab bar 26dp, inline actions 20dp), stroke 1.75–2dp. Pick one library and never mix: outline for inactive, filled for active or engaged states.
-- **Avatars:** 32 (comment) · 40 (feed header, list rows) · 48 (notification) · 88 (profile header). Always circular, always with an initials fallback on a brand-tinted background.
+- **Avatars:** 32 (comment) · 36 (feed header) · 40 (list rows) · 48 (notification) · 88 (profile header). Always circular, always with an initials fallback on the person's colour.
 - **Touch targets:** at least 44×44dp, even when the visible glyph is 20dp.
 
 ### 2.4 Screen patterns

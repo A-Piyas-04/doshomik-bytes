@@ -22,7 +22,7 @@ import { Tap } from '@/ui/Tap';
 import { hasBengali } from '@/lib/script';
 import { ALL, FieldChips } from '../fields';
 import { PaperRow as PaperRowLazy } from './PaperRow';
-import { SurfaceDivider } from './TrailsScreen';
+import { CardGap } from './ResearchHome';
 
 /** Paper search: title, authors and the card questions, in English and Bangla. Recent searches stay on the device. */
 export function PaperSearchScreen() {
@@ -90,7 +90,7 @@ export function PaperSearchScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
-          ItemSeparatorComponent={SurfaceDivider}
+          ItemSeparatorComponent={CardGap}
           ListEmptyComponent={
             results.isPending ? <RowsSkeleton rows={3} /> : <EmptyState icon={MagnifyingGlass} message={t('research.noResults', { q: query })} />
           }

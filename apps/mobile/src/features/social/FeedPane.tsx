@@ -15,6 +15,7 @@ import type { ScrollableHandle } from '../research/ResearchHome';
 import { postMenu } from './menus';
 import { PostCard } from './PostCard';
 import { SuggestedPeople } from './SuggestedPeople';
+import { AreaRail } from '../home/AreaRail';
 
 /** Home › Feed: posts from people you follow, newest first (no algorithmic feed in v1). */
 export const FeedPane = forwardRef<ScrollableHandle, { onOpenResearch: () => void }>(function FeedPane({ onOpenResearch }, ref) {
@@ -58,7 +59,12 @@ export const FeedPane = forwardRef<ScrollableHandle, { onOpenResearch: () => voi
       keyExtractor={(item) => item.id}
       getItemType={(item) => item.type}
       ItemSeparatorComponent={Gap}
-      ListHeaderComponent={feed.items.length < 5 && !feed.isPending ? <SuggestedPeople /> : null}
+      ListHeaderComponent={
+        <View>
+          <AreaRail />
+          {feed.items.length < 5 && !feed.isPending ? <SuggestedPeople /> : null}
+        </View>
+      }
       ListEmptyComponent={empty}
       onEndReached={feed.loadMore}
       onEndReachedThreshold={1.5}

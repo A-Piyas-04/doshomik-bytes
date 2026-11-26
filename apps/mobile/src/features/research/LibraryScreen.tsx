@@ -17,6 +17,7 @@ import { RowsSkeleton } from '@/ui/Skeleton';
 import { EmptyState } from '@/ui/States';
 import { PaperRow } from './PaperRow';
 import { STEP_LABEL } from './ReadingDots';
+import { CardGap } from './ResearchHome';
 import { SurfaceDivider, TrailRow } from './TrailsScreen';
 
 type Tab = 'saved' | 'read' | 'trails';
@@ -77,7 +78,7 @@ export function LibraryScreen() {
           renderItem={renderPaper}
           keyExtractor={(item) => item.id}
           ListHeaderComponent={header}
-          ItemSeparatorComponent={SurfaceDivider}
+          ItemSeparatorComponent={CardGap}
           ListEmptyComponent={
             list.isPending ? (
               <RowsSkeleton rows={3} />
@@ -126,5 +127,5 @@ const styles = StyleSheet.create({
   statRule: { width: StyleSheet.hairlineWidth },
   statRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
   statNumber: { minWidth: 28, fontVariant: ['tabular-nums'] },
-  tabs: { marginTop: space.md },
+  tabs: { marginTop: space.md, marginBottom: space.md },
 });

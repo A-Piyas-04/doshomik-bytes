@@ -21,10 +21,12 @@ interface ScreenHeaderProps {
   noInset?: boolean;
   /** Match a screen that reads on the white surface (paper, lesson). */
   surface?: boolean;
+  /** A coloured header (the paper's area): background and the colour of everything on it. */
+  tint?: { bg: string; fg: string };
 }
 
 /** The header of every pushed screen: back, a left-aligned title, up to two actions. */
-export function ScreenHeader({ title, leading = 'back', onLeading, right, divider = true, noInset, surface }: ScreenHeaderProps) {
+export function ScreenHeader({ title, leading = 'back', onLeading, right, divider = true, noInset, surface, tint }: ScreenHeaderProps) {
   const colors = useColors();
   const t = useT();
   const router = useRouter();
@@ -35,16 +37,16 @@ export function ScreenHeader({ title, leading = 'back', onLeading, right, divide
     <View
       style={[
         styles.bar,
-        { paddingTop: noInset ? 0 : insets.top, backgroundColor: surface ? colors.surface : colors.bg, borderBottomColor: divider ? colors.border : 'transparent' },
+        { paddingTop: noInset ? 0 : insets.top, backgroundColor: tint?.bg ?? (surface ? colors.surface : colors.bg), borderBottomColor: divider && !tint ? colors.border : 'transparent' },
       ]}
     >
       <View style={styles.row}>
         {leading === 'none' ? (
           <View style={styles.spacer} />
         ) : (
-          <IconButton icon={leading === 'back' ? CaretLeft : X} label={t(leading === 'back' ? 'a11y.back' : 'common.close')} onPress={goBack} />
+          <IconButton icon={leading === 'back' ? CaretLeft : X} color={tint?.fg} label={t(leading === 'back' ? 'a11y.back' : 'common.close')} onPress={goBack} />
         )}
-        <AppText variant="bodyStrong" numberOfLines={1} style={styles.title} accessibilityRole="header">
+        <AppText variant="bodyStrong" numberOfLines={1} style={[styles.title, tint ? { color: tint.fg } : null]} accessibilityRole="header">
           {title ?? ''}
         </AppText>
         <View style={styles.right}>{right}</View>

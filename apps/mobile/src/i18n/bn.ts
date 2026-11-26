@@ -350,6 +350,9 @@ export const bn: Record<MessageKey, string> = {
   'learn.empty': 'এই বিভাগে এখনো কিছু নেই।',
   'learn.start': 'শুরু করুন',
   'learn.resume': 'আবার শুরু',
+  'learn.ourCourses': 'দশমিক কোর্স',
+  'learn.freeCourses': 'ওয়েবের ফ্রি কোর্স',
+  'learn.practiceHint': 'কুইজ, অনুশীলনী ও সমাধানসহ উত্তর',
   'learn.watchOn': '{site}-এ দেখুন',
   'learn.openLink': '{site}-এ খুলুন',
   'learn.markDone': 'সম্পন্ন হিসেবে চিহ্নিত করুন',
@@ -411,6 +414,10 @@ export const bn: Record<MessageKey, string> = {
   'explore.people': 'মানুষ',
   'explore.posts': 'পোস্ট',
   'explore.papers': 'পেপার',
+  'explore.trendingPapers': 'গবেষণায় ট্রেন্ডিং',
+  'explore.learnSomething': 'নতুন কিছু শিখুন',
+  'explore.roadmap': 'রোডম্যাপ',
+  'explore.fromPeople': 'কমিউনিটি থেকে',
 
   // ----- Reels -----
   'reels.empty': 'এখনো কোনো রিল নেই। প্রথমটি আপনিই পোস্ট করুন।',

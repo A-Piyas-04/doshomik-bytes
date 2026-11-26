@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { createElement, useMemo, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useFields, useInterests, useSetInterests } from '@/api/research';
 import type { Ref } from '@/api/types';
@@ -10,7 +10,8 @@ import { AppText } from '@/ui/AppText';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { Button } from '@/ui/Button';
 import { ChipRow, type ChipOption } from '@/ui/Chips';
-import { Check } from '@/ui/icons';
+import { Brain, ChartLineUp, ChatsCircle, Check, Compass, Eye, Lightning, Sparkle, type IconComponent, type IconProps } from '@/ui/icons';
+import { useAreaPalette } from '@/theme/area';
 import { Tap } from '@/ui/Tap';
 
 /**
@@ -33,6 +34,33 @@ export function fieldName(field: Ref, lang: Lang): string {
 export const ALL = 'all';
 export const FOR_YOU = 'for-you';
 
+/** Each launch area's glyph; later areas get a compass. */
+const AREA_ICON: Record<string, IconComponent> = {
+  'ml-fundamentals': ChartLineUp,
+  'deep-learning': Brain,
+  'computer-vision': Eye,
+  transformers: Lightning,
+  llms: ChatsCircle,
+};
+export const areaIcon = (slug: string | null | undefined): IconComponent => (slug ? (AREA_ICON[slug] ?? Compass) : Compass);
+
+/** An area's glyph as an element (the glyph component itself is looked up, never created). */
+export function AreaGlyph({ slug, ...props }: IconProps & { slug: string | null | undefined }) {
+  return createElement(areaIcon(slug), props);
+}
+
+/** The short name used under area circles ("ML", "LLMs"). */
+const SHORT: Record<string, { en: string; bn: string }> = {
+  'ml-fundamentals': { en: 'ML basics', bn: 'ML ভিত্তি' },
+  'deep-learning': { en: 'Deep learning', bn: 'ডিপ লার্নিং' },
+  'computer-vision': { en: 'Vision', bn: 'ভিশন' },
+  transformers: { en: 'Transformers', bn: 'ট্রান্সফর্মার' },
+  llms: { en: 'LLMs', bn: 'LLM' },
+};
+export function shortFieldName(field: Ref, lang: Lang): string {
+  return SHORT[field.slug]?.[lang] ?? fieldName(field, lang);
+}
+
 /** The area chips: All, the areas in order, and "For you" first when the user picked interests. */
 export function FieldChips({
   value,
@@ -48,13 +76,18 @@ export function FieldChips({
   const t = useT();
   const lang = useLang();
   const fields = useFields();
+  const palette = useAreaPalette();
+  const colors = useColors();
   const options = useMemo(() => {
     const list: ChipOption<string>[] = [];
-    if (forYou) list.push({ value: FOR_YOU, label: t('common.forYou') });
+    if (forYou) list.push({ value: FOR_YOU, label: t('common.forYou'), icon: Sparkle, color: { solid: colors.accent, on: colors.onAccent } });
     list.push({ value: ALL, label: t('common.all') });
-    for (const field of fields.data ?? []) list.push({ value: field.slug, label: fieldName(field, lang) });
+    for (const field of fields.data ?? []) {
+      const c = palette(field.slug);
+      list.push({ value: field.slug, label: fieldName(field, lang), icon: areaIcon(field.slug), color: { solid: c.solid, on: c.on } });
+    }
     return list;
-  }, [fields.data, forYou, lang, t]);
+  }, [fields.data, forYou, lang, t, palette, colors.accent, colors.onAccent]);
   return <ChipRow options={options} value={value} onChange={onChange} style={style} />;
 }
 

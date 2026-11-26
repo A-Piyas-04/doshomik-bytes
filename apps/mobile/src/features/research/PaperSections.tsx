@@ -9,7 +9,6 @@ import { go } from '@/shell/nav';
 import { useColors } from '@/theme/theme';
 import { layout, radius, space } from '@/theme/tokens';
 import { AppText } from '@/ui/AppText';
-import { Divider } from '@/ui/Bits';
 import { Button } from '@/ui/Button';
 import { CaretDown, ChatCircle, Sparkle } from '@/ui/icons';
 import { CommentRow } from '../social/CommentRow';
@@ -198,12 +197,11 @@ export function ConnectionsTab({ paperId }: { paperId: string }) {
         <AppText variant="meta" tone="textTertiary" style={styles.groupLabel} accessibilityRole="header">
           {t(label)}
         </AppText>
-        {papers.map((paper, index) => (
-          <View key={paper.id}>
-            {index > 0 ? <Divider /> : null}
-            <PaperRow paper={paper} compact onOpen={go.paper} onToggleSave={onSave} note={note ? note(paper as LineagePaper) : null} />
-          </View>
-        ))}
+        <View style={styles.cards}>
+          {papers.map((paper) => (
+            <PaperRow key={paper.id} paper={paper} compact onOpen={go.paper} onToggleSave={onSave} note={note ? note(paper as LineagePaper) : null} />
+          ))}
+        </View>
       </View>
     ) : null;
 
@@ -262,7 +260,8 @@ const styles = StyleSheet.create({
   flip: { transform: [{ rotate: '180deg' }] },
   abstractToggle: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: layout.screenPadding, paddingTop: space.xxl, paddingBottom: space.sm, minHeight: 44 },
   aiNote: { flexDirection: 'row', gap: space.sm, alignItems: 'center', paddingHorizontal: layout.screenPadding, paddingTop: space.xxl },
-  groupLabel: { paddingHorizontal: layout.screenPadding, paddingTop: space.xxl },
+  groupLabel: { paddingHorizontal: layout.screenPadding, paddingTop: space.xxl, paddingBottom: space.sm },
+  cards: { gap: space.sm },
   more: { alignSelf: 'flex-start', marginLeft: layout.screenPadding - space.sm },
   discussHead: { paddingHorizontal: layout.screenPadding, paddingTop: space.lg, paddingBottom: space.sm },
 });

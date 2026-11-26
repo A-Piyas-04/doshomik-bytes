@@ -6,7 +6,7 @@ import { useComments } from '@/api/social';
 import { compactNumber, useLang, useT } from '@/i18n';
 import type { Lang } from '@/lib/prefs';
 import { copyLink, openExternal, shareLink } from '@/lib/share';
-import { useColors } from '@/theme/theme';
+import { useColors, useTheme } from '@/theme/theme';
 import { layout, radius, space } from '@/theme/tokens';
 import { showActions } from '@/ui/ActionSheet';
 import { AppText } from '@/ui/AppText';
@@ -20,7 +20,9 @@ import { Bone, Pulse } from '@/ui/Skeleton';
 import { EmptyState, ErrorState } from '@/ui/States';
 import { Tap } from '@/ui/Tap';
 import { go } from '@/shell/nav';
-import { fieldName } from '../fields';
+import { AreaGlyph, fieldName } from '../fields';
+import { useArea, useWash } from '@/theme/area';
+import { StatusBar } from 'expo-status-bar';
 import { AddToTrailSheet } from './AddToTrailSheet';
 import { DotMeter } from './DotMeter';
 import { pickCard } from './paper-text';
@@ -42,6 +44,10 @@ export function PaperScreen({ id }: { id: string }) {
   const colors = useColors();
   const paper = usePaper(id);
   const learnFirst = useLearnFirst(id);
+  const area = useArea(paper.data?.field.slug);
+  const wash = useWash();
+  const { scheme } = useTheme();
+  const heroBg = wash(area.solid);
   const discussion = useComments({ kind: 'papers', id });
   const toggleSave = useToggleSave();
   const markRead = useMarkRead(id);
@@ -112,8 +118,9 @@ export function PaperScreen({ id }: { id: string }) {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.surface }]}>
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <ScreenHeader
-        surface
+        tint={{ bg: heroBg, fg: colors.text }}
         title={titleInHeader ? data.title : ''}
         right={
           <>
@@ -125,15 +132,22 @@ export function PaperScreen({ id }: { id: string }) {
               selected={data.saved_by_me}
               onPress={() => toggleSave.mutate({ id, save: !data.saved_by_me })}
             />
-            <IconButton icon={DotsThree} weight="bold" label={t('paper.options')} onPress={openMenu} />
+            <IconButton icon={DotsThree} weight="bold" color={colors.text} label={t('paper.options')} onPress={openMenu} />
           </>
         }
       />
       <ScrollView stickyHeaderIndices={[1]} onScroll={onScroll} scrollEventThrottle={64} contentContainerStyle={{ paddingBottom: space.x4 }}>
-        <View style={styles.hero}>
+        <View>
+        <View style={[styles.hero, { backgroundColor: heroBg }]}>
           <View style={styles.metaLine}>
-            <AppText variant="meta" tone="textTertiary">
-              {[fieldName(data.field, lang), data.venue ?? data.year].filter(Boolean).join(' · ')}
+            <View style={[styles.areaPill, { borderColor: area.ink, backgroundColor: colors.surface }]}>
+              <AreaGlyph slug={data.field.slug} size={13} weight="fill" color={area.ink} />
+              <AppText variant="micro" tone="text">
+                {fieldName(data.field, lang)}
+              </AppText>
+            </View>
+            <AppText variant="meta" tone="textSecondary">
+              {String(data.venue ?? data.year ?? '')}
             </AppText>
             {data.is_new ? <Tag label={t('common.new')} tone="highlight" /> : data.is_trending ? <Tag label={t('common.trending')} tone="highlight" /> : null}
           </View>
@@ -142,7 +156,7 @@ export function PaperScreen({ id }: { id: string }) {
           </AppText>
           {data.authors ? (
             <Tap feedback="none" onPress={() => setShowAllAuthors((v) => !v)} accessibilityState={{ expanded: showAllAuthors }}>
-              <AppText variant="caption" tone="textSecondary" numberOfLines={showAllAuthors ? undefined : 2}>
+              <AppText variant="caption" numberOfLines={showAllAuthors ? undefined : 2} tone="textSecondary">
                 {data.authors}
               </AppText>
             </Tap>
@@ -160,13 +174,15 @@ export function PaperScreen({ id }: { id: string }) {
                     {'·  '}
                   </AppText>
                 ) : null}
-                <AppText variant="label" tone="accent">
+                <AppText variant="label" weight="semibold" tone="text">
                   {link.label}
                 </AppText>
-                <ArrowUpRight size={12} color={colors.accent} weight="bold" />
+                <ArrowUpRight size={12} color={colors.text} weight="bold" />
               </Tap>
             ))}
           </View>
+        </View>
+        <View style={styles.below}>
 
           {/* The question: what the paper sets out to answer. */}
           {card?.question ? (
@@ -236,6 +252,7 @@ export function PaperScreen({ id }: { id: string }) {
             </Tap>
           ) : null}
         </View>
+        </View>
 
         <View style={{ backgroundColor: colors.surface }}>
           <SegmentedTabs options={tabs} value={tab} onChange={setTab} />
@@ -296,11 +313,13 @@ function PaperSkeleton() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
-  hero: { paddingHorizontal: layout.screenPadding, paddingTop: space.lg, paddingBottom: space.xl, gap: space.sm },
+  hero: { paddingHorizontal: layout.screenPadding, paddingTop: space.md, paddingBottom: space.lg, gap: space.sm },
+  below: { paddingHorizontal: layout.screenPadding, paddingBottom: space.lg },
+  areaPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: radius.xs, paddingHorizontal: 6, height: 22 },
   metaLine: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
   links: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   link: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 36, paddingRight: space.sm },
-  question: { gap: space.sm, paddingTop: space.lg },
+  question: { gap: space.sm, paddingTop: space.xl },
   questionHead: { flexDirection: 'row', alignItems: 'center', minHeight: 28 },
   langSwitch: { flexDirection: 'row', borderWidth: 1, borderRadius: radius.sm, padding: 2 },
   langOption: { paddingHorizontal: space.md, height: 28, justifyContent: 'center', borderRadius: radius.xs },

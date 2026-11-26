@@ -27,6 +27,11 @@ export interface Ref {
   name: string;
 }
 
+/** A topic as other objects carry it: with the slug of its learn area, for colour. */
+export interface TopicRef extends Ref {
+  field?: string | null;
+}
+
 export interface UserSummary {
   id: string;
   username: string;
@@ -76,7 +81,7 @@ export interface Post {
   id: string;
   type: PostType;
   caption: string | null;
-  topic: Ref | null;
+  topic: TopicRef | null;
   status: PostStatus;
   media: MediaView | null;
   like_count: number;
@@ -290,7 +295,7 @@ export interface Topic {
 
 export interface LearnItem {
   id: string;
-  topic: Ref | null;
+  topic: TopicRef | null;
   title: string;
   kind: LearnItemKind;
   body: string | null;

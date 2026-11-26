@@ -57,14 +57,14 @@ const brand = {
 
 export const palettes: Record<SchemeName, Palette> = {
   light: {
-    bg: '#F3F4F1',
+    bg: '#F1F2EE',
     surface: '#FFFFFF',
-    elevated: '#ECEEEA',
-    border: '#E2E4DF',
-    divider: '#ECEEEA',
+    elevated: '#EAECE7',
+    border: '#DCDFD8',
+    divider: '#E4E7E1',
     text: '#15181E',
-    textSecondary: '#50555C',
-    textTertiary: '#7B8086',
+    textSecondary: '#4B5057',
+    textTertiary: '#787D83',
     accent: brand.teal,
     onAccent: '#FFFFFF',
     accentWash: '#DDF1E9',
@@ -109,6 +109,66 @@ export const palettes: Record<SchemeName, Palette> = {
     scrim: 'rgba(8, 9, 12, 0.62)',
   },
 };
+
+/**
+ * One vivid colour per learn area: the area's identity everywhere it appears (chips, badges, the
+ * paper hero, course covers, coloured text posts, Explore tiles). `solid` is the fill, `on` the
+ * text on it, `tint` a light wash, `ink` text on the wash. Areas added later cycle through
+ * `extraAreas` by slug.
+ */
+export interface AreaColor {
+  solid: string;
+  on: string;
+  tint: string;
+  ink: string;
+}
+
+const AREAS_LIGHT: Record<string, AreaColor> = {
+  'ml-fundamentals': { solid: '#0E9F7A', on: '#FFFFFF', tint: '#DDF4EC', ink: '#0B6E55' },
+  'deep-learning': { solid: '#6A4CF5', on: '#FFFFFF', tint: '#ECE8FF', ink: '#4A2FC9' },
+  'computer-vision': { solid: '#F0564A', on: '#FFFFFF', tint: '#FFE6E2', ink: '#B9342A' },
+  transformers: { solid: '#F5A70F', on: '#1F1600', tint: '#FFF0CF', ink: '#8A5600' },
+  llms: { solid: '#2A78F0', on: '#FFFFFF', tint: '#E2EDFF', ink: '#1956BB' },
+};
+const AREAS_DARK: Record<string, AreaColor> = {
+  'ml-fundamentals': { solid: '#18B88E', on: '#06231B', tint: 'rgba(24,184,142,0.16)', ink: '#5FD6B2' },
+  'deep-learning': { solid: '#7D63FF', on: '#FFFFFF', tint: 'rgba(125,99,255,0.18)', ink: '#B3A3FF' },
+  'computer-vision': { solid: '#FF6A5E', on: '#2A0805', tint: 'rgba(255,106,94,0.16)', ink: '#FF9E95' },
+  transformers: { solid: '#F7B32B', on: '#1F1600', tint: 'rgba(247,179,43,0.16)', ink: '#FFD27A' },
+  llms: { solid: '#4A8CFF', on: '#FFFFFF', tint: 'rgba(74,140,255,0.18)', ink: '#9CC0FF' },
+};
+const EXTRA_LIGHT: AreaColor[] = [
+  { solid: '#D9448E', on: '#FFFFFF', tint: '#FDE4F0', ink: '#A12A65' },
+  { solid: '#0F8FB5', on: '#FFFFFF', tint: '#DDF2F9', ink: '#0A6683' },
+];
+const EXTRA_DARK: AreaColor[] = [
+  { solid: '#EF5FA6', on: '#2A0517', tint: 'rgba(239,95,166,0.16)', ink: '#F7A3CC' },
+  { solid: '#27A9CF', on: '#03202A', tint: 'rgba(39,169,207,0.16)', ink: '#86D3EA' },
+];
+/** Content with no area (a post without a topic): light grey with ink text, so it stays quiet. */
+const NEUTRAL_LIGHT: AreaColor = { solid: '#E3E6E0', on: '#15181E', tint: '#ECEEEA', ink: '#3A4048' };
+const NEUTRAL_DARK: AreaColor = { solid: '#3A3F48', on: '#F4F1E8', tint: '#282C34', ink: '#C9CBC6' };
+
+function hash(text: string): number {
+  let h = 0;
+  for (const char of text) h = (h * 31 + char.charCodeAt(0)) >>> 0;
+  return h;
+}
+
+/** The colour of a learn area (by field slug); neutral when there is no area. */
+export function areaColor(slug: string | null | undefined, scheme: SchemeName): AreaColor {
+  if (!slug) return scheme === 'dark' ? NEUTRAL_DARK : NEUTRAL_LIGHT;
+  const known = (scheme === 'dark' ? AREAS_DARK : AREAS_LIGHT)[slug];
+  if (known) return known;
+  const extra = scheme === 'dark' ? EXTRA_DARK : EXTRA_LIGHT;
+  return extra[hash(slug) % extra.length]!;
+}
+
+/** A stable colour for a person (avatar fallbacks), drawn from the area palette. */
+export function personColor(name: string, scheme: SchemeName): AreaColor {
+  const all = Object.values(scheme === 'dark' ? AREAS_DARK : AREAS_LIGHT);
+  return all[hash(name) % all.length]!;
+}
 
 /** The colours of the logo itself, for the loading screen and splash. */
 export const brandColors = brand;

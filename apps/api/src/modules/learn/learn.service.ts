@@ -6,10 +6,14 @@ import { badRequest, found } from '../../lib/errors';
 import { fetchPage, mapPage, type PageQuery } from '../../lib/pagination';
 import { MEDIA_COLUMNS, mediaView, type MediaColumns } from '../media/media.service';
 
-/** `{ slug, name }` of the topic aliased `t`, or null when the item has no topic. */
+/**
+ * `{ slug, name, field }` of the topic aliased `t`, or null when the item has no topic. `field` is
+ * the slug of the topic's learn area (or null), so clients can colour posts and lessons by area.
+ */
 export const topicRef = (t: string) =>
-  sql<{ slug: string; name: string } | null>`CASE WHEN ${sql.ref(`${t}.id`)} IS NULL THEN NULL
-    ELSE json_build_object('slug', ${sql.ref(`${t}.slug`)}, 'name', ${sql.ref(`${t}.name`)}) END`;
+  sql<{ slug: string; name: string; field: string | null } | null>`CASE WHEN ${sql.ref(`${t}.id`)} IS NULL THEN NULL
+    ELSE json_build_object('slug', ${sql.ref(`${t}.slug`)}, 'name', ${sql.ref(`${t}.name`)},
+      'field', (SELECT f.slug FROM fields f WHERE f.id = ${sql.ref(`${t}.field_id`)})) END`;
 
 /** `{ slug, name }` of the field (learn area) aliased `f`, or null when there is none. */
 export const fieldRef = (f: string) =>
@@ -45,7 +49,7 @@ function selectLearnItems() {
 
 type LearnItemRow = MediaColumns & {
   id: string;
-  topic: { slug: string; name: string } | null;
+  topic: { slug: string; name: string; field: string | null } | null;
   title: string;
   kind: string;
   body: string | null;

@@ -5,13 +5,14 @@ import { useFields, useInterests, usePapers, useReadingStats, useToggleSave, use
 import type { PaperCard } from '@/api/types';
 import { useLang, useT } from '@/i18n';
 import { go } from '@/shell/nav';
+import { useWash } from '@/theme/area';
 import { useColors } from '@/theme/theme';
 import { layout, radius, space } from '@/theme/tokens';
 import { showActions } from '@/ui/ActionSheet';
 import { AppText } from '@/ui/AppText';
-import { Divider, ListFooter, NavRow, SectionLabel } from '@/ui/Bits';
+import { ListFooter, NavRow, SectionLabel } from '@/ui/Bits';
 import { IconButton } from '@/ui/IconButton';
-import { ArrowsDownUp, Books, CaretRight, FileText, MagnifyingGlass, MapTrifold, Path } from '@/ui/icons';
+import { ArrowRight, ArrowsDownUp, Books, CaretRight, FileText, MagnifyingGlass, MapTrifold, Path, type IconComponent } from '@/ui/icons';
 import { Bone, Pulse, RowsSkeleton } from '@/ui/Skeleton';
 import { EmptyState, ErrorState } from '@/ui/States';
 import { Tap } from '@/ui/Tap';
@@ -67,10 +68,9 @@ export const ResearchHome = forwardRef<ScrollableHandle, { active: boolean }>(fu
     <View>
       <Desk />
       <SectionLabel label={t('research.paths')} />
-      <View style={[styles.surface, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <NavRow icon={MapTrifold} title={t('research.roadmaps')} subtitle={t('research.roadmapsHint')} onPress={() => go.roadmaps()} />
-        <Divider inset={layout.screenPadding + 52} />
-        <NavRow icon={Path} title={t('research.trails')} subtitle={t('research.trailsHint')} onPress={go.trails} />
+      <View style={styles.paths}>
+        <PathTile icon={MapTrifold} title={t('research.roadmaps')} hint={t('research.roadmapsHint')} color={colors.accent} ink={colors.accent} onPress={() => go.roadmaps()} />
+        <PathTile icon={Path} title={t('research.trails')} hint={t('research.trailsHint')} color={colors.highlight} ink={colors.highlightText} onPress={go.trails} />
       </View>
 
       <View style={styles.papersHeader}>
@@ -86,7 +86,6 @@ export const ResearchHome = forwardRef<ScrollableHandle, { active: boolean }>(fu
         <IconButton icon={MagnifyingGlass} size={22} label={t('research.searchPapers')} onPress={go.paperSearch} />
       </View>
       <FieldChips value={chip} onChange={setChip} forYou={hasInterests} style={styles.chips} />
-      <View style={[styles.listTop, { backgroundColor: colors.border }]} />
     </View>
   );
 
@@ -103,7 +102,7 @@ export const ResearchHome = forwardRef<ScrollableHandle, { active: boolean }>(fu
       keyExtractor={(item) => item.id}
       ListHeaderComponent={header}
       ListEmptyComponent={empty}
-      ItemSeparatorComponent={RowDivider}
+      ItemSeparatorComponent={CardGap}
       onEndReached={papers.loadMore}
       onEndReachedThreshold={1}
       ListFooterComponent={<ListFooter loading={papers.isFetchingNextPage} done={!papers.hasNextPage && papers.items.length > 6} doneLabel={t('common.endOfList')} />}
@@ -113,12 +112,27 @@ export const ResearchHome = forwardRef<ScrollableHandle, { active: boolean }>(fu
   );
 });
 
-function RowDivider() {
+export function CardGap() {
+  return <View style={styles.cardGap} />;
+}
+
+/** A reading path: a tile washed in its colour, with its glyph, name and one line on what it is. */
+function PathTile({ icon: Icon, title, hint, color, ink, onPress }: { icon: IconComponent; title: string; hint: string; color: string; ink: string; onPress: () => void }) {
   const colors = useColors();
+  const wash = useWash();
   return (
-    <View style={{ backgroundColor: colors.surface }}>
-      <Divider />
-    </View>
+    <Tap onPress={onPress} style={[styles.pathTile, { backgroundColor: wash(color) }]} accessibilityLabel={title} accessibilityHint={hint}>
+      <View style={[styles.pathIcon, { borderColor: ink, backgroundColor: colors.surface }]}>
+        <Icon size={20} weight="bold" color={ink} />
+      </View>
+      <View style={styles.pathText}>
+        <AppText variant="title">{title}</AppText>
+        <AppText variant="caption" tone="textSecondary" numberOfLines={2}>
+          {hint}
+        </AppText>
+      </View>
+      <ArrowRight size={18} weight="bold" color={colors.text} style={styles.pathArrow} />
+    </Tap>
   );
 }
 
@@ -128,6 +142,7 @@ function Desk() {
   const lang = useLang();
   const colors = useColors();
   const upNext = useUpNext();
+  const wash = useWash();
   const stats = useReadingStats();
   const interests = useInterests();
   const fields = useFields();
@@ -143,21 +158,21 @@ function Desk() {
     );
   } else if (upNext.data) {
     const paper = upNext.data;
-    // The one ink block on the page: where to pick up again.
+    // Where to pick up again: the one washed block at the top of the page.
     row = (
-      <Tap onPress={() => go.paper(paper.id)} style={[styles.banner, { backgroundColor: colors.banner }]} accessibilityHint={t('research.upNext')}>
+      <Tap onPress={() => go.paper(paper.id)} style={[styles.banner, { backgroundColor: wash(colors.accent) }]} accessibilityHint={t('research.upNext')}>
         <View style={styles.flex}>
-          <AppText variant="meta" style={{ color: colors.highlight }}>
+          <AppText variant="meta" tone="accent">
             {t('research.upNext')}
           </AppText>
-          <AppText variant="paperRow" tone="onBanner" numberOfLines={2}>
+          <AppText variant="paperRow" numberOfLines={2}>
             {paper.title}
           </AppText>
-          <AppText variant="caption" tone="onBanner" numberOfLines={1} style={styles.dim}>
+          <AppText variant="caption" tone="textSecondary" numberOfLines={1}>
             {paperMeta(paper, lang)}
           </AppText>
         </View>
-        <CaretRight size={16} color={colors.onBanner} />
+        <CaretRight size={16} color={colors.text} />
       </Tap>
     );
   } else if ((stats.data?.total.explored ?? 0) > 0) {
@@ -198,11 +213,15 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   deskLabel: { paddingTop: space.lg },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginHorizontal: layout.screenPadding, padding: space.lg, borderRadius: radius.md },
-  dim: { opacity: 0.7 },
   surface: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
-  listTop: { height: StyleSheet.hairlineWidth },
+  cardGap: { height: space.md },
+  paths: { flexDirection: 'row', gap: space.md, paddingHorizontal: space.md },
+  pathTile: { flex: 1, minHeight: 132, borderRadius: radius.lg, padding: space.lg, justifyContent: 'space-between', gap: space.md },
+  pathIcon: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  pathText: { gap: 2 },
+  pathArrow: { position: 'absolute', top: space.lg, right: space.lg },
   deskSkeleton: { paddingHorizontal: layout.screenPadding, paddingVertical: space.md, gap: space.sm },
   papersHeader: { flexDirection: 'row', alignItems: 'center', paddingLeft: layout.screenPadding, paddingRight: space.xs, paddingTop: space.xxl },
   sort: { flexDirection: 'row', alignItems: 'center', gap: space.xs, height: 44, paddingHorizontal: space.sm },
-  chips: { flexGrow: 0, paddingBottom: space.sm },
+  chips: { flexGrow: 0, paddingBottom: space.md },
 });

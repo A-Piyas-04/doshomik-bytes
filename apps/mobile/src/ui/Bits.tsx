@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } f
 import { useColors } from '@/theme/theme';
 import { layout, space } from '@/theme/tokens';
 import { AppText } from './AppText';
-import { CaretRight, type IconComponent } from './icons';
+import { ArrowRight, CaretRight, type IconComponent } from './icons';
 import { Tap } from './Tap';
 
 /** A hairline between list rows, inset to the text column. */
@@ -27,6 +27,30 @@ export function SectionLabel({ label, action, onAction, style }: { label: string
         </Tap>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * A bold section head for discovery surfaces (Learn, Explore): a coloured glyph, the title, and an
+ * arrow when the whole head opens the full list.
+ */
+export function SectionTitle({ icon: Icon, color, title, onPress }: { icon: IconComponent; color: string; title: string; onPress?: () => void }) {
+  const colors = useColors();
+  const body = (
+    <>
+      <Icon size={18} weight="fill" color={color} />
+      <AppText variant="title" accessibilityRole="header" style={styles.flex}>
+        {title}
+      </AppText>
+      {onPress ? <ArrowRight size={16} weight="bold" color={colors.textTertiary} /> : null}
+    </>
+  );
+  return onPress ? (
+    <Tap feedback="none" onPress={onPress} style={styles.sectionTitle}>
+      {body}
+    </Tap>
+  ) : (
+    <View style={styles.sectionTitle}>{body}</View>
   );
 }
 
@@ -93,10 +117,21 @@ export function ListFooter({ loading, done, doneLabel }: { loading: boolean; don
  * A small badge on a wash: mint for reading state ("✓ Explored"), amber for New/Trending, neutral
  * for Draft or a language. `icon` goes before the label.
  */
-export function Tag({ label, tone = 'neutral', icon: Icon }: { label: string; tone?: 'neutral' | 'accent' | 'highlight' | 'danger'; icon?: IconComponent }) {
+export function Tag({
+  label,
+  tone = 'neutral',
+  icon: Icon,
+  color,
+}: {
+  label: string;
+  tone?: 'neutral' | 'accent' | 'highlight' | 'danger';
+  icon?: IconComponent;
+  /** An area's colours: its wash and ink. */
+  color?: { tint: string; ink: string };
+}) {
   const colors = useColors();
-  const bg = tone === 'accent' ? colors.accentWash : tone === 'highlight' ? colors.highlightWash : colors.elevated;
-  const fg = tone === 'accent' ? colors.accent : tone === 'highlight' ? colors.highlightText : tone === 'danger' ? colors.danger : colors.textSecondary;
+  const bg = color?.tint ?? (tone === 'accent' ? colors.accentWash : tone === 'highlight' ? colors.highlightWash : colors.elevated);
+  const fg = color?.ink ?? (tone === 'accent' ? colors.accent : tone === 'highlight' ? colors.highlightText : tone === 'danger' ? colors.danger : colors.textSecondary);
   return (
     <View style={[styles.tag, { backgroundColor: bg }]}>
       {Icon ? <Icon size={12} weight="bold" color={fg} /> : null}
@@ -114,6 +149,8 @@ export function Group({ children, style }: { children: ReactNode; style?: StyleP
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: layout.screenPadding, paddingTop: space.xl, paddingBottom: space.md },
   section: {
     flexDirection: 'row',
     alignItems: 'center',

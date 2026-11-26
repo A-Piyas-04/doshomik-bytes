@@ -352,6 +352,9 @@ export const en = {
   'learn.empty': 'Nothing here yet for this area.',
   'learn.start': 'Start',
   'learn.resume': 'Resume',
+  'learn.ourCourses': 'Doshomik courses',
+  'learn.freeCourses': 'Free courses around the web',
+  'learn.practiceHint': 'Quizzes, practice sets and worked answers',
   'learn.watchOn': 'Watch on {site}',
   'learn.openLink': 'Open on {site}',
   'learn.markDone': 'Mark as done',
@@ -413,6 +416,10 @@ export const en = {
   'explore.people': 'People',
   'explore.posts': 'Posts',
   'explore.papers': 'Papers',
+  'explore.trendingPapers': 'Trending in research',
+  'explore.learnSomething': 'Learn something new',
+  'explore.roadmap': 'Roadmap',
+  'explore.fromPeople': 'From the community',
 
   // ----- Reels -----
   'reels.empty': 'No reels yet. Be the first to post one.',

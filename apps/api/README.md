@@ -160,7 +160,7 @@ What the worker does:
 | POST | `/media/uploads`, `/media/:id/complete` | See *Uploading media* |
 | GET | `/media/:id` | Your upload's status |
 | POST | `/posts` | `{ type, caption?, media_id?, topic? }`. `topic` (a topic slug) tags a reel with a concept, so Learn before reading can link it |
-| GET / DELETE | `/posts/:id` | Delete is a soft delete, purged after 30 days |
+| GET / DELETE | `/posts/:id` | Delete is a soft delete, purged after 30 days. A post's `topic` (like a learn item's) is `{ slug, name, field }`, where `field` is the topic's learn area slug, or null |
 | GET | `/feed`, `/reels` | Home (accepted follows) and Reels, newest first |
 | GET | `/explore?field=` | Explore grid: published posts from public accounts, not the viewer's own, newest first. `field` keeps one learn area's posts (through each post's topic) |
 | PUT / DELETE | `/posts/:id/like`, `/posts/:id/save` | |

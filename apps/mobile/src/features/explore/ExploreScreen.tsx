@@ -1,31 +1,33 @@
 import { noOutline } from '@/ui/noOutline';
 import { FlashList } from '@shopify/flash-list';
-import { useScrollToTop } from 'expo-router';
+import { router, useLocalSearchParams, useScrollToTop } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Keyboard, RefreshControl, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSearch, useSuggest } from '@/api/learn';
-import { useToggleSave } from '@/api/research';
+import { useCourses, useSearch, useSuggest } from '@/api/learn';
+import { useFields, usePapers, useToggleSave } from '@/api/research';
 import { useExplore } from '@/api/social';
 import type { Post, SearchResults, SearchType } from '@/api/types';
-import { useT } from '@/i18n';
+import { useLang, useT } from '@/i18n';
 import { usePrefs } from '@/lib/prefs';
 import { hasBengali } from '@/lib/script';
 import { openExternal } from '@/lib/share';
 import { go } from '@/shell/nav';
+import { useArea, useWash } from '@/theme/area';
 import { fontFamily } from '@/theme/fonts';
 import { useColors } from '@/theme/theme';
 import { layout, radius, space } from '@/theme/tokens';
 import { AppText } from '@/ui/AppText';
 import { Avatar } from '@/ui/Avatar';
-import { Divider, ListFooter, SectionLabel } from '@/ui/Bits';
+import { Divider, ListFooter, SectionLabel, SectionTitle } from '@/ui/Bits';
 import { IconButton } from '@/ui/IconButton';
-import { BookOpen, FileText, GraduationCap, MagnifyingGlass, UserCircle, X, type IconComponent } from '@/ui/icons';
+import { BookOpen, Exam, FileText, Fire, GraduationCap, MagnifyingGlass, MapTrifold, SquaresFour, UserCircle, X, type IconComponent } from '@/ui/icons';
 import { SegmentedTabs } from '@/ui/SegmentedTabs';
 import { RowsSkeleton } from '@/ui/Skeleton';
 import { EmptyState, ErrorState } from '@/ui/States';
 import { Tap } from '@/ui/Tap';
-import { ALL, FieldChips } from '../fields';
+import { ALL, AreaGlyph, FieldChips, fieldName } from '../fields';
+import { CourseCard } from '../learn/CourseCard';
 import { LessonRow } from '../learn/LearnHome';
 import { PaperRow } from '../research/PaperRow';
 import { PostTile } from './PostTile';
@@ -35,7 +37,8 @@ const GAP = 2;
 
 /**
  * Explore: one search box for everything (people, papers, lessons, courses, topics, posts), and,
- * while not searching, a grid of what people are posting, filtered by learn area.
+ * while not searching, the discovery page: the areas, what is trending in research, courses, then
+ * a mosaic of what people post, all following the chosen area.
  */
 export function ExploreScreen() {
   const t = useT();
@@ -70,9 +73,9 @@ export function ExploreScreen() {
   const searching = focused && !submitted;
   return (
     <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-      <View style={styles.searchBar}>
-        <View style={[styles.field, { backgroundColor: colors.surface, borderColor: focused ? colors.accent : colors.border }]}>
-          <MagnifyingGlass size={18} color={colors.textTertiary} />
+      <View style={[styles.searchBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={[styles.field, { backgroundColor: colors.elevated, borderColor: focused ? colors.accent : 'transparent' }]}>
+          <MagnifyingGlass size={18} weight="bold" color={colors.textSecondary} />
           <TextInput
             ref={input}
             value={text}
@@ -99,7 +102,7 @@ export function ExploreScreen() {
       ) : searching ? (
         <ScrollView keyboardShouldPersistTaps="handled">
           {debounced.length >= 2 && suggest.data?.length ? (
-            <View style={[styles.surface, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {suggest.data.map((item, index) => (
                 <View key={`${item.type}-${item.id}`}>
                   {index > 0 ? <Divider inset={layout.screenPadding + 34} /> : null}
@@ -128,7 +131,7 @@ export function ExploreScreen() {
           ) : null}
         </ScrollView>
       ) : (
-        <ExploreGrid />
+        <Discover />
       )}
     </View>
   );
@@ -146,31 +149,69 @@ function SuggestionRow({ icon: Icon, label, onPress }: { icon: IconComponent; la
   );
 }
 
-function ExploreGrid() {
+type BlockKind = 'row' | 'bigLeft' | 'bigRight';
+interface Block {
+  key: string;
+  kind: BlockKind;
+  posts: Post[];
+}
+const PATTERN: BlockKind[] = ['bigLeft', 'row', 'bigRight', 'row'];
+
+/**
+ * The posts as a mosaic: blocks of three, every other block led by one big tile (a reel first,
+ * then an image, then the first post), alternating sides. Pages are 30 posts, so a new page never
+ * reshuffles the blocks already on screen.
+ */
+function toBlocks(posts: Post[]): Block[] {
+  const blocks: Block[] = [];
+  for (let i = 0, n = 0; i < posts.length; i += 3, n += 1) {
+    const chunk = posts.slice(i, i + 3);
+    const kind = chunk.length < 3 ? 'row' : PATTERN[n % PATTERN.length]!;
+    if (kind !== 'row') {
+      const reel = chunk.findIndex((p) => p.type === 'reel');
+      const image = chunk.findIndex((p) => p.type === 'image');
+      const lead = reel >= 0 ? reel : image >= 0 ? image : 0;
+      chunk.unshift(chunk.splice(lead, 1)[0]!);
+    }
+    blocks.push({ key: chunk.map((p) => p.id).join(':'), kind, posts: chunk });
+  }
+  return blocks;
+}
+
+/** The discovery page. The area comes from the URL (the feed's area circles link here with one). */
+function Discover() {
   const t = useT();
   const colors = useColors();
   const { width } = useWindowDimensions();
-  const [area, setArea] = useState(ALL);
-  const explore = useExplore(area === ALL ? undefined : area);
-  const size = Math.min(width, 720) / 3 - GAP;
+  const params = useLocalSearchParams<{ area?: string }>();
+  const area = params.area || ALL;
+  const field = area === ALL ? undefined : area;
+  const setArea = (value: string) => router.setParams({ area: value === ALL ? '' : value });
+  const explore = useExplore(field);
+  const blocks = useMemo(() => toBlocks(explore.items), [explore.items]);
+  const small = (Math.min(width, 720) - GAP * 2) / 3;
   const list = useRef(null);
   useScrollToTop(list);
-  const renderItem = useCallback(
-    ({ item }: { item: Post }) => (
-      <View style={styles.cell}>
-        <PostTile post={item} size={size} />
-      </View>
-    ),
-    [size],
-  );
+
+  const renderItem = useCallback(({ item }: { item: Block }) => <MosaicBlock block={item} small={small} />, [small]);
   return (
     <FlashList
       ref={list}
-      data={explore.items}
-      numColumns={3}
+      data={blocks}
       renderItem={renderItem}
-      keyExtractor={(item) => item.id}
-      ListHeaderComponent={<FieldChips value={area} onChange={setArea} style={styles.chips} />}
+      keyExtractor={(item) => item.key}
+      getItemType={(item) => item.kind}
+      ListHeaderComponent={
+        <View>
+          <View style={[styles.chipBand, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <FieldChips value={area} onChange={setArea} style={styles.chips} />
+          </View>
+          {field ? <AreaSpotlight slug={field} /> : null}
+          <TrendingPapers field={field} />
+          <CourseRail field={field} />
+          <SectionTitle icon={SquaresFour} color={colors.text} title={t('explore.fromPeople')} />
+        </View>
+      }
       ItemSeparatorComponent={GridGap}
       ListEmptyComponent={
         explore.isPending ? <RowsSkeleton rows={3} /> : explore.isError ? <ErrorState onRetry={() => void explore.refetch()} /> : <EmptyState icon={MagnifyingGlass} message={t('explore.empty')} />
@@ -184,8 +225,109 @@ function ExploreGrid() {
   );
 }
 
+function MosaicBlock({ block, small }: { block: Block; small: number }) {
+  const big = small * 2 + GAP;
+  const [a, b, c] = block.posts;
+  if (block.kind === 'row' || !a || !b || !c) {
+    return (
+      <View style={styles.mosaicRow}>
+        {block.posts.map((post) => (
+          <PostTile key={post.id} post={post} size={small} />
+        ))}
+      </View>
+    );
+  }
+  const stack = (
+    <View style={styles.stack}>
+      <PostTile post={b} size={small} />
+      <PostTile post={c} size={small} />
+    </View>
+  );
+  return (
+    <View style={styles.mosaicRow}>
+      {block.kind === 'bigRight' ? stack : null}
+      <PostTile post={a} size={big} />
+      {block.kind === 'bigLeft' ? stack : null}
+    </View>
+  );
+}
+
 function GridGap() {
   return <View style={{ height: GAP }} />;
+}
+
+/** A chosen area, in its colour: what it is, and the two ways in (its roadmap, practice). */
+function AreaSpotlight({ slug }: { slug: string }) {
+  const t = useT();
+  const lang = useLang();
+  const colors = useColors();
+  const wash = useWash();
+  const fields = useFields();
+  const area = useArea(slug);
+  const info = fields.data?.find((f) => f.slug === slug);
+  if (!info) return null;
+  return (
+    <View style={[styles.spotlight, { backgroundColor: wash(area.solid) }]}>
+      <AreaGlyph slug={slug} size={120} weight="fill" color={area.solid} style={styles.spotGlyph} />
+      <AppText variant="display">{fieldName(info, lang)}</AppText>
+      {info.description ? (
+        <AppText variant="body" tone="textSecondary" numberOfLines={3} style={styles.spotText}>
+          {info.description}
+        </AppText>
+      ) : null}
+      <View style={styles.spotActions}>
+        <SpotAction icon={MapTrifold} label={t('explore.roadmap')} fill={colors.surface} ink={area.ink} onPress={() => go.roadmaps(slug)} />
+        <SpotAction icon={Exam} label={t('learn.practice')} fill={colors.surface} ink={area.ink} onPress={() => go.practiceSession({ field: slug })} />
+      </View>
+    </View>
+  );
+}
+
+function SpotAction({ icon: Icon, label, fill, ink, onPress }: { icon: IconComponent; label: string; fill: string; ink: string; onPress: () => void }) {
+  return (
+    <Tap onPress={onPress} style={[styles.spotAction, { backgroundColor: fill }]} accessibilityLabel={label}>
+      <Icon size={16} weight="bold" color={ink} />
+      <AppText variant="label" weight="semibold" tone="text">
+        {label}
+      </AppText>
+    </Tap>
+  );
+}
+
+function TrendingPapers({ field }: { field?: string }) {
+  const t = useT();
+  const colors = useColors();
+  const papers = usePapers({ field, sort: 'trend' });
+  const toggleSave = useToggleSave();
+  const onSave = useCallback((id: string, save: boolean) => toggleSave.mutate({ id, save }), [toggleSave]);
+  if (!papers.items.length) return null;
+  return (
+    <View>
+      <SectionTitle icon={Fire} color={colors.highlight} title={t('explore.trendingPapers')} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+        {papers.items.slice(0, 8).map((paper) => (
+          <PaperRow key={paper.id} paper={paper} width={286} onOpen={go.paper} onToggleSave={onSave} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function CourseRail({ field }: { field?: string }) {
+  const t = useT();
+  const colors = useColors();
+  const courses = useCourses(field);
+  if (!courses.items.length) return null;
+  return (
+    <View>
+      <SectionTitle icon={GraduationCap} color={colors.accent} title={t('explore.learnSomething')} onPress={() => router.navigate('/learn')} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+        {courses.items.slice(0, 10).map((course) => (
+          <CourseCard key={course.id} course={course} width={200} />
+        ))}
+      </ScrollView>
+    </View>
+  );
 }
 
 /** Search results: Top shows a few of each kind; the other tabs show one kind in full. */
@@ -255,7 +397,7 @@ function ResultSections({ results, limit, onSeeAll }: { results: SearchResults; 
   const toggleSave = useToggleSave();
   const cut = <T,>(items: T[] | undefined) => (limit ? (items ?? []).slice(0, limit) : (items ?? []));
   const seeAll = (type: SearchType) => (limit && onSeeAll && (results[type]?.length ?? 0) > limit ? () => onSeeAll(TAB_OF[type]!) : undefined);
-  const surface = [styles.surface, { backgroundColor: colors.surface, borderColor: colors.border }];
+  const group = [styles.group, { backgroundColor: colors.surface, borderColor: colors.border }];
   const tile = (Math.min(width, 720) - GAP * 2) / 3;
 
   return (
@@ -263,12 +405,9 @@ function ResultSections({ results, limit, onSeeAll }: { results: SearchResults; 
       {results.papers?.length ? (
         <>
           <SectionLabel label={t('explore.papers')} action={seeAll('papers') ? t('common.seeAll') : undefined} onAction={seeAll('papers')} />
-          <View style={surface}>
-            {cut(results.papers).map((paper, i) => (
-              <View key={paper.id}>
-                {i > 0 ? <Divider /> : null}
-                <PaperRow paper={paper} onOpen={go.paper} onToggleSave={(id, save) => toggleSave.mutate({ id, save })} />
-              </View>
+          <View style={styles.cards}>
+            {cut(results.papers).map((paper) => (
+              <PaperRow key={paper.id} paper={paper} onOpen={go.paper} onToggleSave={(id, save) => toggleSave.mutate({ id, save })} />
             ))}
           </View>
         </>
@@ -276,18 +415,11 @@ function ResultSections({ results, limit, onSeeAll }: { results: SearchResults; 
       {results.topics?.length ? (
         <>
           <SectionLabel label={t('explore.topics')} action={seeAll('topics') ? t('common.seeAll') : undefined} onAction={seeAll('topics')} />
-          <View style={surface}>
+          <View style={group}>
             {cut(results.topics).map((topic, i) => (
               <View key={topic.slug}>
-                {i > 0 ? <Divider /> : null}
-                <Tap feedback="fill" onPress={() => go.topic(topic.slug)} style={styles.row}>
-                  <AppText variant="bodyStrong">{topic.name}</AppText>
-                  {topic.summary ? (
-                    <AppText variant="caption" tone="textSecondary" numberOfLines={2}>
-                      {topic.summary}
-                    </AppText>
-                  ) : null}
-                </Tap>
+                {i > 0 ? <Divider inset={layout.screenPadding + 50} /> : null}
+                <IconRow icon={BookOpen} title={topic.name} subtitle={topic.summary} onPress={() => go.topic(topic.slug)} />
               </View>
             ))}
           </View>
@@ -296,10 +428,10 @@ function ResultSections({ results, limit, onSeeAll }: { results: SearchResults; 
       {results.learn_items?.length ? (
         <>
           <SectionLabel label={t('explore.lessons')} action={seeAll('learn_items') ? t('common.seeAll') : undefined} onAction={seeAll('learn_items')} />
-          <View style={surface}>
+          <View style={group}>
             {cut(results.learn_items).map((item, i) => (
               <View key={item.id}>
-                {i > 0 ? <Divider inset={layout.screenPadding + 36} /> : null}
+                {i > 0 ? <Divider inset={layout.screenPadding + 50} /> : null}
                 <LessonRow item={{ ...item, duration_seconds: null }} />
               </View>
             ))}
@@ -309,18 +441,16 @@ function ResultSections({ results, limit, onSeeAll }: { results: SearchResults; 
       {results.courses?.length ? (
         <>
           <SectionLabel label={t('explore.courses')} action={seeAll('courses') ? t('common.seeAll') : undefined} onAction={seeAll('courses')} />
-          <View style={surface}>
+          <View style={group}>
             {cut(results.courses).map((course, i) => (
               <View key={course.id}>
-                {i > 0 ? <Divider /> : null}
-                <Tap feedback="fill" onPress={() => (course.external_url ? void openExternal(course.external_url) : go.course(course.id))} style={styles.row}>
-                  <AppText variant="bodyStrong">{course.title}</AppText>
-                  {course.description ? (
-                    <AppText variant="caption" tone="textSecondary" numberOfLines={2}>
-                      {course.description}
-                    </AppText>
-                  ) : null}
-                </Tap>
+                {i > 0 ? <Divider inset={layout.screenPadding + 50} /> : null}
+                <IconRow
+                  icon={GraduationCap}
+                  title={course.title}
+                  subtitle={course.description}
+                  onPress={() => (course.external_url ? void openExternal(course.external_url) : go.course(course.id))}
+                />
               </View>
             ))}
           </View>
@@ -329,7 +459,7 @@ function ResultSections({ results, limit, onSeeAll }: { results: SearchResults; 
       {results.users?.length ? (
         <>
           <SectionLabel label={t('explore.people')} action={seeAll('users') ? t('common.seeAll') : undefined} onAction={seeAll('users')} />
-          <View style={surface}>
+          <View style={group}>
             {cut(results.users).map((user, i) => (
               <View key={user.id}>
                 {i > 0 ? <Divider inset={layout.screenPadding + 52} /> : null}
@@ -363,6 +493,28 @@ function ResultSections({ results, limit, onSeeAll }: { results: SearchResults; 
   );
 }
 
+/** A topic or course result: its glyph on the accent wash, the name, one line on what it is. */
+function IconRow({ icon: Icon, title, subtitle, onPress }: { icon: IconComponent; title: string; subtitle: string | null; onPress: () => void }) {
+  const colors = useColors();
+  return (
+    <Tap feedback="fill" onPress={onPress} style={styles.iconRow}>
+      <View style={[styles.iconTile, { backgroundColor: colors.accentWash }]}>
+        <Icon size={20} weight="fill" color={colors.accent} />
+      </View>
+      <View style={styles.flex}>
+        <AppText variant="bodyStrong" numberOfLines={1}>
+          {title}
+        </AppText>
+        {subtitle ? (
+          <AppText variant="caption" tone="textSecondary" numberOfLines={2}>
+            {subtitle}
+          </AppText>
+        ) : null}
+      </View>
+    </Tap>
+  );
+}
+
 function useDebounced<T>(value: T, ms: number): T {
   const [state, setState] = useState(value);
   useEffect(() => {
@@ -375,16 +527,26 @@ function useDebounced<T>(value: T, ms: number): T {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
-  searchBar: { paddingHorizontal: layout.screenPadding, paddingVertical: space.sm },
-  field: { flexDirection: 'row', alignItems: 'center', gap: space.sm, height: 44, borderRadius: radius.sm, borderWidth: 1, paddingLeft: space.md },
-  input: { flex: 1, fontSize: 15, height: 44, paddingVertical: 0 },
-  chips: { flexGrow: 0, paddingBottom: space.sm },
+  searchBar: { paddingHorizontal: layout.screenPadding, paddingVertical: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  field: { flexDirection: 'row', alignItems: 'center', gap: space.sm, height: 42, borderRadius: radius.sm, borderWidth: 1.5, paddingLeft: space.md },
+  input: { flex: 1, fontSize: 15, height: 40, paddingVertical: 0 },
+  chipBand: { borderBottomWidth: StyleSheet.hairlineWidth },
+  chips: { flexGrow: 0, paddingVertical: space.sm },
   gridContent: { paddingBottom: space.x4 },
-  surface: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  spotlight: { marginHorizontal: space.md, marginTop: space.md, borderRadius: radius.lg, padding: space.lg, gap: space.sm, overflow: 'hidden', minHeight: 168 },
+  spotGlyph: { position: 'absolute', right: -18, bottom: -22, opacity: 0.28 },
+  spotText: { maxWidth: '82%' },
+  spotActions: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
+  spotAction: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: space.md, borderRadius: radius.sm },
+  rail: { paddingHorizontal: space.md, gap: space.md },
+  mosaicRow: { flexDirection: 'row', gap: GAP },
+  stack: { gap: GAP },
+  group: { marginHorizontal: space.md, borderRadius: radius.lg, borderWidth: 1, overflow: 'hidden' },
+  cards: { gap: space.sm },
   suggestion: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: layout.screenPadding, minHeight: 48 },
   results: { paddingBottom: space.x5 },
-  row: { paddingHorizontal: layout.screenPadding, paddingVertical: space.md, gap: 2 },
+  iconRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: layout.screenPadding, paddingVertical: space.md },
+  iconTile: { width: 38, height: 38, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   person: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: layout.screenPadding, paddingVertical: space.sm },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
-  cell: { paddingHorizontal: GAP / 2 },
 });

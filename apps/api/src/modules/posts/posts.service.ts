@@ -53,7 +53,7 @@ type PostRow = MediaColumns & {
   id: string;
   type: string;
   caption: string | null;
-  topic: { slug: string; name: string } | null;
+  topic: { slug: string; name: string; field: string | null } | null;
   status: string;
   like_count: number;
   comment_count: number;

@@ -47,7 +47,7 @@ export function Timeline({ steps }: { steps: Step[] }) {
               <View style={[styles.segment, styles.grow, { backgroundColor: index === steps.length - 1 ? 'transparent' : colors.border }]} />
             </View>
             <View style={styles.body}>
-              <PaperRow paper={item.paper} compact inset={0} onOpen={go.paper} onToggleSave={(id, save) => toggleSave.mutate({ id, save })} />
+              <PaperRow paper={item.paper} variant="row" compact inset={0} onOpen={go.paper} onToggleSave={(id, save) => toggleSave.mutate({ id, save })} />
               {isNext ? (
                 <View style={styles.nextTag}>
                   <Tag label={t('roadmap.next')} tone="highlight" />
