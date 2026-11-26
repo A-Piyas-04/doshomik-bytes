@@ -11,6 +11,18 @@ export const topicRef = (t: string) =>
   sql<{ slug: string; name: string } | null>`CASE WHEN ${sql.ref(`${t}.id`)} IS NULL THEN NULL
     ELSE json_build_object('slug', ${sql.ref(`${t}.slug`)}, 'name', ${sql.ref(`${t}.name`)}) END`;
 
+/** `{ slug, name }` of the field (learn area) aliased `f`, or null when there is none. */
+export const fieldRef = (f: string) =>
+  sql<{ slug: string; name: string } | null>`CASE WHEN ${sql.ref(`${f}.id`)} IS NULL THEN NULL
+    ELSE json_build_object('slug', ${sql.ref(`${f}.slug`)}, 'name', ${sql.ref(`${f}.name`)}) END`;
+
+/**
+ * Keeps rows whose topic (aliased `t`) belongs to the learn area with this field slug. Learn
+ * items, questions, quizzes and tagged posts reach their area through their topic (migration 007).
+ */
+export const inArea = (t: string, fieldSlug: string) =>
+  sql<boolean>`${sql.ref(`${t}.field_id`)} = (SELECT id FROM fields WHERE slug = ${fieldSlug})`;
+
 /** Published learn items with their topic and media. */
 function selectLearnItems() {
   return db
@@ -61,19 +73,34 @@ export function toLearnItem(row: LearnItemRow) {
   };
 }
 
-export function listTopics() {
-  return db.selectFrom('topics').select(['slug', 'name', 'summary']).orderBy('name').execute();
+/** Topics with their learn area. */
+function selectTopics() {
+  return db
+    .selectFrom('topics as t')
+    .leftJoin('fields as f', 'f.id', 't.field_id')
+    .select(['t.id', 't.slug', 't.name', 't.summary', fieldRef('f').as('field')]);
+}
+
+/** Every topic, or one learn area's, by name. */
+export async function listTopics(filter: { field?: string } = {}) {
+  const rows = await selectTopics()
+    .$if(filter.field !== undefined, (qb) => qb.where('f.slug', '=', filter.field!))
+    .orderBy('t.name')
+    .execute();
+  return rows.map(({ id: _, ...topic }) => topic);
 }
 
 export async function getTopic(slug: string) {
-  const topic = found(await db.selectFrom('topics').select(['id', 'slug', 'name', 'summary']).where('slug', '=', slug).executeTakeFirst(), 'Topic');
+  const topic = found(await selectTopics().where('t.slug', '=', slug).executeTakeFirst(), 'Topic');
   const items = await selectLearnItems().where('li.topic_id', '=', topic.id).orderBy('li.id').execute();
   const { id: _, ...publicTopic } = topic;
   return { ...publicTopic, learn_items: items.map(toLearnItem) };
 }
 
-export async function listLearnItems(filter: { topic?: string }, page: PageQuery) {
-  const query = selectLearnItems().$if(filter.topic !== undefined, (qb) => qb.where('t.slug', '=', filter.topic!));
+export async function listLearnItems(filter: { topic?: string; field?: string }, page: PageQuery) {
+  const query = selectLearnItems()
+    .$if(filter.topic !== undefined, (qb) => qb.where('t.slug', '=', filter.topic!))
+    .$if(filter.field !== undefined, (qb) => qb.where(inArea('t', filter.field!)));
   return mapPage(await fetchPage(query, 'li', page), toLearnItem);
 }
 
@@ -86,6 +113,7 @@ function selectCourses(viewerId: number) {
   return db
     .selectFrom('courses as c')
     .leftJoin('course_progress as cp', (join) => join.onRef('cp.course_id', '=', 'c.id').on('cp.user_id', '=', viewerId))
+    .leftJoin('fields as cf', 'cf.id', 'c.field_id')
     .where(isPublished('c'))
     .select((eb) => [
       'c.public_id as id',
@@ -93,6 +121,7 @@ function selectCourses(viewerId: number) {
       'c.description',
       'c.thumbnail_url',
       'c.external_url',
+      fieldRef('cf').as('field'),
       'c.created_at',
       sql<string>`${env.PUBLIC_URL} || '/courses/' || c.public_id`.as('share_url'),
       eb
@@ -107,8 +136,10 @@ function selectCourses(viewerId: number) {
     ]);
 }
 
-export function listCourses(viewerId: number, page: PageQuery) {
-  return fetchPage(selectCourses(viewerId), 'c', page);
+/** Published courses, optionally one learn area's. */
+export function listCourses(viewerId: number, filter: { field?: string }, page: PageQuery) {
+  const query = selectCourses(viewerId).$if(filter.field !== undefined, (qb) => qb.where('cf.slug', '=', filter.field!));
+  return fetchPage(query, 'c', page);
 }
 
 /** Courses the viewer has started, most recent first: "continue where you left off". */

@@ -59,7 +59,9 @@ export async function buildApp() {
 
   await app.register(compress);
   await app.register(etag);
-  await app.register(cors, { origin: env.CORS_ORIGINS });
+  // Browser clients (the admin dashboard, the app's web build) use every verb the API has; the
+  // plugin's default allows only GET, HEAD and POST, which blocked saves, toggles and edits.
+  await app.register(cors, { origin: env.CORS_ORIGINS, methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'] });
   await app.register(jwt, { secret: deriveKey('jwt'), sign: { expiresIn: env.ACCESS_TOKEN_TTL_SECONDS } });
   if (env.NODE_ENV !== 'test') {
     // Opted into per route (lib/rate-limits.ts). preHandler, so per-user limits know the user.

@@ -2,9 +2,15 @@
 
 The Android app: React Native + Expo (SDK 58) + TypeScript, with Expo Router.
 
-Right now this is **scaffold only**. There is one placeholder screen that shows
-whether the API is reachable. No product UI is built yet; it is built from
-`docs/project-context.md` §2 once the design details are settled.
+The full product UI is built: Home (Feed and Research), Learn with Practice,
+Explore, Reels and Profile, in English and Bangla, light and dark. The design
+and every decision are in
+[`docs/frontend-implementation-notes.md`](../../docs/frontend-implementation-notes.md);
+the UI spec is [`docs/project-context.md`](../../docs/project-context.md) §2.
+
+Sign-in is not built yet (the owner's "auth last" rule): the API runs with
+`DEV_AUTH_BYPASS`, and in development Settings › "Act as" switches between the
+seeded accounts (admin, learner1, learner2).
 
 ## Setup
 
@@ -15,8 +21,20 @@ cp .env.example .env      # then set EXPO_PUBLIC_API_URL for your device
 pnpm start                # Metro dev server
 ```
 
-Run the API in another terminal (`cd apps/api && pnpm dev`), or the placeholder
-screen reports it as unreachable.
+Run the API in another terminal (`cd apps/api && pnpm dev`, plus `pnpm worker`
+for media processing). For data, the API's database needs `pnpm db:migrate` and
+`pnpm db:seed`, which fills every screen.
+
+### Web build (for checking screens on a computer)
+
+```powershell
+$env:EXPO_PUBLIC_API_URL='http://localhost:3000'; npx expo start --web
+```
+
+Start the API with `CORS_ORIGINS=http://localhost:8081` (and
+`PUBLIC_URL=http://localhost:3000` so media links resolve). The web build is for
+QA only; the product is the Android app. If Metro misses newly added route
+files, restart it with `--clear`.
 
 > **Windows:** run Expo commands from PowerShell, not Git Bash. Git Bash's
 > lowercase `e:\` working directory makes Metro build a doubled path
@@ -26,7 +44,9 @@ screen reports it as unreachable.
 
 Expo Go is not an option for SDK 58 (the matching Expo Go is not in the stores
 yet), so a **development build** is needed. Build it once, then every code
-change reloads over Wi-Fi without rebuilding.
+change reloads over Wi-Fi without rebuilding. All native modules the app uses
+are already installed, so one build covers everything built so far; rebuild
+only after adding a native dependency.
 
 ```sh
 npx eas-cli@latest login                                            # free Expo account
@@ -85,7 +105,11 @@ eas.json          Build profiles
   Generation). Native behaviour is configured in `app.json` and config plugins.
 - **`npx expo install <pkg>`**, never a plain `pnpm add`, so versions stay
   SDK-compatible.
-- Run `pnpm typecheck` and `pnpm doctor` before calling anything done.
+- **Every string goes through `t()`.** Add the key to `src/i18n/en.ts` and
+  `bn.ts`; a missing Bangla key fails typecheck.
+- **Colours, sizes and fonts come from `src/theme/`.** No literals in screens.
+- **Text is `AppText`**, which picks the Bangla or Latin font per script run.
+- Run `pnpm typecheck`, `pnpm lint` and `pnpm doctor` before calling anything done.
 
 ## Decisions taken while scaffolding (26 Nov 2026)
 
@@ -95,6 +119,6 @@ eas.json          Build profiles
 | Android package `com.doshomik.bytes`, version `0.1.0` | Confirmed by the owner on 26 Nov 2026. It is the permanent Play Store identity and **cannot be changed after the first release** |
 | Expo Router (file-based routing) | The template default, and what the Expo docs target |
 | JavaScript `Tabs` planned, not `NativeTabs` | The five-tab bar needs exact control of icons and colours per state; the Expo docs say native tabs follow platform behaviour and are not a drop-in |
-| Template demo code, web support, `@expo/ui`, `expo-glass-effect` and `expo-symbols` removed | Android-only target; glass effects are banned by the design rules. Also keeps the install small |
+| Template demo code, `expo-glass-effect` and `expo-symbols` removed | Glass effects are banned by the design rules. (Web support and `@expo/ui` came back with the UI build: web for screenshot QA, `@expo/ui` as an installed fallback for native sheets) |
 | Expo's MIT `LICENSE` file deleted | It covered the template, not this proprietary product |
 | `AGENTS.md` kept from the template | Its Expo-specific guidance (check versioned docs, CNG, `expo install`) is accurate and useful |

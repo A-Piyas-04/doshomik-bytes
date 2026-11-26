@@ -16,6 +16,7 @@ description: How to change the Doshomik Bytes database schema with node-pg-migra
 | `…004_toggles-and-stored-counts.sql` | Toggle rows (`post_likes.is_active`, `follows.status = 'inactive'`), stored `users.follower_count`/`following_count`, unread and suggestion indexes, drops the redundant Prototype 1 reels index |
 | `…005_research-collection.sql` | Research tab Group A: paper metadata, `paper_cards`, `bangla` search config and `refresh_paper_search()`, `paper_saves`, `reading_passes`, `research_outputs`, `paper_edges`, `trails`, Learn before reading links, `user_known_topics`, `learn_item_completions` |
 | `…006_papers-split-and-block-toggle.sql` | `blocks.is_active`/`updated_at` (toggle rows); `paper_metadata`, `paper_metrics`, `paper_sync` (one-to-one, `paper_id` PK/FK cascade, created with each paper by `createPaperCompanions`); the old summary columns moved into `paper_cards`; `refresh_paper_search()` reads the cards. 42 tables |
+| `…007_learn-areas.sql` | `topics.field_id` and `courses.field_id`: learn areas are the `fields`, shared by every tab's chips |
 
 Never edit the Prototype v1 doc or the Prototype 2 doc.
 

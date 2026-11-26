@@ -4,7 +4,7 @@ import { db } from '../../db';
 import { isPublished } from '../../db/visibility';
 import { found } from '../../lib/errors';
 import { fetchPage, type PageQuery } from '../../lib/pagination';
-import { topicRef } from '../learn/learn.service';
+import { inArea, topicRef } from '../learn/learn.service';
 
 /** Published questions as the app shows them: never with the answer or explanation. */
 function selectQuestions() {
@@ -15,10 +15,11 @@ function selectQuestions() {
     .select(['q.public_id as id', topicRef('t').as('topic'), 'q.kind', 'q.prompt', 'q.options']);
 }
 
-/** Random questions from one topic, or from all for "Random". */
-export function listQuestions(filter: { topic?: string }, limit: number) {
+/** Random questions from one topic or one learn area, or from all for "Random". */
+export function listQuestions(filter: { topic?: string; field?: string }, limit: number) {
   return selectQuestions()
     .$if(filter.topic !== undefined, (qb) => qb.where('t.slug', '=', filter.topic!))
+    .$if(filter.field !== undefined, (qb) => qb.where(inArea('t', filter.field!)))
     .orderBy(sql`random()`) // fine at this volume
     .limit(limit)
     .execute();
@@ -134,8 +135,10 @@ function selectQuizzes() {
     ]);
 }
 
-export function listQuizzes(filter: { topic?: string }, page: PageQuery) {
-  const query = selectQuizzes().$if(filter.topic !== undefined, (qb) => qb.where('t.slug', '=', filter.topic!));
+export function listQuizzes(filter: { topic?: string; field?: string }, page: PageQuery) {
+  const query = selectQuizzes()
+    .$if(filter.topic !== undefined, (qb) => qb.where('t.slug', '=', filter.topic!))
+    .$if(filter.field !== undefined, (qb) => qb.where(inArea('t', filter.field!)));
   return fetchPage(query, 'qz', page);
 }
 

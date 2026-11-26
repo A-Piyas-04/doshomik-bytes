@@ -567,6 +567,7 @@ The worker's hourly maintenance ([`src/worker/maintenance.ts`](../../apps/api/sr
 | `1795305600004_toggles-and-stored-counts.sql` | Toggle rows for likes and follows, stored follow counts, the unread and suggestion indexes; drops the redundant Prototype 1 reels index |
 | `1795305600005_research-collection.sql` | Research tab Group A: the `bangla` configuration; `fields.position`; paper metadata and `search_vector` with `refresh_paper_search()`; `paper_cards` (English backfilled), `paper_saves` and `reading_passes` (backfilled from `user_papers`), `research_outputs`, `paper_edges`, `trails`, `trail_items`; prerequisite links, `posts.topic_id`, `user_known_topics`, `learn_item_completions`; trails in reports. 9 new tables |
 | `1795305600006_papers-split-and-block-toggle.sql` | Database refactoring: `blocks.is_active` and `updated_at` (toggle rows); `paper_metadata`, `paper_metrics`, `paper_sync` split off `papers` with their indexes and checks; the Prototype 2 summary columns moved into `paper_cards` (four new card columns; conflicts archived in `audit_log`); `refresh_paper_search()` reads the cards. 3 new tables |
+| `1795305600007_learn-areas.sql` | Learn areas: `topics.field_id` and `courses.field_id` (nullable FK to `fields`, `ON DELETE SET NULL`, partial indexes), so one set of area chips filters Research, Learn, Practice and Explore (implementation notes §2.10) |
 
 Rules:
 

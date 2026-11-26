@@ -69,7 +69,7 @@ afterAll(async () => {
 describe('migration 006', () => {
   it('moves paper data to the companions and the cards, keeping ids and losing nothing', { timeout: 60_000 }, async () => {
     const before = await rows('SELECT id, public_id FROM papers ORDER BY id');
-    await migrate('up');
+    await migrate('up', 1); // 006 only; later migrations have their own tests below
 
     expect(await rows('SELECT id, public_id FROM papers ORDER BY id')).toEqual(before);
     const tables = await rows<{ n: number }>(`SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'pgmigrations'`);
@@ -157,7 +157,27 @@ describe('migration 006', () => {
     expect(await rows(`SELECT to_regclass('paper_metadata') AS t`)).toEqual([{ t: null }]);
     expect(await rows('SELECT count(*)::int AS n FROM blocks')).toEqual([{ n: 0 }]); // inactive blocks did not exist before
 
-    await migrate('up');
+    await migrate('up', 1);
     expect(await rows('SELECT count(*)::int AS n FROM paper_metadata')).toEqual([{ n: 4 }]);
+  });
+});
+
+describe('migration 007', () => {
+  it('files topics and courses under a learn area, and rolls back cleanly', { timeout: 60_000 }, async () => {
+    await client.query(`INSERT INTO topics (name, slug) VALUES ('Migration 7 topic', 'migration-7-topic')`);
+    await migrate('up', 1);
+
+    const field = await rows<{ id: string }>(`INSERT INTO fields (name, slug) VALUES ('Migration 7 area', 'migration-7-area') RETURNING id`);
+    await client.query(`UPDATE topics SET field_id = ${field[0]!.id} WHERE slug = 'migration-7-topic'`);
+    await client.query(`INSERT INTO courses (title, field_id) VALUES ('Migration 7 course', ${field[0]!.id})`);
+    // Deleting an area leaves its topics and courses in place, unfiled.
+    await client.query(`DELETE FROM fields WHERE id = ${field[0]!.id}`);
+    expect(await rows(`SELECT slug, field_id FROM topics WHERE slug = 'migration-7-topic'`)).toEqual([{ slug: 'migration-7-topic', field_id: null }]);
+    expect(await rows(`SELECT title, field_id FROM courses WHERE title = 'Migration 7 course'`)).toEqual([{ title: 'Migration 7 course', field_id: null }]);
+
+    await migrate('down', 1);
+    expect(await rows(`SELECT column_name FROM information_schema.columns WHERE table_name IN ('topics', 'courses') AND column_name = 'field_id'`)).toEqual([]);
+    expect(await rows(`SELECT slug FROM topics WHERE slug = 'migration-7-topic'`)).toEqual([{ slug: 'migration-7-topic' }]);
+    await migrate('up');
   });
 });

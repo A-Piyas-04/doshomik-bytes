@@ -10,4 +10,5 @@ export const TEST_ENV = {
   MEDIA_DIR: path.join(os.tmpdir(), 'doshomik-test-media'),
   DEV_MAIL_DIR: path.join(os.tmpdir(), 'doshomik-test-mail'),
   GOOGLE_CLIENT_IDS: 'test-client-id',
+  CORS_ORIGINS: 'http://localhost:5173',
 };

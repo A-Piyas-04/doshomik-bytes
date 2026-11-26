@@ -191,6 +191,18 @@ The owner asked for four schema changes after reviewing the 39-table schema. The
 | Report targets are validated per type before filing (no FK on purpose) | The owner's spec | User: active, not yourself (`400 SELF_REPORT`). Post and trail: visible to the reporter. Comment: live, in a thread the reporter can see, author not blocked either way. Otherwise `404`. A blocked user can still be reported |
 | Verified on a throwaway cluster | The dev database still rejects the `.env` password | Up, down, up on a database with pre-`…006` data; a migration test (`test/migration.test.ts`) does the same on its own database; all tests pass; `src/db/types.ts` is real `kysely-codegen` output. **Run `db:migrate` on the dev database once its password is fixed**, then check `audit_log` for `paper.summary_migration` rows |
 
+### 2.10 Backend support for the mobile app (migration `…007`, 26 Nov 2026)
+
+Built with the mobile frontend; the app side is in [`frontend-implementation-notes.md`](frontend-implementation-notes.md).
+
+| Decision | Why | Consequence / later |
+| --- | --- | --- |
+| **Learn areas:** `topics.field_id` and `courses.field_id` (nullable FK to `fields`, `ON DELETE SET NULL`, partial indexes) | The owner's brief organises Learn by five areas (ML fundamentals, Deep learning, Computer vision, Transformers, LLMs). Research already had them as `fields`, so one taxonomy now drives every tab's chips. Topics stay fine-grained concepts filed under an area | Learn items, questions, quizzes and tagged posts reach their area through their topic (`inArea` in `learn.service.ts`). New `?field=` filters on `/topics`, `/learn-items`, `/courses`, `/quizzes`, `/practice/questions`; `field` in topic and course responses; staff set it with `field` on `/admin/topics` and `/admin/courses` (audited). Deleting an area unfiles, never deletes |
+| **`GET /v1/explore?field=`**: published posts from public accounts, not the viewer's own, newest first | Explore needed a discovery grid; `/feed` is follows only | Same visibility rule as search (`isSearchablePost`), so private-account posts never appear, even to followers. Ranking by engagement waits for Redis and watch data, like Reels (§3.1) |
+| **CORS allows PUT, PATCH and DELETE** | `@fastify/cors` allows only GET, HEAD and POST by default, so every browser client (the admin dashboard, the app's web build) failed on saves, toggles and edits | Covered by `test/cors.test.ts`. Native apps don't do CORS and were never affected |
+| **Seed:** the five areas, 14 topics under them, 14 lessons (2 of them free outside videos), 3 of our courses and 6 free outside ones (Coursera, fast.ai, Karpathy, CS231n, Hugging Face, YouTube), 12 questions, 2 quizzes, 8 papers with English cards (3 with Bangla cards too), Learn first links, lineage edges, a roadmap per area; outside production, dev activity (profiles, follows, 12 posts, likes, comments, a paper discussion, 3 trails, saves, reading passes, notifications) | Every screen of the app needs real data to be built and checked | Papers carry no citation or upvote numbers: the worker's sync fills them from OpenAlex, Semantic Scholar and Hugging Face. Reseed a dev database with `db:reset`, `db:migrate`, `db:seed`. Field slugs changed (`ml-fundamentals`, `llms`, …) |
+| Tests | | `test/learn-areas.test.ts` (filters, staff moves, explore visibility), a `…007` round trip in `test/migration.test.ts` (the `…006` test now migrates exactly one step), `test/cors.test.ts`. Run tests with `TEST_DATABASE_URL=postgresql://dev@localhost:55433/doshomik_test` (vitest doesn't read `.env`) and from PowerShell: Git Bash's lowercase drive letter makes vitest find no test files |
+
 ### 2.5 API shape
 
 | Decision | Why |

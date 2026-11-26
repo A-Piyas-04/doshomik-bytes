@@ -2,13 +2,13 @@ import { LEARN_ITEM_KINDS } from '@doshomik/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { sql } from 'kysely';
 import { z } from 'zod';
-import { db } from '../../db';
+import { db, type Db } from '../../db';
 import { audit } from '../../lib/audit';
 import { badRequest, found } from '../../lib/errors';
 import { emitSearchSync } from '../../lib/outbox';
 import { fetchPage } from '../../lib/pagination';
 import { httpUrl, idParams, optionalText, publicId, slug, slugify, slugParams, text, uniqueIds, updateOf } from '../../lib/validation';
-import { topicRef } from '../learn/learn.service';
+import { fieldRef, topicRef } from '../learn/learn.service';
 import { MEDIA_COLUMNS, type MediaColumns, withMediaView } from '../media/media.service';
 import { adminListQuery, contentId, contentMediaId, idsInOrder, lifecycleRoutes, slugToId, syncSearch } from './content';
 
@@ -16,6 +16,7 @@ const TopicBody = z.object({
   name: text(100),
   slug: slug.optional(), // defaults to one made from the name
   summary: optionalText(1000), // shown in Learn first when the topic has no learn items yet
+  field: slug.nullish(), // the learn area (a field slug) the concept belongs to; null unfiles it
 });
 
 const LearnItemFields = z.object({
@@ -33,7 +34,13 @@ const CourseBody = z.object({
   description: optionalText(2000),
   thumbnail_url: httpUrl.nullish(),
   external_url: httpUrl.nullish(), // set for an outside course card; such a course has no items
+  field: slug.nullish(), // the learn area (a field slug); null unfiles it
 });
+
+/** The public shape of a topic row joined with its field. */
+const topicColumns = ['t.id', 't.slug', 't.name', 't.summary', fieldRef('f').as('field')] as const;
+const selectTopic = (trx: Db, id: number) =>
+  trx.selectFrom('topics as t').leftJoin('fields as f', 'f.id', 't.field_id').select(topicColumns).where('t.id', '=', id).executeTakeFirstOrThrow();
 
 export const adminLearnRoutes: FastifyPluginAsyncZod = async (app) => {
   // ----- Topics (always live; no drafts) -----
@@ -43,12 +50,17 @@ export const adminLearnRoutes: FastifyPluginAsyncZod = async (app) => {
     const topic = await db.transaction().execute(async (trx) => {
       const row = await trx
         .insertInto('topics')
-        .values({ name: request.body.name, slug: topicSlug, summary: request.body.summary })
-        .returning(['id', 'slug', 'name', 'summary'])
+        .values({
+          name: request.body.name,
+          slug: topicSlug,
+          summary: request.body.summary,
+          field_id: (await slugToId(trx, 'fields', request.body.field)) ?? null,
+        })
+        .returning('id')
         .executeTakeFirstOrThrow();
       await emitSearchSync(trx, 'topic', row.id);
       await audit(trx, request, { action: 'topic.create', entityType: 'topic', entityId: row.id, changes: request.body });
-      return row;
+      return selectTopic(trx, row.id);
     });
     const { id: _, ...publicTopic } = topic;
     return reply.status(201).send(publicTopic);
@@ -56,13 +68,19 @@ export const adminLearnRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.patch('/topics/:slug', { schema: { params: slugParams, body: updateOf(TopicBody) } }, async (request) =>
     db.transaction().execute(async (trx) => {
+      const { field, ...changes } = request.body;
       const row = found(
-        await trx.updateTable('topics').set(request.body).where('slug', '=', request.params.slug).returning(['id', 'slug', 'name', 'summary']).executeTakeFirst(),
+        await trx
+          .updateTable('topics')
+          .set({ ...changes, ...(field !== undefined ? { field_id: await slugToId(trx, 'fields', field) } : {}) })
+          .where('slug', '=', request.params.slug)
+          .returning('id')
+          .executeTakeFirst(),
         'Topic',
       );
       await emitSearchSync(trx, 'topic', row.id);
       await audit(trx, request, { action: 'topic.update', entityType: 'topic', entityId: row.id, changes: request.body });
-      const { id: _, ...publicTopic } = row;
+      const { id: _, ...publicTopic } = await selectTopic(trx, row.id);
       return publicTopic;
     }),
   );
@@ -161,6 +179,7 @@ export const adminLearnRoutes: FastifyPluginAsyncZod = async (app) => {
   const selectCourses = () =>
     db
       .selectFrom('courses as c')
+      .leftJoin('fields as cf', 'cf.id', 'c.field_id')
       .select((eb) => [
         'c.public_id as id',
         'c.status',
@@ -168,6 +187,7 @@ export const adminLearnRoutes: FastifyPluginAsyncZod = async (app) => {
         'c.description',
         'c.thumbnail_url',
         'c.external_url',
+        fieldRef('cf').as('field'),
         'c.published_at',
         'c.created_at',
         'c.updated_at',
@@ -195,9 +215,15 @@ export const adminLearnRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.post('/courses', { schema: { body: CourseBody } }, async (request, reply) => {
     const coursePublicId = await db.transaction().execute(async (trx) => {
+      const { field, ...fields } = request.body;
       const row = await trx
         .insertInto('courses')
-        .values({ ...request.body, created_by: request.auth.userId, updated_by: request.auth.userId })
+        .values({
+          ...fields,
+          field_id: (await slugToId(trx, 'fields', field)) ?? null,
+          created_by: request.auth.userId,
+          updated_by: request.auth.userId,
+        })
         .returning(['id', 'public_id'])
         .executeTakeFirstOrThrow();
       await syncSearch(trx, 'courses', row.id);
@@ -210,7 +236,17 @@ export const adminLearnRoutes: FastifyPluginAsyncZod = async (app) => {
   app.patch('/courses/:id', { schema: { params: idParams, body: updateOf(CourseBody) } }, async (request) => {
     await db.transaction().execute(async (trx) => {
       const id = await contentId(trx, 'courses', request.params.id);
-      await trx.updateTable('courses').set({ ...request.body, updated_by: request.auth.userId, updated_at: new Date() }).where('id', '=', id).execute();
+      const { field, ...changes } = request.body;
+      await trx
+        .updateTable('courses')
+        .set({
+          ...changes,
+          ...(field !== undefined ? { field_id: await slugToId(trx, 'fields', field) } : {}),
+          updated_by: request.auth.userId,
+          updated_at: new Date(),
+        })
+        .where('id', '=', id)
+        .execute();
       await syncSearch(trx, 'courses', id);
       await audit(trx, request, { action: 'course.update', entityType: 'course', entityId: id, changes: request.body });
     });

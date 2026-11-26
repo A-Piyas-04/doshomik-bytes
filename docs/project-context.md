@@ -8,7 +8,7 @@
 
 ## 0. Condensed context (paste this when you only have room for one paragraph)
 
-Doshomik Bytes (দশমিক বাইটস) is a bilingual Bangla/English mobile social-learning app for machine learning, AI and research: a short-form social feed whose content is educational rather than entertainment. Prototype v1 is Android-first, built with React Native + Expo + TypeScript, a Node.js API and one PostgreSQL database with 16 tables across four areas: Social, Learn, Practice and Research. Users post text, one image, or one reel (up to 90 seconds), follow people, like, comment and reply. They learn from short learn items and team-made courses, practise MCQ and short-answer questions by topic, and read structured summaries of research papers with a "Learn first" list, a saved/reading/completed tracker, a starting roadmap per field and a discussion thread. The app has five tabs (Home, Reels, Learn, Practice, Research), plus Search, Notifications and Profile in the header. The UI follows mainstream social-app conventions users already know from Instagram-class apps: a fixed bottom tab bar, a full-screen vertical swipe reel viewer, bottom sheets for secondary actions, double-tap to like and pull-to-refresh, so navigation needs no learning. The visual identity is our own (our palette, our wordmark, our icon set): we borrow the *interaction patterns*, never the *branding*. Dark-first, Bangla-first typography, fast on cheap Android phones and slow networks.
+Doshomik Bytes (দশমিক বাইটস) is a bilingual Bangla/English mobile social-learning app for machine learning, AI and research: a short-form social feed whose content is educational rather than entertainment. Prototype v1 is Android-first, built with React Native + Expo + TypeScript, a Node.js API and one PostgreSQL database with 16 tables across four areas: Social, Learn, Practice and Research. Users post text, one image, or one reel (up to 90 seconds), follow people, like, comment and reply. They learn from short learn items and team-made courses, practise MCQ and short-answer questions by topic, and read structured summaries of research papers with a "Learn first" list, a saved/reading/completed tracker, a starting roadmap per field and a discussion thread. The app has five tabs (Home with Feed and Research sub-tabs, Learn with Practice inside, Explore, Reels, Profile); Create, the language switch and Notifications sit in Home's header. The UI follows mainstream social-app conventions users already know from Instagram-class apps: a fixed bottom tab bar, a full-screen vertical swipe reel viewer, bottom sheets for secondary actions, double-tap to like and pull-to-refresh, so navigation needs no learning. The visual identity is our own (our palette, our wordmark, our icon set): we borrow the *interaction patterns*, never the *branding*. Light-first in the owner's colour theme (dark available), Bangla-first typography, fast on cheap Android phones and slow networks.
 
 ---
 
@@ -91,76 +91,70 @@ So layout, navigation, gestures, affordance placement and information density sh
 
 ### 2.2 Information architecture
 
-**Five fixed bottom tabs, with Create, Search, Notifications and Profile in the header:**
+> Updated 26 Nov 2026 to the owner's frontend brief (it replaces the earlier five-tab layout). Decisions and the full Research design: [`frontend-implementation-notes.md`](frontend-implementation-notes.md).
+
+**Five fixed bottom tabs. Home has its own header and two sub-tabs:**
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│  Doshomik Bytes            (+)   Search   Bell(3)   Avatar │  ← header
+│  (+)            Doshomik. (wordmark)       [বাং|EN]  Bell  │  ← Home header
+│               Feed               Research                  │  ← Home sub-tabs
 ├────────────────────────────────────────────────────────────┤
-│                                                            │
 │                         CONTENT                            │
-│                                                            │
 ├────────────────────────────────────────────────────────────┤
-│   Home      Reels      Learn      Practice      Research   │  ← tab bar
+│   Home      Learn      Explore      Reels      Profile     │  ← tab bar
 └────────────────────────────────────────────────────────────┘
 ```
 
-- **Home** — posts (text, image, reel) from people you follow, newest first. Reels in the feed are 9:16 previews that open the full-screen reel viewer on tap. With no follows yet, Home suggests people to follow and points to Learn and Research.
-- **Reels** — reel posts only, in a full-screen vertical scrolling viewer.
-- **Learn** — browse courses (ours and external course cards) and learn items, or search a topic. Open a single learn item on its own, or open a course and go through its items in order. An external course opens its outside link.
-- **Practice** — pick a topic or choose Random, answer one question at a time, see whether you were right, the correct answer and the explanation, then go to the next question.
-- **Research** — paper list with a field filter and search, plus a **Starting roadmap** entry point. Opening a paper pushes the Paper screen.
-- **Header: Create (+)** — opens a bottom sheet: `Text · Image · Reel`. Each leads to its own full-screen flow.
-- **Header: Search** — one search box; results grouped by type: Users, Posts, Topics, Learn items, Courses, Papers.
-- **Header: Notifications** — a bell with an unread count. Opening a notification goes to the post, comment or profile and marks it read.
-- **Header: Profile** — avatar, display name, bio, counts (posts / followers / following), Follow/Unfollow or Edit profile, then tabs: `Posts · Papers` (the reading tracker grouped into Saved, Reading, Completed).
+- **Home › Feed** — posts (text, image, reel) from people you follow, newest first. Reels show a poster that opens the full-screen viewer. With few follows, "Suggested for you" and a way into Research.
+- **Home › Research** — the main attraction: your desk (one contextual row: Up next, this month, pick your fields, or start a roadmap), reading paths (Roadmaps, Trails), then papers by area with search. Pushes Paper, Learn first, Roadmaps, Trails, Trail, Library.
+- **Learn** — area chips (ML fundamentals, Deep learning, Computer vision, Transformers, LLMs), Continue, courses (ours and free outside ones), lessons by concept. A **Practice** button in the header opens practice (by area or Random, named quizzes, history).
+- **Explore** — one search box for people, papers, lessons, courses, topics and posts (results in Top · Papers · Learn · People · Posts); while not searching, a grid of posts filtered by area.
+- **Reels** — reel posts only, full-height vertical paging; the tab bar stays.
+- **Profile** — avatar, name, bio, counts, Edit profile or Follow, then `Posts · Research` (reading counts and published trails). Settings from the gear.
+- **Header: Create (+)** — a sheet: `Text · Image · Reel`, each a full-screen flow. **Language switch** — EN/বাং for the whole app. **Bell** — notifications with an unread dot.
 
-The tab bar is fixed and 56dp tall. It is always visible except in the full-screen reel viewer, any create flow and modal screens. The active tab shows a filled icon in the accent colour; inactive tabs show outline icons at 60% opacity. Tapping the active tab scrolls that stack to the top; double-tapping refreshes.
+The tab bar has labels; the active tab gets a filled icon, full-strength label and a small amber dot. Tapping the active tab returns its stack to the top. It is hidden only under full-screen screens (create flows, trail editor, edit profile, the single-reel viewer, the image viewer).
 
-**Pushed screens** (not tabs), reachable from lists, search and notifications: Paper, Learn first, Starting roadmap, Course, Learn item, Post detail with comments, another user's Profile.
+**Pushed screens**, shared by every tab's stack: Paper, Learn first, Roadmaps, Trails, Trail, Library, Paper search, Course, Lesson, Topic, Practice, Practice session, Practice history, Post, Comments, Profile, Notifications, Settings.
 
 ### 2.3 Visual language
 
-**Dark-first.** The app ships in dark mode by default, because the main surface is full-screen video and because it is what this audience expects from a short-form app. Light mode is a full first-class theme, not a stylesheet afterthought: every colour is a semantic token, never a literal.
+**Light-first**, in the owner's colour theme (mockups of 26 Nov 2026): a warm light-grey page, white surfaces, ink text, a deep teal primary, mint washes and amber as the second accent. Dark is a full first-class theme on the logo's ink. Every colour is a semantic token in `apps/mobile/src/theme/tokens.ts`, never a literal.
 
 #### Colour tokens
 
 ```ts
-// Dark theme (default)
-bg.base       #0B0B0F   // app background, reel player
-bg.surface    #16161C   // cards, sheets, inputs
-bg.elevated   #1F1F27   // menus, pressed states, chips
-border.subtle #26262F
-text.primary  #F5F5F7
-text.secondary #A0A0AB
-text.tertiary #6B6B76
+// Light theme (default)
+bg            #F3F4F1   // page
+surface       #FFFFFF   // rows, sheets, inputs
+elevated      #ECEEEA   // pressed, skeletons, switch track
+border        #E2E4DF
+text          #15181E
+textSecondary #50555C
+textTertiary  #7B8086
+accent        #12755E   // deep teal: primary actions, links, bookmarks, progress, reading dots
+accentWash    #DDF1E9   // mint wash behind accent badges
+highlight     #F2A20C   // amber: active-tab dot, New/Trending badges
+inverse       #16191F   // ink: selected chip, "Up next" banner
 
-// Light theme
-bg.base       #FFFFFF
-bg.surface    #F7F7F9
-bg.elevated   #FFFFFF
-border.subtle #E6E6EB
-text.primary  #0B0B0F
-text.secondary #5A5A66
-text.tertiary  #8E8E99
+// Dark theme
+bg #16191F · surface #1E2128 · elevated #282C34 · border #30343D
+text #F4F1E8 · accent #5BC9A1 (the logo's mint) · highlight #F5A524
 
-// Brand & semantic (identical in both themes)
-brand.primary   #1FB58F   // primary actions, Follow, active tab
-brand.research  #7C5CFF   // Research tab, paper surfaces, paper card accents
-brand.learn     #F5A524   // Learn and Practice surfaces, courses
-state.like      #FF3366   // heart, filled on like
-state.danger    #E5484D   // destructive actions, delete
-state.success   #30A46C   // correct answer, completed paper
-state.warning   #F76808
+// Semantic
+like #E5484D · danger #D33A40 · alert (unread dot) #EF5350
 ```
 
-Treat these as placeholders for a brand palette if one is supplied later, but **never** hardcode hex values in components. Everything reads from the theme.
+Shapes: blocks 12, buttons and chips 8, badges 4; no pills. Lists are rows on one white surface with hairline dividers, not stacks of floating cards.
 
 #### Typography
 
 Two families, loaded together, selected per script:
 
 - **Latin:** Inter (or the system `-apple-system` / Roboto fallback).
+- **Paper titles and reading surfaces:** Source Serif 4 (Bengali runs inside it use Noto Sans Bengali).
+- **Labels and step numbers:** JetBrains Mono, upper-case for Latin only.
 - **Bangla:** Noto Sans Bengali (fallback: Hind Siliguri). Bangla conjuncts and matras need vertical room, so Bangla text gets **line-height 1.6–1.7**, compared with 1.4–1.5 for Latin. Never apply negative letter-spacing to Bangla. Never force uppercase on Bangla (it has no case). Pick Western Arabic numerals app-wide unless a string is explicitly localised otherwise, and be consistent.
 
 ```

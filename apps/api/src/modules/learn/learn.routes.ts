@@ -5,20 +5,23 @@ import { idParams, slug, slugParams } from '../../lib/validation';
 import * as learn from './learn.service';
 
 export const learnRoutes: FastifyPluginAsyncZod = async (app) => {
-  app.get('/topics', async () => ({ items: await learn.listTopics() }));
+  app.get('/topics', { schema: { querystring: z.object({ field: slug.optional() }) } }, async (request) => ({
+    items: await learn.listTopics({ field: request.query.field }),
+  }));
 
   app.get('/topics/:slug', { schema: { params: slugParams } }, async (request) => learn.getTopic(request.params.slug));
 
-  app.get('/learn-items', { schema: { querystring: pageQuery.extend({ topic: slug.optional() }) } }, async (request) => {
-    const { topic, ...page } = request.query;
-    return learn.listLearnItems({ topic }, page);
+  app.get('/learn-items', { schema: { querystring: pageQuery.extend({ topic: slug.optional(), field: slug.optional() }) } }, async (request) => {
+    const { topic, field, ...page } = request.query;
+    return learn.listLearnItems({ topic, field }, page);
   });
 
   app.get('/learn-items/:id', { schema: { params: idParams } }, async (request) => learn.getLearnItem(request.params.id));
 
-  app.get('/courses', { schema: { querystring: pageQuery } }, async (request) =>
-    learn.listCourses(request.auth.userId, request.query),
-  );
+  app.get('/courses', { schema: { querystring: pageQuery.extend({ field: slug.optional() }) } }, async (request) => {
+    const { field, ...page } = request.query;
+    return learn.listCourses(request.auth.userId, { field }, page);
+  });
 
   app.get('/courses/:id', { schema: { params: idParams } }, async (request) =>
     learn.getCourse(request.auth.userId, request.params.id),

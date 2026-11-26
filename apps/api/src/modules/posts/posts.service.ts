@@ -2,11 +2,11 @@ import type { PostType } from '@doshomik/shared';
 import { sql } from 'kysely';
 import { env } from '../../config/env';
 import { db } from '../../db';
-import { isVisiblePost } from '../../db/visibility';
+import { isSearchablePost, isVisiblePost } from '../../db/visibility';
 import { badRequest, conflict, forbidden, found, notFound } from '../../lib/errors';
 import { emit, emitSearchSync } from '../../lib/outbox';
 import { fetchPage, mapPage, type PageQuery } from '../../lib/pagination';
-import { topicRef } from '../learn/learn.service';
+import { inArea, topicRef } from '../learn/learn.service';
 import { MEDIA_COLUMNS, mediaView, type MediaColumns } from '../media/media.service';
 import { userSummary, type UserSummary } from '../users/user-summary';
 import { visibleUserId } from '../users/users.service';
@@ -100,6 +100,20 @@ export async function listFeed(viewerId: number, page: PageQuery) {
 /** Newest reels the viewer may see. Ranking by engagement waits for Redis and watch data. */
 export async function listReels(viewerId: number, page: PageQuery) {
   const query = selectPosts(viewerId).where('p.type', '=', 'reel').where('p.status', '=', 'published');
+  return mapPage(await fetchPage(query, 'p', page), toPost);
+}
+
+/**
+ * Explore: published posts from public accounts the viewer may see, newest first, without the
+ * viewer's own. The same rule as search (isSearchablePost), so private posts never appear. `field`
+ * keeps one learn area's posts, through the topic each post is tagged with (migration 007).
+ * Ranking by engagement waits for Redis and watch data, like the Reels order.
+ */
+export async function listExplore(viewerId: number, filter: { field?: string }, page: PageQuery) {
+  const query = selectPosts(viewerId)
+    .where(isSearchablePost(viewerId, 'p', 'u'))
+    .where('p.user_id', '!=', viewerId)
+    .$if(filter.field !== undefined, (qb) => qb.where(inArea('pt', filter.field!)));
   return mapPage(await fetchPage(query, 'p', page), toPost);
 }
 

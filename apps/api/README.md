@@ -162,6 +162,7 @@ What the worker does:
 | POST | `/posts` | `{ type, caption?, media_id?, topic? }`. `topic` (a topic slug) tags a reel with a concept, so Learn before reading can link it |
 | GET / DELETE | `/posts/:id` | Delete is a soft delete, purged after 30 days |
 | GET | `/feed`, `/reels` | Home (accepted follows) and Reels, newest first |
+| GET | `/explore?field=` | Explore grid: published posts from public accounts, not the viewer's own, newest first. `field` keeps one learn area's posts (through each post's topic) |
 | PUT / DELETE | `/posts/:id/like`, `/posts/:id/save` | |
 | GET / POST | `/posts/:id/comments`, `/papers/:id/comments` | `{ body, parent_id? }` |
 | GET / DELETE | `/comments/:id/replies`, `/comments/:id` | Deleted comments stay as `is_deleted` placeholders |
@@ -170,17 +171,17 @@ What the worker does:
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/topics`, `/topics/:slug` | |
+| GET | `/topics?field=`, `/topics/:slug` | Each topic has its learn area, `field` (`{ slug, name }` or null; migration 007) |
 | PUT / DELETE | `/topics/:slug/known` | "I already know this" |
-| GET | `/learn-items?topic=`, `/learn-items/:id` | |
+| GET | `/learn-items?topic=&field=`, `/learn-items/:id` | `field` filters by learn area, through the item's topic |
 | PUT / DELETE | `/learn-items/:id/complete` | Completed lessons and notes (course progress also marks the steps it reaches) |
-| GET | `/courses`, `/courses/:id` | With `my_progress` |
+| GET | `/courses?field=`, `/courses/:id` | With `my_progress` and the course's learn area `field` |
 | PUT | `/courses/:id/progress` | `{ last_position }`; the last step marks the course completed |
-| GET | `/practice/questions?topic=&limit=` | Random; no answers |
+| GET | `/practice/questions?topic=&field=&limit=` | Random; no answers. `field` draws from every topic of one learn area |
 | POST | `/practice/questions/:id/answer` | `{ answer }` → `{ correct, correct_answer, explanation }`; recorded |
 | GET | `/me/practice/history`, `/me/practice/stats` | Stats give accuracy per topic and `streak_days` |
-| GET | `/quizzes?topic=`, `/quizzes/:id` | |
-| GET | `/fields`, `/fields/:slug/roadmap` | Fields are the topic chips, in `position` order |
+| GET | `/quizzes?topic=&field=`, `/quizzes/:id` | |
+| GET | `/fields`, `/fields/:slug/roadmap` | Fields are the learn areas (one set of chips for Research, Learn, Practice and Explore), in `position` order |
 | GET | `/papers?field=&q=&interests=true&sort=trend\|newest` | Default order is the trend rank kept by the worker. `q` searches title, authors and the cards' questions and key idea in English and Bangla |
 | GET | `/papers/:id` | Adds `cards` (`en`, `bn`), `links` (`open_url`, `pdf_url`, `code_url`), metadata, and `my_reading` (step and private note) |
 | GET | `/papers/:id/learn-first` | `ready` / `total`, `ai_suggested`, and per topic `label`, `why`, `link` (lesson, note, quiz or reel), `known`, `done` |
@@ -215,7 +216,7 @@ What the worker does:
 | moderator+ | POST | `/admin/reports/:id/resolve { action: dismiss, remove_content or suspend_user }` |
 | admin | GET · POST · PATCH | `/admin/papers`, `/admin/courses`, `/admin/learn-items`, `/admin/questions`, `/admin/quizzes` (lists take `?status=`), and `GET /admin/<type>/:id` for the preview |
 | admin | PUT · DELETE | `/admin/<type>/:id/status { status: draft, published or archived }`, `/admin/<type>/:id` |
-| admin | POST · PATCH · DELETE | `/admin/topics[/:slug]`, `/admin/fields[/:slug]` |
+| admin | POST · PATCH · DELETE | `/admin/topics[/:slug]`, `/admin/fields[/:slug]`. Topics and courses take `field` (a learn area slug, or null to unfile) |
 | admin | PUT | `/admin/courses/:id/items { item_ids }`, `/admin/quizzes/:id/questions { question_ids }`, `/admin/papers/:id/prerequisites { topics }` or `{ items: [{ topic, label?, why?, link?, suggested_by? }] }`, `/admin/fields/:slug/roadmap { steps }` |
 | admin | POST | `/admin/papers/import { field, arxiv_id or doi }` (draft; the worker fills metadata), `/admin/papers/:id/sync` (queue a refresh) |
 | admin | GET · PUT · DELETE | `/admin/papers/:id/cards`, `/admin/papers/:id/cards/:lang` (`en` or `bn`). PUT `{ question?, extra_questions?, problem?, key_idea?, data_source?, method_steps?, findings?, evaluation?, figures?, takeaway?, limitations?, glossary?, source? }`. The paper's summary fields (`research_questions`, `main_idea`, `results`…) in `/admin/papers` read and write the English card |

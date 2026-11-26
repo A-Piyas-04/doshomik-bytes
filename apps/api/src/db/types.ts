@@ -90,6 +90,7 @@ export interface Courses {
   created_by: number | null;
   description: string | null;
   external_url: string | null;
+  field_id: number | null;
   id: Generated<number>;
   public_id: Generated<string>;
   published_at: Timestamp | null;
@@ -411,6 +412,7 @@ export interface Sessions {
 }
 
 export interface Topics {
+  field_id: number | null;
   id: Generated<number>;
   name: string;
   slug: string;

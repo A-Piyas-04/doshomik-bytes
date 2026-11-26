@@ -18,6 +18,11 @@ export const postRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get('/reels', { schema: { querystring: pageQuery } }, async (request) => posts.listReels(request.auth.userId, request.query));
 
+  app.get('/explore', { schema: { querystring: pageQuery.extend({ field: slug.optional() }) } }, async (request) => {
+    const { field, ...page } = request.query;
+    return posts.listExplore(request.auth.userId, { field }, page);
+  });
+
   app.get('/users/:id/posts', { schema: { params: idParams, querystring: pageQuery } }, async (request) =>
     posts.listUserPosts(request.auth.userId, request.params.id, request.query),
   );
