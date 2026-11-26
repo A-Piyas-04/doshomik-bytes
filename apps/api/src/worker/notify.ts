@@ -35,6 +35,7 @@ export async function notify(
           eb
             .selectFrom('blocks')
             .select('blocker_id')
+            .where('is_active', '=', true)
             .where((b) =>
               b.or([
                 b.and([b('blocker_id', '=', alert.userId), b('blocked_id', '=', alert.actorId)]),

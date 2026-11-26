@@ -291,24 +291,40 @@ export async function block(blockerId: number, userPublicId: string): Promise<vo
   if (target.id === blockerId) throw badRequest('You cannot block yourself', 'SELF_BLOCK');
 
   await db.transaction().execute(async (trx) => {
-    await trx.insertInto('blocks').values({ blocker_id: blockerId, blocked_id: target.id }).onConflict((oc) => oc.doNothing()).execute();
+    // One row per pair: blocking again reactivates it, keeping created_at (the first block).
+    await trx
+      .insertInto('blocks')
+      .values({ blocker_id: blockerId, blocked_id: target.id })
+      .onConflict((oc) =>
+        oc.columns(['blocker_id', 'blocked_id']).doUpdateSet({ is_active: true, updated_at: sql`now()` }).where('blocks.is_active', '=', false),
+      )
+      .execute();
     // Kept as 'inactive' rather than deleted, so block → unblock → follow can't re-notify either.
     await endFollow(trx, blockerId, target.id);
     await endFollow(trx, target.id, blockerId);
   });
 }
 
+/** Ends a block, keeping the row with is_active = false. Does nothing if there is no active block. */
 export async function unblock(blockerId: number, userPublicId: string): Promise<void> {
-  await db.deleteFrom('blocks').where('blocker_id', '=', blockerId).where('blocked_id', '=', idOfUser(userPublicId)).execute();
+  await db
+    .updateTable('blocks')
+    .set({ is_active: false, updated_at: sql`now()` })
+    .where('blocker_id', '=', blockerId)
+    .where('blocked_id', '=', idOfUser(userPublicId))
+    .where('is_active', '=', true)
+    .execute();
 }
 
+/** The user's active blocks, most recent first by when each (re)started. */
 export function listBlocks(userId: number, page: PageQuery) {
   const query = db
     .selectFrom('blocks as b')
     .innerJoin('users as u', 'u.id', 'b.blocked_id')
     .where('b.blocker_id', '=', userId)
-    .select([userSummary('u').as('user'), 'b.created_at as blocked_at']);
-  return fetchPage(query, { createdAt: 'b.created_at', id: 'b.blocked_id' }, page);
+    .where('b.is_active', '=', true)
+    .select([userSummary('u').as('user'), 'b.updated_at as blocked_at']);
+  return fetchPage(query, { createdAt: 'b.updated_at', id: 'b.blocked_id' }, page);
 }
 
 /** Fields picked at onboarding. */

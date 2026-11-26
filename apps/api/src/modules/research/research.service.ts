@@ -8,7 +8,7 @@ import {
 } from '@doshomik/shared';
 import { sql } from 'kysely';
 import { env } from '../../config/env';
-import { db } from '../../db';
+import { db, type Db } from '../../db';
 import { fullText } from '../../db/search';
 import { canSeeContentOf, isPublished, isVisiblePost } from '../../db/visibility';
 import { found, notFound } from '../../lib/errors';
@@ -16,18 +16,50 @@ import { fetchPage, fetchRankedPage, type PageQuery } from '../../lib/pagination
 import { MEDIA_COLUMNS, mediaView } from '../media/media.service';
 import { visibleUserId } from '../users/users.service';
 
-/** The default Research order. Must match papers_trend_idx: unranked papers come last. */
-const trendRank = sql<number>`coalesce(p.trend_rank, 2147483647)`;
+/** The default Research order. Must match paper_metrics_trend_idx: unranked papers come last. */
+const trendRank = sql<number>`coalesce(pm.trend_rank, 2147483647)`;
 
 /**
- * Published papers as lists show them: metadata from ingestion (venue, citations, Hugging Face
- * upvotes, trend rank, New badge), the card question in both languages, and the viewer's save,
- * reading step and Prototype 2 tracker status (`my_status`, kept as it was).
+ * Creates a paper's three one-to-one companion rows (migration 006). Call it in the transaction
+ * that inserts the paper: lists and the ingestion queue join them, so a paper without them would
+ * not be listed or synced. `ids` are the identifiers known up front (an import, or staff input).
+ */
+export async function createPaperCompanions(trx: Db, paperId: number, ids: { doi?: string | null; arxiv_id?: string | null } = {}) {
+  await trx.insertInto('paper_metadata').values({ paper_id: paperId, doi: ids.doi ?? null, arxiv_id: ids.arxiv_id ?? null }).execute();
+  await trx.insertInto('paper_metrics').values({ paper_id: paperId }).execute();
+  await trx.insertInto('paper_sync').values({ paper_id: paperId }).execute(); // synced_at NULL: queued
+}
+
+/**
+ * The Prototype 2 summary fields, read from the English Paper Card (left-joined as `en`), which is
+ * their only home since migration 006. research_questions is the card question followed by its
+ * extra questions.
+ */
+export const summaryFromEnglishCard = () =>
+  [
+    sql<string[]>`CASE WHEN en.question IS NULL THEN coalesce(en.extra_questions, '{}') ELSE en.question || en.extra_questions END`.as(
+      'research_questions',
+    ),
+    sql<string | null>`en.key_idea`.as('main_idea'),
+    sql<string | null>`en.data_source`.as('data_source'),
+    sql<string[]>`coalesce(en.method_steps, '{}')`.as('method_steps'),
+    sql<string | null>`en.findings`.as('results'),
+    sql<unknown>`coalesce(en.figures, '[]'::jsonb)`.as('figures'),
+    sql<string | null>`en.limitations`.as('limitations'),
+    sql<string | null>`en.evaluation`.as('evaluation'),
+  ] as const;
+
+/**
+ * Published papers as lists show them: metadata from ingestion (venue, TLDR, citations, Hugging
+ * Face upvotes, trend rank, New badge), the card question in both languages, and the viewer's
+ * save, reading step and Prototype 2 tracker status (`my_status`, kept as it was).
  */
 export function selectPaperCards(viewerId: number) {
   return db
     .selectFrom('papers as p')
     .innerJoin('fields as f', 'f.id', 'p.field_id')
+    .innerJoin('paper_metadata as pmd', 'pmd.paper_id', 'p.id')
+    .innerJoin('paper_metrics as pm', 'pm.paper_id', 'p.id')
     .where(isPublished('p'))
     .select((eb) => [
       'p.public_id as id',
@@ -41,11 +73,11 @@ export function selectPaperCards(viewerId: number) {
       sql<{ en: string | null; bn: string | null }>`json_build_object(
         'en', (SELECT c.question FROM paper_cards c WHERE c.paper_id = p.id AND c.lang = 'en'),
         'bn', (SELECT c.question FROM paper_cards c WHERE c.paper_id = p.id AND c.lang = 'bn'))`.as('question'),
-      'p.tldr',
-      'p.citation_count',
-      'p.hf_upvotes',
-      'p.trend_rank',
-      sql<boolean>`coalesce(p.hf_trending_at >= now() - make_interval(days => ${PAPER_TRENDING_DAYS}), false)`.as('is_trending'),
+      'pmd.tldr',
+      'pm.citation_count',
+      'pm.hf_upvotes',
+      'pm.trend_rank',
+      sql<boolean>`coalesce(pm.hf_trending_at >= now() - make_interval(days => ${PAPER_TRENDING_DAYS}), false)`.as('is_trending'),
       sql<boolean>`coalesce(p.published_on >= current_date - ${PAPER_NEW_DAYS}::int, false)`.as('is_new'),
       eb
         .exists(eb.selectFrom('paper_saves as s').whereRef('s.paper_id', '=', 'p.id').where('s.user_id', '=', viewerId).select(sql.lit(1).as('one')))
@@ -85,39 +117,36 @@ export function listPapers(
       qb.where('p.field_id', 'in', (eb) => eb.selectFrom('user_fields').select('field_id').where('user_id', '=', viewerId)),
     );
   if (filter.sort === 'newest') return fetchPage(query, 'p', page);
-  return fetchRankedPage(query, { rank: trendRank, id: 'p.id' }, page);
+  // pm.paper_id (= p.id) so the order is the index's, and Postgres reads paper_metrics_trend_idx in order.
+  return fetchRankedPage(query, { rank: trendRank, id: 'pm.paper_id' }, page);
 }
 
 type CardJson = Record<'en' | 'bn', unknown>;
 
 /**
- * The paper screen: the Prototype 2 structured summary (unchanged), the Paper Card in each language
- * it exists in, scholarly metadata, the links to open the original (A10; we never host a PDF) and
- * the viewer's own reading pass with their private note.
+ * The paper screen: the Prototype 2 structured summary (same keys as before, now read from the
+ * English card), the Paper Card in each language it exists in, scholarly metadata, the links to
+ * open the original (A10; we never host a PDF) and the viewer's own reading pass with their
+ * private note.
  */
 export async function getPaper(viewerId: number, paperPublicId: string) {
   const paper = await selectPaperCards(viewerId)
+    .leftJoin('paper_cards as en', (join) => join.onRef('en.paper_id', '=', 'p.id').on('en.lang', '=', 'en'))
     .select([
       'p.paper_url',
-      'p.research_questions',
-      'p.main_idea',
-      'p.data_source',
-      'p.method_steps',
-      'p.results',
-      'p.figures',
-      'p.limitations',
-      'p.evaluation',
+      ...summaryFromEnglishCard(),
       'p.published_at',
       'p.abstract',
-      'p.doi',
-      'p.arxiv_id',
+      'pmd.doi',
+      'pmd.arxiv_id',
       sql<string | null>`to_char(p.published_on, 'YYYY-MM-DD')`.as('published_on'),
       sql<{ open_url: string; pdf_url: string | null; code_url: string | null }>`json_build_object(
         'open_url', p.paper_url, 'pdf_url', p.pdf_url, 'code_url', p.code_url)`.as('links'),
       sql<Partial<CardJson>>`coalesce((
         SELECT json_object_agg(c.lang, json_build_object(
-          'question', c.question, 'problem', c.problem, 'key_idea', c.key_idea, 'method_steps', c.method_steps,
-          'findings', c.findings, 'takeaway', c.takeaway, 'limitations', c.limitations, 'glossary', c.glossary,
+          'question', c.question, 'extra_questions', c.extra_questions, 'problem', c.problem, 'key_idea', c.key_idea,
+          'data_source', c.data_source, 'method_steps', c.method_steps, 'findings', c.findings, 'evaluation', c.evaluation,
+          'figures', c.figures, 'takeaway', c.takeaway, 'limitations', c.limitations, 'glossary', c.glossary,
           'source', c.source, 'updated_at', c.updated_at))
         FROM paper_cards c WHERE c.paper_id = p.id), '{}'::json)`.as('cards'),
       sql<unknown>`(SELECT json_build_object('step', rp.step, 'note', rp.note, 'explored_at', rp.explored_at,
@@ -284,7 +313,7 @@ export async function getLineage(viewerId: number, paperPublicId: string, limit:
       .where('e.citing_paper_id', '=', paperId)
       .select(['e.intent', 'e.is_influential'])
       .orderBy('e.is_influential', 'desc')
-      .orderBy(sql`p.citation_count DESC NULLS LAST`)
+      .orderBy(sql`pm.citation_count DESC NULLS LAST`)
       .orderBy('p.id')
       .limit(limit)
       .execute(),
@@ -293,7 +322,7 @@ export async function getLineage(viewerId: number, paperPublicId: string, limit:
       .where('e.cited_paper_id', '=', paperId)
       .select(['e.intent', 'e.is_influential'])
       .orderBy('e.is_influential', 'desc')
-      .orderBy(sql`p.citation_count DESC NULLS LAST`)
+      .orderBy(sql`pm.citation_count DESC NULLS LAST`)
       .orderBy('p.id')
       .limit(limit)
       .execute(),

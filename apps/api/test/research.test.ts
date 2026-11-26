@@ -254,3 +254,161 @@ describe('A13 Learn before reading', () => {
     expect(after.topics[1]).toMatchObject({ known: true, done: true });
   });
 });
+
+describe('papers split into companion tables (migration 006)', () => {
+  const companions = async (publicId: string) => {
+    const { id } = await db.selectFrom('papers').select('id').where('public_id', '=', publicId).executeTakeFirstOrThrow();
+    const [metadata, metrics, sync] = await Promise.all([
+      db.selectFrom('paper_metadata').selectAll().where('paper_id', '=', id).executeTakeFirst(),
+      db.selectFrom('paper_metrics').selectAll().where('paper_id', '=', id).executeTakeFirst(),
+      db.selectFrom('paper_sync').selectAll().where('paper_id', '=', id).executeTakeFirst(),
+    ]);
+    return { id, metadata, metrics, sync };
+  };
+
+  it('creates the companion rows with a paper and stores the summary on the English card', async () => {
+    const admin = await createUser(ctx.app, 'boss', { role: 'admin' });
+    await ok(admin, 'POST', '/v1/admin/fields', { name: 'Transformers' });
+    const figure = { url: 'https://cdn.example.com/fig1.png', caption: 'The Transformer' };
+    const paper = await ok(admin, 'POST', '/v1/admin/papers', {
+      field: 'transformers',
+      title: 'Attention Is All You Need',
+      paper_url: 'https://arxiv.org/abs/1706.03762',
+      doi: 'https://doi.org/10.48550/ARXIV.1706.03762',
+      research_questions: ['Can attention replace recurrence?', 'Does it train faster?'],
+      main_idea: 'Self-attention only.',
+      data_source: 'WMT 2014',
+      method_steps: ['Embed', 'Attend'],
+      results: 'State-of-the-art BLEU.',
+      figures: [figure],
+      limitations: 'Quadratic in length.',
+      evaluation: 'BLEU on WMT.',
+    });
+    // The admin response keeps its shape.
+    expect(paper).toMatchObject({
+      doi: '10.48550/arxiv.1706.03762',
+      research_questions: ['Can attention replace recurrence?', 'Does it train faster?'],
+      main_idea: 'Self-attention only.',
+      results: 'State-of-the-art BLEU.',
+      figures: [figure],
+      synced_at: null,
+      trend_rank: null,
+    });
+
+    const rows = await companions(paper.id);
+    expect(rows.metadata).toMatchObject({ doi: '10.48550/arxiv.1706.03762', arxiv_id: null, openalex_topics: [] });
+    expect(rows.metrics).toEqual({ paper_id: rows.id, citation_count: null, hf_upvotes: null, hf_trending_at: null, trend_rank: null });
+    expect(rows.sync).toEqual({ paper_id: rows.id, synced_at: null, sync_error: null });
+
+    const [card] = (await ok(admin, 'GET', `/v1/admin/papers/${paper.id}/cards`)).items;
+    expect(card).toMatchObject({
+      lang: 'en',
+      question: 'Can attention replace recurrence?',
+      extra_questions: ['Does it train faster?'],
+      key_idea: 'Self-attention only.',
+      data_source: 'WMT 2014',
+      method_steps: ['Embed', 'Attend'],
+      findings: 'State-of-the-art BLEU.',
+      figures: [figure],
+      evaluation: 'BLEU on WMT.',
+      updated_by: 'boss',
+    });
+
+    // PATCH changes only what it sends, on the card.
+    const patched = await ok(admin, 'PATCH', `/v1/admin/papers/${paper.id}`, { main_idea: 'Attention, nothing else.', research_questions: ['One question'] });
+    expect(patched).toMatchObject({ main_idea: 'Attention, nothing else.', research_questions: ['One question'], results: 'State-of-the-art BLEU.' });
+
+    await ok(admin, 'PUT', `/v1/admin/papers/${paper.id}/status`, { status: 'published' });
+    const user = await createUser(ctx.app, 'ali');
+    const live = await ok(user, 'GET', `/v1/papers/${paper.id}`);
+    expect(live).toMatchObject({ main_idea: 'Attention, nothing else.', research_questions: ['One question'], evaluation: 'BLEU on WMT.', figures: [figure] });
+    expect(live.cards.en).toMatchObject({ key_idea: 'Attention, nothing else.', extra_questions: [], data_source: 'WMT 2014' });
+
+    // A card PUT from a client that doesn't know the four moved fields leaves them as they are.
+    await ok(admin, 'PUT', `/v1/admin/papers/${paper.id}/cards/en`, { question: 'One question', key_idea: 'Rewritten', takeaway: 'Read it' });
+    expect((await ok(admin, 'GET', `/v1/admin/papers/${paper.id}/cards`)).items[0]).toMatchObject({
+      key_idea: 'Rewritten',
+      takeaway: 'Read it',
+      data_source: 'WMT 2014',
+      evaluation: 'BLEU on WMT.',
+      figures: [figure],
+    });
+
+    // A paper without summary fields gets no card; deleting a paper removes its companions.
+    const bare = await ok(admin, 'POST', '/v1/admin/papers', { field: 'transformers', title: 'Bare', paper_url: 'https://example.com/bare' });
+    expect(bare).toMatchObject({ research_questions: [], method_steps: [], figures: [], main_idea: null });
+    expect((await ok(admin, 'GET', `/v1/admin/papers/${bare.id}/cards`)).items).toHaveLength(0);
+    const bareRows = await companions(bare.id);
+    await ok(admin, 'DELETE', `/v1/admin/papers/${bare.id}`);
+    for (const table of ['paper_metadata', 'paper_metrics', 'paper_sync'] as const) {
+      expect(await db.selectFrom(table).select('paper_id').where('paper_id', '=', bareRows.id).executeTakeFirst()).toBeUndefined();
+    }
+  });
+
+  it('keeps outside identifiers unique', async () => {
+    const admin = await createUser(ctx.app, 'boss', { role: 'admin' });
+    await ok(admin, 'POST', '/v1/admin/fields', { name: 'Transformers' });
+    await ok(admin, 'POST', '/v1/admin/papers/import', { field: 'transformers', arxiv_id: '1706.03762' });
+    const again = await call(ctx.app, admin, 'POST', '/v1/admin/papers/import', { field: 'transformers', arxiv_id: '1706.03762' });
+    expect(again.body.error.code).toBe('ALREADY_EXISTS');
+
+    const base = { field: 'transformers', title: 'X', paper_url: 'https://example.com/x' };
+    await ok(admin, 'POST', '/v1/admin/papers', { ...base, doi: '10.1000/one' });
+    expect((await call(ctx.app, admin, 'POST', '/v1/admin/papers', { ...base, doi: '10.1000/ONE' })).status).toBe(409); // normalised, then unique
+    const other = await ok(admin, 'POST', '/v1/admin/papers', { ...base, doi: '10.1000/two' });
+    expect((await call(ctx.app, admin, 'PATCH', `/v1/admin/papers/${other.id}`, { arxiv_id: '1706.03762' })).status).toBe(409);
+    expect((await call(ctx.app, admin, 'PATCH', `/v1/admin/papers/${other.id}`, { arxiv_id: '1706.03762v5' })).status).toBe(400); // no version
+    expect(await ok(admin, 'PATCH', `/v1/admin/papers/${other.id}`, { doi: null })).toMatchObject({ doi: null });
+    // The failed create rolled back with its companions: no orphan rows.
+    expect(await db.selectFrom('papers').select(({ fn }) => fn.countAll<number>().as('n')).executeTakeFirstOrThrow()).toEqual({ n: 3 });
+  });
+
+  it('records sync results and errors on paper_sync, and only queues papers with an identifier', async () => {
+    const { admin, attention } = await seedCollection();
+    expect((await companions(attention.id)).sync).toMatchObject({ synced_at: expect.any(Date), sync_error: null });
+    expect((await companions(attention.id)).metadata).toMatchObject({ openalex_id: 'W1', s2_id: 's2-attention', tldr: 'Attention alone is enough.' });
+
+    const bare = await ok(admin, 'POST', '/v1/admin/papers', { field: 'transformers', title: 'No ids', paper_url: 'https://example.com/n' });
+    expect((await call(ctx.app, admin, 'POST', `/v1/admin/papers/${bare.id}/sync`)).body.error.code).toBe('NO_IDENTIFIER');
+
+    await ok(admin, 'POST', `/v1/admin/papers/${attention.id}/sync`);
+    expect((await companions(attention.id)).sync).toMatchObject({ synced_at: null });
+    providers.scholarly = { ...fakeSources, openAlex: { work: async () => Promise.reject(new Error('OpenAlex is down')) } };
+    expect(await syncDuePapers(silent)).toBe(1); // the paper without ids is never picked
+    expect((await companions(attention.id)).sync).toMatchObject({ synced_at: expect.any(Date), sync_error: 'OpenAlex is down' });
+    expect((await companions(bare.id)).sync).toMatchObject({ synced_at: null });
+  });
+
+  it('ranks only published papers, from paper_metrics', async () => {
+    const { admin, attention, bert } = await seedCollection();
+    expect((await companions(bert.id)).metrics).toMatchObject({ trend_rank: 1, hf_upvotes: 42, citation_count: 90000, hf_trending_at: expect.any(Date) });
+    expect((await companions(attention.id)).metrics).toMatchObject({ trend_rank: 2, hf_upvotes: null, citation_count: 150000 });
+
+    await ok(admin, 'PUT', `/v1/admin/papers/${bert.id}/status`, { status: 'archived' });
+    await rankPapers();
+    expect((await companions(bert.id)).metrics).toMatchObject({ trend_rank: null });
+    expect((await companions(attention.id)).metrics).toMatchObject({ trend_rank: 1 });
+    const user = await createUser(ctx.app, 'ali');
+    expect((await ok(user, 'GET', '/v1/papers')).items.map((p: { id: string }) => p.id)).toEqual([attention.id]);
+  });
+
+  it('searches the card questions and key idea in both languages, and follows card changes', async () => {
+    const { admin, attention, bert } = await seedCollection();
+    const user = await createUser(ctx.app, 'ali');
+    const ids = async (q: string) => (await ok(user, 'GET', `/v1/papers?q=${encodeURIComponent(q)}`)).items.map((p: { id: string }) => p.id);
+
+    await ok(admin, 'PATCH', `/v1/admin/papers/${attention.id}`, {
+      main_idea: 'Multi-head self-attention',
+      research_questions: ['Is recurrence needed?', 'Does parallelism help?'],
+    });
+    await ok(admin, 'PUT', `/v1/admin/papers/${bert.id}/cards/bn`, { question: 'প্রশ্ন', key_idea: 'দ্বিমুখী প্রশিক্ষণ' });
+    expect(await ids('multi-head')).toEqual([attention.id]);
+    expect(await ids('parallelism')).toEqual([attention.id]); // an extra question
+    expect(await ids('দ্বিমুখী')).toEqual([bert.id]); // the Bangla key idea
+    expect((await ok(user, 'GET', '/v1/search?q=multi-head')).papers).toHaveLength(1);
+
+    await ok(admin, 'DELETE', `/v1/admin/papers/${attention.id}/cards/en`);
+    expect(await ids('multi-head')).toEqual([]);
+    expect(await ids('Vaswani')).toEqual([attention.id]); // authors stay on papers
+  });
+});

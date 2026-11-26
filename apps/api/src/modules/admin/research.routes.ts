@@ -8,6 +8,7 @@ import { audit } from '../../lib/audit';
 import { badRequest, conflict, found } from '../../lib/errors';
 import { fetchPage } from '../../lib/pagination';
 import { httpUrl, idParams, optionalText, publicId, slug, slugify, slugParams, text, updateOf } from '../../lib/validation';
+import { createPaperCompanions, summaryFromEnglishCard } from '../research/research.service';
 import { adminListQuery, contentId, idsInOrder, lifecycleRoutes, slugToId, syncSearch } from './content';
 
 const FieldBody = z.object({
@@ -34,6 +35,11 @@ const Figure = z.object({
   caption: z.string().trim().max(500).optional(),
 });
 
+/**
+ * A paper as staff edit it. The Prototype 2 summary fields (research_questions … evaluation) are
+ * kept for the admin panel but stored on the English Paper Card (migration 006); doi and arxiv_id
+ * go to paper_metadata.
+ */
 const PaperFields = z.object({
   field: slug,
   title: text(300),
@@ -62,17 +68,44 @@ const ImportBody = z
   .object({ field: slug, arxiv_id: arxivId.optional(), doi: doi.optional() })
   .refine((body) => Boolean(body.arxiv_id) !== Boolean(body.doi), 'Give either arxiv_id or doi');
 
+/**
+ * A full card. The four fields added by migration 006 (extra_questions, data_source, evaluation,
+ * figures) hold content moved from papers, so a PUT that leaves them out keeps them as they are:
+ * a client written before 006 can't wipe them. Send null or [] to clear one.
+ */
 const CardBody = z.object({
   question: optionalText(1000),
+  extra_questions: z.array(text(1000)).max(19).optional(), // further research questions, in order
   problem: optionalText(3000),
   key_idea: optionalText(3000),
+  data_source: optionalText(2000),
   method_steps: z.array(text(2000)).max(30).default([]),
   findings: optionalText(5000),
+  evaluation: optionalText(5000),
+  figures: z.array(Figure).max(20).optional(),
   takeaway: optionalText(2000),
   limitations: optionalText(5000),
   glossary: z.array(z.object({ term: text(100), definition: text(500) })).max(50).default([]),
   source: z.enum(PAPER_CARD_SOURCES).default('staff'),
 });
+
+const CARD_COLUMNS = [
+  'lang',
+  'question',
+  'extra_questions',
+  'problem',
+  'key_idea',
+  'data_source',
+  'method_steps',
+  'findings',
+  'evaluation',
+  'figures',
+  'takeaway',
+  'limitations',
+  'glossary',
+  'source',
+  'updated_at',
+] as const;
 
 /** A prerequisite with its label, why it matters, and a typed link to our own content (A13). */
 const PrerequisiteItem = z.object({
@@ -98,11 +131,18 @@ const RoadmapBody = z.object({
     .refine((steps) => new Set(steps.map((step) => step.paper_id)).size === steps.length, 'Each paper can appear once'),
 });
 
-/** Staff view of papers: every status, with who changed them last. */
+/**
+ * Staff view of papers: every status, with who changed them last. Same response shape as before
+ * migration 006. Left joins on the companions, so a paper that somehow lacks them still shows here.
+ */
 const selectPapers = () =>
   db
     .selectFrom('papers as p')
     .innerJoin('fields as f', 'f.id', 'p.field_id')
+    .leftJoin('paper_metadata as pmd', 'pmd.paper_id', 'p.id')
+    .leftJoin('paper_metrics as pm', 'pm.paper_id', 'p.id')
+    .leftJoin('paper_sync as ps', 'ps.paper_id', 'p.id')
+    .leftJoin('paper_cards as en', (join) => join.onRef('en.paper_id', '=', 'p.id').on('en.lang', '=', 'en'))
     .leftJoin('users as editor', 'editor.id', 'p.updated_by')
     .select([
       'p.public_id as id',
@@ -112,35 +152,61 @@ const selectPapers = () =>
       'p.authors',
       'p.year',
       'p.paper_url',
-      'p.research_questions',
-      'p.main_idea',
-      'p.data_source',
-      'p.method_steps',
-      'p.results',
-      'p.figures',
-      'p.limitations',
-      'p.evaluation',
+      ...summaryFromEnglishCard(),
       'p.venue',
       'p.abstract',
       sql<string | null>`to_char(p.published_on, 'YYYY-MM-DD')`.as('published_on'),
-      'p.doi',
-      'p.arxiv_id',
-      'p.openalex_id',
-      'p.s2_id',
+      'pmd.doi',
+      'pmd.arxiv_id',
+      'pmd.openalex_id',
+      'pmd.s2_id',
       'p.pdf_url',
       'p.code_url',
-      'p.tldr',
-      'p.citation_count',
-      'p.hf_upvotes',
-      'p.trend_rank',
-      'p.openalex_topics',
-      'p.synced_at',
-      'p.sync_error',
+      'pmd.tldr',
+      'pm.citation_count',
+      'pm.hf_upvotes',
+      'pm.trend_rank',
+      'pmd.openalex_topics',
+      'ps.synced_at',
+      'ps.sync_error',
       'p.published_at',
       'p.created_at',
       'p.updated_at',
       'editor.username as updated_by',
     ]);
+
+type PaperBody = Partial<z.infer<typeof PaperFields>>;
+
+/**
+ * Splits a paper body by where each field is stored: the papers row, paper_metadata (doi,
+ * arxiv_id) and the English Paper Card (the Prototype 2 summary). Fields left out stay undefined,
+ * which Kysely skips, so a PATCH changes only what was sent.
+ */
+function splitPaperBody(body: PaperBody) {
+  const { field, doi, arxiv_id, research_questions, main_idea, data_source, method_steps, results, figures, limitations, evaluation, ...paper } = body;
+  const card = {
+    question: research_questions === undefined ? undefined : (research_questions[0] ?? null),
+    extra_questions: research_questions?.slice(1),
+    key_idea: main_idea,
+    data_source,
+    method_steps,
+    findings: results,
+    figures: figures === undefined ? undefined : JSON.stringify(figures), // jsonb: send JSON text
+    limitations,
+    evaluation,
+  };
+  return { field, paper, ids: { doi, arxiv_id }, card };
+}
+
+/** Writes summary fields from a paper body to the English card, creating it if needed. */
+async function writeSummaryToCard(trx: Db, paperId: number, card: ReturnType<typeof splitPaperBody>['card'], userId: number) {
+  if (Object.values(card).every((value) => value === undefined)) return;
+  await trx
+    .insertInto('paper_cards')
+    .values({ paper_id: paperId, lang: 'en', ...card, updated_by: userId })
+    .onConflict((oc) => oc.columns(['paper_id', 'lang']).doUpdateSet({ ...card, updated_by: userId, updated_at: sql`now()` }))
+    .execute();
+}
 
 type LinkKind = 'learn_item' | 'quiz' | 'reel';
 
@@ -242,18 +308,21 @@ export const adminResearchRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.post('/papers', { schema: { body: PaperFields } }, async (request, reply) => {
     const paperPublicId = await db.transaction().execute(async (trx) => {
-      const { field, figures, ...fields } = request.body;
+      const { paper, ids, card } = splitPaperBody(request.body);
       const row = await trx
         .insertInto('papers')
         .values({
-          ...fields,
-          field_id: await slugToId(trx, 'fields', field),
-          figures: figures === undefined ? undefined : JSON.stringify(figures), // jsonb: send JSON text
+          ...paper,
+          title: request.body.title,
+          paper_url: request.body.paper_url,
+          field_id: await slugToId(trx, 'fields', request.body.field),
           created_by: request.auth.userId,
           updated_by: request.auth.userId,
         })
         .returning(['id', 'public_id'])
         .executeTakeFirstOrThrow();
+      await createPaperCompanions(trx, row.id, ids);
+      await writeSummaryToCard(trx, row.id, card, request.auth.userId);
       await refreshPaperSearch(trx, row.id);
       await syncSearch(trx, 'papers', row.id);
       await audit(trx, request, { action: 'paper.create', entityType: 'paper', entityId: row.id, changes: request.body });
@@ -265,18 +334,16 @@ export const adminResearchRoutes: FastifyPluginAsyncZod = async (app) => {
   app.patch('/papers/:id', { schema: { params: idParams, body: updateOf(PaperFields) } }, async (request) => {
     await db.transaction().execute(async (trx) => {
       const id = await contentId(trx, 'papers', request.params.id);
-      const { field, figures, ...fields } = request.body;
+      const { field, paper, ids, card } = splitPaperBody(request.body);
       await trx
         .updateTable('papers')
-        .set({
-          ...fields,
-          field_id: await slugToId(trx, 'fields', field),
-          figures: figures === undefined ? undefined : JSON.stringify(figures),
-          updated_by: request.auth.userId,
-          updated_at: new Date(),
-        })
+        .set({ ...paper, field_id: await slugToId(trx, 'fields', field), updated_by: request.auth.userId, updated_at: new Date() })
         .where('id', '=', id)
         .execute();
+      if (ids.doi !== undefined || ids.arxiv_id !== undefined) {
+        await trx.updateTable('paper_metadata').set(ids).where('paper_id', '=', id).execute();
+      }
+      await writeSummaryToCard(trx, id, card, request.auth.userId);
       await refreshPaperSearch(trx, id);
       await syncSearch(trx, 'papers', id);
       await audit(trx, request, { action: 'paper.update', entityType: 'paper', entityId: id, changes: request.body });
@@ -342,8 +409,8 @@ export const adminResearchRoutes: FastifyPluginAsyncZod = async (app) => {
     const { field, arxiv_id, doi: paperDoi } = request.body;
     const paperPublicId = await db.transaction().execute(async (trx) => {
       const existing = await trx
-        .selectFrom('papers')
-        .select('public_id')
+        .selectFrom('paper_metadata')
+        .select('paper_id')
         .where((eb) => (arxiv_id ? eb('arxiv_id', '=', arxiv_id) : eb('doi', '=', paperDoi!)))
         .executeTakeFirst();
       if (existing) throw conflict('This paper is already in the collection', 'ALREADY_EXISTS');
@@ -353,13 +420,12 @@ export const adminResearchRoutes: FastifyPluginAsyncZod = async (app) => {
           field_id: await slugToId(trx, 'fields', field),
           title: '',
           paper_url: arxiv_id ? `https://arxiv.org/abs/${arxiv_id}` : `https://doi.org/${paperDoi}`,
-          arxiv_id: arxiv_id ?? null,
-          doi: paperDoi ?? null,
           created_by: request.auth.userId,
           updated_by: request.auth.userId,
         })
         .returning(['id', 'public_id'])
         .executeTakeFirstOrThrow();
+      await createPaperCompanions(trx, row.id, { doi: paperDoi, arxiv_id });
       await refreshPaperSearch(trx, row.id);
       await audit(trx, request, { action: 'paper.import', entityType: 'paper', entityId: row.id, changes: request.body });
       return row.public_id;
@@ -372,10 +438,18 @@ export const adminResearchRoutes: FastifyPluginAsyncZod = async (app) => {
     await db.transaction().execute(async (trx) => {
       const id = await contentId(trx, 'papers', request.params.id);
       const result = await trx
-        .updateTable('papers')
+        .updateTable('paper_sync')
         .set({ synced_at: null, sync_error: null })
-        .where('id', '=', id)
-        .where(sql<boolean>`(doi IS NOT NULL OR arxiv_id IS NOT NULL)`)
+        .where('paper_id', '=', id)
+        .where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('paper_metadata as pmd')
+              .whereRef('pmd.paper_id', '=', 'paper_sync.paper_id')
+              .where((m) => m.or([m('pmd.doi', 'is not', null), m('pmd.arxiv_id', 'is not', null)]))
+              .select(sql.lit(1).as('one')),
+          ),
+        )
         .executeTakeFirst();
       if (result.numUpdatedRows === 0n) throw badRequest('Add a DOI or arXiv id first', 'NO_IDENTIFIER');
       await audit(trx, request, { action: 'paper.sync', entityType: 'paper', entityId: id });
@@ -389,20 +463,7 @@ export const adminResearchRoutes: FastifyPluginAsyncZod = async (app) => {
       .selectFrom('paper_cards as c')
       .innerJoin('papers as p', 'p.id', 'c.paper_id')
       .leftJoin('users as editor', 'editor.id', 'c.updated_by')
-      .select([
-        'c.lang',
-        'c.question',
-        'c.problem',
-        'c.key_idea',
-        'c.method_steps',
-        'c.findings',
-        'c.takeaway',
-        'c.limitations',
-        'c.glossary',
-        'c.source',
-        'c.updated_at',
-        'editor.username as updated_by',
-      ])
+      .select([...CARD_COLUMNS.map((column) => `c.${column}` as const), 'editor.username as updated_by'])
       .where('p.public_id', '=', request.params.id)
       .orderBy('c.lang')
       .execute();
@@ -415,13 +476,19 @@ export const adminResearchRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) =>
       db.transaction().execute(async (trx) => {
         const paperId = await contentId(trx, 'papers', request.params.id);
-        const { glossary, ...card } = request.body;
-        const values = { ...card, glossary: JSON.stringify(glossary), updated_by: request.auth.userId };
+        const { glossary, figures, ...card } = request.body;
+        // Undefined values (fields not sent) are skipped by Kysely in both the insert and the update.
+        const values = {
+          ...card,
+          glossary: JSON.stringify(glossary),
+          figures: figures === undefined ? undefined : JSON.stringify(figures),
+          updated_by: request.auth.userId,
+        };
         const row = await trx
           .insertInto('paper_cards')
           .values({ paper_id: paperId, lang: request.params.lang, ...values })
           .onConflict((oc) => oc.columns(['paper_id', 'lang']).doUpdateSet({ ...values, updated_at: sql`now()` }))
-          .returning(['lang', 'question', 'problem', 'key_idea', 'method_steps', 'findings', 'takeaway', 'limitations', 'glossary', 'source', 'updated_at'])
+          .returning(CARD_COLUMNS)
           .executeTakeFirstOrThrow();
         await refreshPaperSearch(trx, paperId);
         await syncSearch(trx, 'papers', paperId);

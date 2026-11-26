@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doshomik backend guide</title>
+<script>
+  // The page opens light. A saved choice is applied before the first paint, so it doesn't flash.
+  try { const saved = localStorage.getItem('api-guide-theme'); if (saved) document.documentElement.dataset.theme = saved; } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Same skin as docs/schema-guide.html: ink on paper, hairline structure, one cobalt accent. */
+:root{
+  --bg:#FAFAF8; --surface:#FFFFFF; --ink:#15181C; --ink-2:#434A53; --muted:#737A83; --line:#E2E4E7; --line-2:#CDD1D6;
+  --accent:#2547C4; --accent-ink:#FFFFFF; --accent-soft:#EEF1FB;
+  --red:#B3402D; --red-soft:#FBEEEB; --amber:#8F6000; --amber-soft:#FAF3E2; --slate:#58626E; --slate-soft:#EFF1F3;
+  --blue:#3F6B8C; --blue-soft:#E6EEF5; --green:#2C7A4B; --green-soft:#E5F2EA; --violet:#7A4A93; --violet-soft:#F2EAF6;
+  --code-bg:rgba(21,24,28,.055);
+  --a0:#2F6A9C; --a1:#8A4C9E; --a2:#B4532A; --a3:#7C6A1F; --a4:#2C8456; --a5:#A66414; --a6:#147A86; --a7:#5C6670;
+  --font:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1114; --surface:#15181D; --ink:#E7E9EC; --ink-2:#B2B8C0; --muted:#7F868F; --line:#252A31; --line-2:#363C45;
+    --accent:#8EA5FF; --accent-ink:#0F1114; --accent-soft:#1A2140;
+    --red:#E8907E; --red-soft:#2C1C19; --amber:#DDB45C; --amber-soft:#2A2314; --slate:#A3ADB8; --slate-soft:#1D2229;
+    --blue:#8DB6D4; --blue-soft:#1C2730; --green:#7CCB9C; --green-soft:#16261D; --violet:#C896DA; --violet-soft:#261C2C;
+    --code-bg:rgba(231,233,236,.07);
+    --a0:#7DB3E3; --a1:#C896DA; --a2:#E8977A; --a3:#CDB866; --a4:#7CCB9C; --a5:#E3A35E; --a6:#6CC6D1; --a7:#A6B0BA;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1114; --surface:#15181D; --ink:#E7E9EC; --ink-2:#B2B8C0; --muted:#7F868F; --line:#252A31; --line-2:#363C45;
+  --accent:#8EA5FF; --accent-ink:#0F1114; --accent-soft:#1A2140;
+  --red:#E8907E; --red-soft:#2C1C19; --amber:#DDB45C; --amber-soft:#2A2314; --slate:#A3ADB8; --slate-soft:#1D2229;
+  --blue:#8DB6D4; --blue-soft:#1C2730; --green:#7CCB9C; --green-soft:#16261D; --violet:#C896DA; --violet-soft:#261C2C;
+  --code-bg:rgba(231,233,236,.07);
+  --a0:#7DB3E3; --a1:#C896DA; --a2:#E8977A; --a3:#CDB866; --a4:#7CCB9C; --a5:#E3A35E; --a6:#6CC6D1; --a7:#A6B0BA;
+  color-scheme:dark;
+}
+/* methods and access tiers */
+.m-GET{--c:var(--blue);--cs:var(--blue-soft)}
+.m-POST{--c:var(--green);--cs:var(--green-soft)}
+.m-PUT{--c:var(--amber);--cs:var(--amber-soft)}
+.m-PATCH{--c:var(--violet);--cs:var(--violet-soft)}
+.m-DELETE{--c:var(--red);--cs:var(--red-soft)}
+.x-public{--c:var(--slate);--cs:var(--slate-soft)}
+.x-token{--c:var(--blue);--cs:var(--blue-soft)}
+.x-user{--c:var(--accent);--cs:var(--accent-soft)}
+.x-moderator{--c:var(--amber);--cs:var(--amber-soft)}
+.x-admin{--c:var(--red);--cs:var(--red-soft)}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16.5px;line-height:1.65;-webkit-font-smoothing:antialiased;transition:background-color .3s ease,color .3s ease}
+::selection{background:var(--accent);color:var(--accent-ink)}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+h1,h2,h3{line-height:1.2;margin:0;font-weight:700;text-wrap:balance}
+h1{font-size:2.3rem;letter-spacing:-.025em;margin-bottom:12px}
+h2{font-size:1.25rem;letter-spacing:-.015em}
+h3{font-size:1.02rem;letter-spacing:-.01em}
+p{margin:0 0 1em;max-width:70ch}
+code,.t{font-family:var(--mono);font-size:.86em}
+code{background:var(--code-bg);border-radius:3px;padding:.08em .32em}
+button{font:inherit;color:inherit}
+
+/* ---- top bar ---- */
+.bar{background:var(--bg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+.bar-in{max-width:1120px;margin:0 auto;padding:0 24px;min-height:58px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 20px;justify-content:space-between}
+.brand{display:inline-flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
+.brand::before{content:"";width:14px;height:14px;border:2px solid var(--ink);border-radius:2px;box-shadow:3px 3px 0 var(--accent)}
+nav.main{display:flex;flex-wrap:wrap;align-items:center;gap:2px}
+nav.main a{color:var(--muted);text-decoration:none;padding:18px 9px 16px;font-weight:500;font-size:.95rem;box-shadow:inset 0 -2px 0 transparent;transition:color .2s,box-shadow .2s}
+nav.main a:hover{color:var(--ink)}
+nav.main a[aria-current="page"]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+nav.main a.out{color:var(--ink-2)}
+.theme-toggle{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--line-2);border-radius:4px;padding:5px 9px;cursor:pointer;color:var(--ink-2);margin-left:8px}
+.theme-toggle:hover{border-color:var(--ink);color:var(--ink)}
+.theme-toggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+main{max-width:1120px;margin:0 auto;padding:44px 24px 90px}
+main.narrow{max-width:800px}
+.lede{font-size:1.1rem;color:var(--ink-2);max-width:72ch}
+.hint{color:var(--muted);font-size:.92rem}
+.crumbs{font-size:.88rem;color:var(--muted);margin:0 0 16px;display:flex;flex-wrap:wrap;gap:6px}
+.crumbs a{color:var(--muted);text-decoration-color:var(--line-2)}
+.block{margin-top:40px}
+.block > h2{margin-bottom:14px}
+.block > h2 small{font-weight:500;color:var(--muted);font-size:.9rem;margin-left:8px}
+footer{max-width:1120px;margin:0 auto;padding:0 24px 48px;color:var(--muted);font-size:.85rem}
+footer::before{content:"";display:block;border-top:1px solid var(--line);margin-bottom:20px}
+
+/* ---- small pieces ---- */
+.meth{display:inline-block;font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.03em;color:var(--c);background:var(--cs);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);border-radius:3px;padding:1px 0;width:58px;text-align:center;flex:none}
+.meth.big{font-size:1rem;width:auto;padding:4px 12px}
+.path{font-family:var(--mono);font-size:.92rem;color:var(--ink);word-break:break-all}
+.path .param{color:var(--accent);font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:.74rem;font-weight:600;color:var(--c);background:var(--cs);border-radius:3px;padding:1px 8px;white-space:nowrap}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--c)}
+.tag{display:inline-block;font-size:.72rem;font-weight:600;padding:1px 7px;border:1px solid var(--line-2);border-radius:3px;color:var(--ink-2);white-space:nowrap}
+.tag.w{border-color:var(--ink-2);color:var(--ink)}
+.tag.ev{border-color:var(--accent);color:var(--accent)}
+.tag.rl{border-color:var(--amber);color:var(--amber)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.82rem;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);border-radius:3px;padding:3px 9px}
+a.chip:hover{border-color:var(--ink)}
+.chip i{font-style:normal;font-family:var(--font);font-size:.7rem;font-weight:700;letter-spacing:.03em;color:var(--muted)}
+.chip.dot::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c,var(--muted));flex:none}
+.op{font-family:var(--font);font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:0 5px;border-radius:2px}
+.op.read{color:var(--muted);background:var(--slate-soft)}
+.op.insert{color:var(--green);background:var(--green-soft)}
+.op.update{color:var(--amber);background:var(--amber-soft)}
+.op.delete{color:var(--red);background:var(--red-soft)}
+.btn{display:inline-block;font-weight:600;padding:9px 18px;border-radius:4px;border:1px solid var(--line-2);background:transparent;color:var(--ink);text-decoration:none;cursor:pointer;transition:border-color .2s,background-color .2s,color .2s}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.primary:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn[aria-disabled="true"]{visibility:hidden}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;margin:26px 0 24px;border-bottom:1px solid var(--line)}
+.tabs a{padding:9px 12px;text-decoration:none;color:var(--ink-2);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a:hover{color:var(--ink)}
+.tabs a[aria-current="page"]{color:var(--ink);font-weight:600;border-bottom-color:var(--accent)}
+.tabs a small{color:var(--muted);font-weight:500;margin-left:4px}
+.facts{display:flex;flex-wrap:wrap;gap:6px 0;color:var(--ink-2);padding:0;list-style:none;margin:0 0 6px}
+.facts li{padding-right:16px;margin-right:16px;border-right:1px solid var(--line)}
+.facts li:last-child{border-right:0}
+.facts b{color:var(--ink);font-weight:600}
+.empty{color:var(--muted);padding:14px 0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.86rem;color:var(--muted);margin:0 0 12px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.legend span.line::before{height:3px;width:18px;vertical-align:3px}
+.legend span.dash::before{height:0;width:18px;border-top:2px dashed var(--c);background:none;vertical-align:3px}
+.toggle{display:inline-flex;align-items:center;gap:7px;font-size:.9rem;color:var(--ink-2);cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--accent);width:16px;height:16px}
+.copy{font-size:.8rem;font-weight:600;padding:4px 10px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);cursor:pointer;color:var(--ink-2)}
+.copy:hover{border-color:var(--ink)}
+.copy.done{color:var(--green);border-color:var(--green)}
+pre.code{font-family:var(--mono);font-size:.84rem;line-height:1.6;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px 16px;overflow-x:auto;margin:0;color:var(--ink)}
+.codehead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 6px}
+.codehead h3{font-size:.95rem}
+.src{font-family:var(--mono);font-size:.78rem;color:var(--muted);text-decoration:none}
+.src:hover{color:var(--accent);text-decoration:underline}
+
+/* ---- home ---- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:18px;margin:34px 0 10px}
+.stat{border-top:3px solid var(--c,var(--ink));padding-top:12px}
+.stat b{display:block;font-size:2.6rem;font-weight:700;letter-spacing:-.04em;line-height:1}
+.stat span{display:block;margin-top:6px;color:var(--ink-2);font-size:.95rem;font-weight:500}
+.stack{display:flex;height:34px;border-radius:4px;overflow:hidden;margin:12px 0 8px;border:1px solid var(--line)}
+.stack a{display:flex;align-items:center;justify-content:center;background:var(--cs);color:var(--c);font-weight:700;font-size:.85rem;text-decoration:none;border-right:2px solid var(--bg);min-width:28px;transition:filter .2s}
+.stack a:last-child{border-right:0}
+.stack a:hover{filter:brightness(.95) saturate(1.3)}
+.doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:18px}
+.door{display:block;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--c,var(--accent));border-radius:4px;padding:18px 20px;transition:box-shadow .2s,border-color .2s}
+.door b{display:block;font-size:1.2rem;letter-spacing:-.015em}
+.door span{display:block;margin-top:6px;color:var(--ink-2);font-size:.95rem;line-height:1.5}
+.door:hover{border-color:var(--line-2);box-shadow:0 10px 24px -18px rgba(0,0,0,.4)}
+.door:hover b{color:var(--c,var(--accent))}
+.start{counter-reset:s;list-style:none;padding:0;margin:0}
+.start li{counter-increment:s;position:relative;padding:12px 0 12px 44px;border-bottom:1px solid var(--line)}
+.start li::before{content:counter(s);position:absolute;left:0;top:12px;width:28px;height:28px;border-radius:50%;border:1.5px solid var(--ink);display:grid;place-items:center;font-weight:700;font-size:.85rem}
+
+/* ---- diagrams ---- */
+.canvas{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background-color:var(--surface);background-image:radial-gradient(var(--line-2) 1px,transparent 1.2px);background-size:22px 22px;margin:16px 0 12px}
+svg.dia{display:block;width:100%;height:auto}
+svg.dia text{font-family:var(--font);fill:var(--ink)}
+svg.dia .mono{font-family:var(--mono)}
+svg.dia .sub{fill:var(--muted);font-size:11.5px}
+svg.dia .hd{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;fill:var(--muted)}
+svg.dia .box{fill:var(--surface);stroke:var(--line-2);stroke-width:1.3}
+svg.dia .proc{fill:none;stroke:var(--ink);stroke-width:1.4;stroke-dasharray:none}
+svg.dia .tier{fill:var(--bg);stroke:var(--line-2);stroke-width:1}
+svg.dia .node{cursor:pointer;transition:opacity .15s}
+svg.dia .node rect{fill:var(--surface);stroke:var(--line-2);stroke-width:1.3;transition:stroke .15s,stroke-width .15s}
+svg.dia .node:hover rect,svg.dia .node:focus-visible rect{stroke:var(--ink);stroke-width:2.2}
+svg.dia .node:focus{outline:none}
+svg.dia .node text{font-size:13px;font-weight:600}
+svg.dia .node text.mono{font-size:12px;font-weight:500}
+svg.dia .node text.n{font-size:11px;font-weight:600;fill:var(--muted)}
+svg.dia .edge{fill:none;stroke:var(--muted);stroke-width:1.4;transition:opacity .15s}
+svg.dia .edge.async{stroke-dasharray:5 4}
+svg.dia .edge.w{stroke-width:2}
+svg.dia .edge.r{stroke-opacity:.45;stroke-width:1}
+svg.dia .elabel{font-family:var(--mono);font-size:10.5px;fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
+svg.dia.focusing .edge{opacity:.06}
+svg.dia.focusing .edge.on{opacity:1}
+svg.dia.focusing .node{opacity:.25}
+svg.dia.focusing .node.on{opacity:1}
+svg.dia .arrow{fill:var(--muted)}
+.panel{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 4px 4px 0;background:var(--surface);padding:14px 18px;margin:12px 0}
+.panel h3{margin-bottom:6px}
+.panel .hint{margin:0 0 8px}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin:10px 0}
+
+/* ---- matrix ---- */
+.matrix-wrap{overflow:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface);margin:16px 0;max-height:78vh}
+table.matrix{border-collapse:separate;border-spacing:0;font-size:.8rem}
+table.matrix th,table.matrix td{padding:0}
+table.matrix thead{position:sticky;top:0;z-index:3;background:var(--surface)}
+table.matrix thead th{position:relative;vertical-align:bottom;height:168px;width:26px;min-width:26px;max-width:26px}
+table.matrix thead th.area{height:26px;width:auto;max-width:none;font-size:.68rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c);border-bottom:3px solid var(--c);text-align:left}
+table.matrix thead th.area span{position:absolute;left:4px;right:2px;top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.matrix thead th .rot{position:absolute;left:10px;bottom:8px;transform:rotate(-60deg);transform-origin:0 100%;white-space:nowrap;font-family:var(--mono);font-weight:500;color:var(--ink-2)}
+table.matrix thead th a{color:inherit;text-decoration:none}
+table.matrix thead th a:hover{color:var(--accent)}
+table.matrix tbody th{position:sticky;left:0;background:var(--surface);z-index:1;text-align:left;font-weight:600;padding:0 14px 0 12px;white-space:nowrap;border-right:1px solid var(--line);font-size:.86rem}
+table.matrix tbody th small{color:var(--muted);font-weight:500;margin-left:6px}
+table.matrix td{width:26px;height:26px;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+table.matrix td button{width:100%;height:100%;border:0;background:transparent;cursor:pointer;font-family:var(--mono);font-size:.72rem;font-weight:600;padding:0}
+table.matrix td button.w{background:color-mix(in srgb,var(--c) calc(var(--k) * 1%),transparent);color:var(--ink)}
+table.matrix td button.r{color:var(--muted);background:var(--slate-soft)}
+table.matrix td button:hover{outline:2px solid var(--ink);outline-offset:-2px}
+table.matrix td button[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:-2px}
+table.matrix tr.group th{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:10px;height:30px;background:var(--bg)}
+table.matrix tr.group td{background:var(--bg);border-right:0}
+
+/* ---- endpoint list ---- */
+.toolbar{position:sticky;top:58px;z-index:10;background:var(--bg);padding:12px 0 10px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.search{width:100%;font:inherit;padding:11px 14px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface);color:var(--ink);transition:border-color .2s,box-shadow .2s}
+.search:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.filters .lab{font-size:.78rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 4px 0 10px}
+.filters .lab:first-child{margin-left:0}
+.fbtn{font-size:.82rem;font-weight:600;padding:4px 10px;border-radius:3px;border:1px solid var(--line-2);background:var(--surface);cursor:pointer;color:var(--ink-2);transition:all .15s}
+.fbtn:hover{border-color:var(--ink)}
+.fbtn[aria-pressed="true"]{background:var(--c,var(--ink));border-color:var(--c,var(--ink));color:var(--bg)}
+.count{font-size:.88rem;color:var(--muted);margin:10px 0 0}
+.mod{margin-top:30px}
+.mod-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding-bottom:8px;border-bottom:1px solid var(--ink)}
+.mod-head h2{font-size:1.15rem}
+.mod-head .hint{margin:0}
+.mod-head .n{margin-left:auto;font-weight:600;color:var(--muted);font-size:.9rem}
+.sec{font-size:.74rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:14px 0 4px}
+.eps{list-style:none;margin:0;padding:0}
+.eps li{border-bottom:1px solid var(--line)}
+.eps a{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:4px 14px;align-items:center;padding:9px 10px;text-decoration:none;color:var(--ink);transition:background-color .15s,box-shadow .15s}
+.eps a:hover{background:var(--surface);box-shadow:inset 3px 0 0 var(--accent)}
+.eps .desc{grid-column:2 / 4;font-size:.86rem;color:var(--ink-2);margin-top:-2px;line-height:1.45}
+.eps .marks{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+
+/* ---- endpoint page ---- */
+.ep-title{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:12px}
+.ep-title .path{font-size:1.55rem;font-weight:500;letter-spacing:-.01em}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:8px 0 6px}
+.stage{position:relative;flex:1 1 112px;min-width:112px;max-width:240px;background:var(--surface);border:1px solid var(--line-2);border-top:3px solid var(--c,var(--ink));border-radius:4px;padding:10px 11px 12px;margin:0 18px 14px 0;font-size:.86rem;line-height:1.45;transition:transform .2s,box-shadow .2s}
+.stage::after{content:"";position:absolute;right:-14px;top:50%;width:12px;height:12px;border-top:2px solid var(--muted);border-right:2px solid var(--muted);transform:translateY(-50%) rotate(45deg)}
+.stage:last-child::after,.stage.end::after{display:none}
+.stage.off{opacity:.45;border-top-color:var(--line-2);background:transparent;border-style:dashed}
+.stage.off::after{opacity:.5}
+.stage h4{margin:0 0 4px;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--c,var(--muted))}
+.stage b{display:block;font-size:.95rem;margin-bottom:2px}
+.stage .t{font-size:.78rem;color:var(--ink-2)}
+.stage a{color:inherit}
+.stage.now{box-shadow:0 0 0 3px var(--accent);transform:translateY(-2px)}
+.after{display:flex;align-items:center;gap:12px;margin:6px 0 12px;color:var(--muted);font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.after::before,.after::after{content:"";flex:1;border-top:2px dashed var(--line-2)}
+.fields{width:100%;border-collapse:collapse;font-size:.9rem;margin:6px 0 4px}
+.fields th{text-align:left;font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:6px 10px;border-bottom:1px solid var(--ink)}
+.fields td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.fields td.f{font-family:var(--mono);font-weight:500;white-space:nowrap}
+.fields td.ty{font-family:var(--mono);font-size:.82rem;color:var(--ink-2)}
+.fields td.c{font-size:.84rem;color:var(--ink-2)}
+.req{font-size:.68rem;font-weight:700;color:var(--red);margin-left:6px;letter-spacing:.03em}
+.errs{list-style:none;padding:0;margin:0}
+.errs li{display:grid;grid-template-columns:52px 230px minmax(0,1fr);gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.errs .st{font-family:var(--mono);font-weight:600;color:var(--c,var(--red))}
+.errs .cd{font-family:var(--mono);font-size:.82rem;font-weight:500;word-break:break-all}
+.errs small{color:var(--muted);display:block;font-size:.78rem}
+.s4{--c:var(--amber)} .s5{--c:var(--red)} .s2{--c:var(--green)} .s3{--c:var(--blue)}
+.tree{list-style:none;margin:0;padding:0}
+.tree ul{list-style:none;margin:0;padding:0 0 0 22px;border-left:2px solid var(--line);margin-left:7px}
+.tree li{padding:5px 0}
+.fn{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.fn .nm{font-family:var(--mono);font-weight:600;font-size:.9rem}
+.fn .nm.dim{font-weight:400;color:var(--muted)}
+.fn .doc{flex-basis:100%;font-size:.84rem;color:var(--ink-2);line-height:1.45;max-width:80ch}
+.fn .own{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px}
+.mini{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:.74rem;border:1px solid var(--line);border-radius:3px;padding:0 6px;background:var(--surface)}
+.mini::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--c,var(--muted))}
+.data-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px 16px}
+.card h3{margin-bottom:8px;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tlist{list-style:none;margin:0;padding:0}
+.tlist li{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+.tlist li:last-child{border-bottom:0}
+.tlist a{font-family:var(--mono);font-size:.86rem;text-decoration:none;color:var(--ink)}
+.tlist a:hover{color:var(--accent);text-decoration:underline}
+.tlist .sw{width:9px;height:9px;border-radius:2px;background:var(--c);flex:none}
+.tlist .ops{margin-left:auto;display:flex;gap:3px}
+
+/* ---- journey ---- */
+.row-progress{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:3px;margin-bottom:10px}
+.row-progress a{height:6px;background:var(--line);border-radius:1px;transition:background-color .3s}
+.row-progress a:hover{background:var(--line-2)}
+.row-progress a.done{background:var(--ink)}
+.row-progress a.now{background:var(--accent)}
+.step-count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin:0 0 20px}
+.pick{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 26px;font-size:1.05rem;font-weight:600}
+.big-select{font-family:var(--mono);font-size:.95rem;font-weight:500;color:var(--accent);background:var(--surface);border:0;border-bottom:2px solid var(--accent);padding:6px 10px;max-width:100%;cursor:pointer}
+.tour-nav{display:flex;justify-content:space-between;gap:12px;margin-top:34px;padding-top:20px;border-top:1px solid var(--line)}
+.kbd{font-family:var(--mono);font-size:.75rem;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:3px;padding:0 5px;color:var(--muted)}
+
+/* ---- worker ---- */
+.timeline{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px 18px 10px;margin:16px 0}
+.tl-row{display:grid;grid-template-columns:170px minmax(0,1fr);align-items:center;gap:14px;height:52px;border-bottom:1px dashed var(--line)}
+.tl-row b{font-family:var(--mono);font-weight:600;font-size:.9rem}
+.tl-row b small{display:block;font-family:var(--font);font-weight:500;color:var(--muted);font-size:.75rem}
+.tl-track{position:relative;height:22px;border-bottom:1px solid var(--line-2)}
+.tl-track i{position:absolute;bottom:0;width:2px;height:12px;background:var(--c);border-radius:1px}
+.tl-track .pulse{position:absolute;bottom:-5px;width:10px;height:10px;margin-left:-4px;border-radius:50%;background:var(--c);animation:run var(--d) linear infinite}
+@keyframes run{from{left:0}to{left:var(--to)}}
+.tl-axis{display:grid;grid-template-columns:170px minmax(0,1fr);padding-top:6px;gap:14px;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.tl-axis div{display:flex;justify-content:space-between}
+.loops{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;margin-top:16px}
+.loop{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--c);border-radius:4px;padding:16px 18px}
+.loop h3{font-family:var(--mono);font-size:1.1rem;display:flex;align-items:baseline;gap:10px}
+.loop h3 small{font-family:var(--font);font-weight:600;color:var(--c);font-size:.85rem}
+.loop p{font-size:.92rem;color:var(--ink-2);margin:6px 0 10px}
+.steps{list-style:none;margin:8px 0 10px;padding:0;counter-reset:st}
+.steps li{counter-increment:st;position:relative;padding:6px 0 6px 28px;border-top:1px solid var(--line);font-size:.88rem}
+.steps li::before{content:counter(st);position:absolute;left:0;top:7px;width:19px;height:19px;border-radius:50%;background:var(--cs,var(--slate-soft));color:var(--c,var(--ink));font-size:.7rem;font-weight:700;display:grid;place-items:center}
+.steps .nm{font-family:var(--mono);font-weight:600}
+.steps .d{display:block;color:var(--ink-2);font-size:.82rem;line-height:1.45}
+.bul{padding-left:1.2em;margin:0}
+.bul li{margin:4px 0}
+
+/* ---- access ---- */
+.rt{border:1.5px solid var(--c,var(--line-2));border-radius:6px;padding:12px 14px 14px;margin:10px 0;background:color-mix(in srgb,var(--cs,var(--surface)) 55%,var(--surface))}
+.rt > .rt-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:8px}
+.rt > .rt-h b{font-family:var(--mono);font-size:1rem}
+.rt > .rt-h .g{font-family:var(--mono);font-size:.8rem;color:var(--c)}
+.rt > .rt-h .hint{margin:0}
+.plugs{display:flex;flex-wrap:wrap;gap:6px}
+.plug{display:inline-flex;align-items:baseline;gap:8px;font-family:var(--mono);font-size:.82rem;background:var(--surface);border:1px solid var(--line-2);border-radius:3px;padding:4px 10px;text-decoration:none;color:var(--ink)}
+.plug:hover{border-color:var(--ink)}
+.plug i{font-style:normal;color:var(--muted);font-size:.75rem}
+.bars{list-style:none;margin:0;padding:0}
+.bars li{display:grid;grid-template-columns:minmax(0,330px) minmax(0,1fr) 150px;gap:12px;align-items:center;padding:4px 0;font-size:.85rem}
+.bars .lbl{display:flex;gap:8px;align-items:center;min-width:0}
+.bars .lbl a{text-decoration:none;color:var(--ink);font-family:var(--mono);font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bars .lbl a:hover{color:var(--accent)}
+.bars .track{height:14px;background:var(--line);border-radius:2px;overflow:hidden}
+.bars .fill{height:100%;background:var(--c);border-radius:2px}
+.bars .v{font-family:var(--mono);font-size:.78rem;color:var(--ink-2)}
+
+/* ---- reference ---- */
+details{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;padding:11px 4px;list-style:none;display:grid;grid-template-columns:16px 52px minmax(160px,260px) minmax(0,1fr) auto;gap:10px;align-items:baseline}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-2px) rotate(-45deg);transition:transform .2s}
+details[open] > summary::before{transform:translateY(-4px) rotate(45deg)}
+summary:hover{color:var(--accent)}
+summary .st{font-family:var(--mono);font-weight:600;color:var(--c)}
+summary .cd{font-family:var(--mono);font-size:.85rem;font-weight:600;word-break:break-all}
+summary .ms{font-size:.88rem;color:var(--ink-2)}
+summary .n{font-size:.8rem;color:var(--muted);white-space:nowrap}
+details > .inner{padding:0 4px 16px 30px;animation:fold .2s ease-out}
+@keyframes fold{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.mini-eps{list-style:none;padding:0;margin:0;columns:2 340px}
+.mini-eps li{padding:2px 0;break-inside:avoid;display:flex;gap:8px;align-items:center}
+.mini-eps a{font-family:var(--mono);font-size:.8rem;text-decoration:none;color:var(--ink)}
+.mini-eps a:hover{color:var(--accent);text-decoration:underline}
+.mini-eps .meth{width:50px;font-size:.64rem}
+table.env{width:100%;border-collapse:collapse;font-size:.88rem}
+table.env th{text-align:left;font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:6px 10px;border-bottom:1px solid var(--ink)}
+table.env td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.env td:first-child{font-family:var(--mono);font-weight:600;white-space:nowrap}
+table.env td code{font-size:.78rem;word-break:break-word}
+.rules{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.rules li{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 4px 4px 0;padding:12px 16px}
+.rules b{display:block;margin-bottom:2px}
+.rules span{color:var(--ink-2);font-size:.92rem}
+
+#app.view-in > *{animation:view-in .3s cubic-bezier(.2,.7,.2,1)}
+@keyframes view-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (max-width:760px){
+  body{font-size:15.5px}
+  h1{font-size:1.8rem}
+  main{padding:28px 16px 64px}
+  .bar-in{padding:0 16px}
+  nav.main a{padding:12px 7px 10px}
+  .toolbar{top:0;position:static}
+  .eps a{grid-template-columns:58px minmax(0,1fr)}
+  .eps .marks{grid-column:2;justify-content:flex-start}
+  .errs li{grid-template-columns:48px minmax(0,1fr)}
+  .errs li > :last-child{grid-column:1 / -1}
+  summary{grid-template-columns:16px 46px minmax(0,1fr)}
+  summary .ms,summary .n{grid-column:3}
+  .bars li{grid-template-columns:minmax(0,1fr) 90px}
+  .bars .track{grid-column:1 / -1;order:3}
+  .loops{grid-template-columns:1fr}
+  .stage{max-width:none;margin-right:0}
+  .stage::after{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <a class="brand" href="#/">Doshomik backend</a>
+  <nav class="main" aria-label="Guide">
+    <a href="#/" data-v="home">Overview</a>
+    <a href="#map" data-v="map">Map</a>
+    <a href="#endpoints" data-v="endpoints">Endpoints</a>
+    <a href="#journey" data-v="journey">Journey</a>
+    <a href="#events" data-v="events">Events</a>
+    <a href="#worker" data-v="worker">Worker</a>
+    <a href="#access" data-v="access">Access</a>
+    <a href="#ref" data-v="ref">Reference</a>
+    <a class="out" href="schema-guide.html">Schema guide ↗</a>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg><span class="sr">Switch theme</span></button>
+  </nav>
+</div></header>
+<main id="app" tabindex="-1"></main>
+<footer id="footer"></footer>
+<script type="application/json" id="facts">__FACTS__</script>
+<script type="application/json" id="guide">__GUIDE__</script>
+<script>
+'use strict';
+const F = JSON.parse(document.getElementById('facts').textContent);
+const G = JSON.parse(document.getElementById('guide').textContent);
+const app = document.getElementById('app');
+
+// ------------------------------------------------------------ helpers
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const md = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+const uniq = (a) => [...new Set(a)];
+const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+const srcHref = (file, line) => `../${file}${line ? `#L${line}` : ''}`;
+const srcLink = (file, line, label) => `<a class="src" href="${srcHref(file, line)}" title="Open the source file">${esc(label ?? `${file.replace('apps/api/src/', '')}${line ? `:${line}` : ''}`)}</a>`;
+const pathHtml = (url) => esc(url).replace(/(:[a-zA-Z_]+|\*)/g, '<span class="param">$1</span>');
+const meth = (m, big) => `<span class="meth m-${m}${big ? ' big' : ''}">${m}</span>`;
+const OPS = ['read', 'insert', 'update', 'delete'];
+const isWrite = (ops) => ops.some((o) => o !== 'read');
+
+const MODS = new Map(G.modules.map((m) => [m.id, m]));
+const ACCESS = new Map(G.access.map((a) => [a.id, a]));
+const GROUPS = new Map(G.groups.map((g) => [g.id, g]));
+const accessBadge = (a) => `<span class="badge x-${a}">${esc(ACCESS.get(a)?.name ?? a)}</span>`;
+
+// Tables → schema-guide area (colour index) and links.
+const AREA_OF = new Map();
+F.areas.forEach((a, i) => a.tables.forEach((t) => AREA_OF.set(t, { ...a, i })));
+const areaColor = (t) => `var(--a${AREA_OF.has(t) ? AREA_OF.get(t).i % 8 : 7})`;
+const tableHref = (t) => `schema-guide.html#table/${t}`;
+const tableChip = (t, ops) => `<a class="chip dot" style="--c:${areaColor(t)}" href="${tableHref(t)}" title="Open ${t} in the schema guide">${esc(t)}${ops ? ' ' + ops.map((o) => `<span class="op ${o}">${o === 'read' ? 'R' : o[0].toUpperCase()}</span>`).join('') : ''}</a>`;
+const opsHtml = (ops) => OPS.filter((o) => ops.includes(o)).map((o) => `<span class="op ${o}">${o}</span>`).join('');
+
+// Routes
+F.routes.forEach((r) => {
+  r.key = `${r.method} ${r.url}`;
+  r.href = `#ep/${r.method}${r.url}`;
+  r.writes = Object.entries(r.facts.tables).filter(([, ops]) => isWrite(ops)).map(([t]) => t);
+  // Errors the guards add (authenticate, requireRole), plus validation.
+  r.guardErrors = r.guards.flatMap((g) => F.guards[g]?.errors ?? []).filter((e) => !e.message.startsWith('Dev sign-in'));
+});
+const ROUTE = new Map(F.routes.map((r) => [r.key, r]));
+const FN = new Map(F.functions.map((f) => [f.id, f]));
+const modOrder = G.modules.map((m) => m.id);
+const byModule = new Map(modOrder.map((id) => [id, F.routes.filter((r) => r.module === id)]));
+for (const r of F.routes) if (!byModule.has(r.module)) byModule.set(r.module, [r]);
+
+const describe = (r) => {
+  if (r.doc) return r.doc;
+  const first = r.handlerCalls.map((id) => FN.get(id)).find((f) => f?.doc && f.file.includes('/modules/'));
+  return first ? first.doc : '';
+};
+const shortDoc = (s, n = 150) => (s && s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : s || '');
+
+// Events: who emits them, who handles them.
+const EMITTERS = new Map(F.events.map((e) => [e.name, F.routes.filter((r) => r.facts.events.includes(e.name))]));
+const HANDLER = new Map(F.eventHandlers.map((h) => [h.event, h]));
+// Worker-side emitters (media.ready comes from the media loop).
+const LOOP_EMITS = new Map(F.loops.map((l) => [l.name, l.facts.events]));
+
+const perMinute = (rl) => {
+  const m = String(rl.timeWindow).match(/(\d+)?\s*(second|minute|hour|day)/);
+  const n = Number(m?.[1] ?? 1);
+  const unit = { second: 1 / 60, minute: 1, hour: 60, day: 1440 }[m?.[2] ?? 'minute'];
+  return rl.max / (n * unit);
+};
+
+// ------------------------------------------------------------ JSON Schema → fields and samples
+function typeOf(s) {
+  if (!s) return 'any';
+  if (s.anyOf) {
+    const parts = s.anyOf.filter((x) => x.type !== 'null').map(typeOf);
+    return uniq(parts).join(' | ') + (s.anyOf.some((x) => x.type === 'null') ? ' | null' : '');
+  }
+  if (s.enum) return s.enum.map((v) => JSON.stringify(v)).join(' | ');
+  if (s.const !== undefined) return JSON.stringify(s.const);
+  if (s.type === 'array') return `${typeOf(s.items)}[]`;
+  if (s.format === 'uuid') return 'uuid';
+  if (s.type === 'string' && s.pattern === '^[a-z0-9]+(?:-[a-z0-9]+)*$') return 'slug';
+  if (s.format) return `${s.type} (${s.format})`;
+  return Array.isArray(s.type) ? s.type.join(' | ') : s.type || 'any';
+}
+function rulesOf(s) {
+  if (!s) return [];
+  if (s.anyOf) return uniq(s.anyOf.flatMap(rulesOf));
+  const out = [];
+  if (s.minLength !== undefined && s.maxLength !== undefined) out.push(`${s.minLength}–${s.maxLength} chars`);
+  else if (s.maxLength !== undefined) out.push(`≤ ${s.maxLength} chars`);
+  else if (s.minLength !== undefined) out.push(`≥ ${s.minLength} chars`);
+  if (s.minimum !== undefined && s.maximum !== undefined) out.push(`${s.minimum}–${s.maximum}`);
+  else if (s.maximum !== undefined) out.push(`≤ ${s.maximum}`);
+  else if (s.minimum !== undefined) out.push(`≥ ${s.minimum}`);
+  if (s.exclusiveMinimum !== undefined) out.push(`> ${s.exclusiveMinimum}`);
+  if (s.minItems !== undefined) out.push(`≥ ${s.minItems} items`);
+  if (s.maxItems !== undefined) out.push(`≤ ${s.maxItems} items`);
+  if (s.pattern && !s.format && s.pattern !== '^[a-z0-9]+(?:-[a-z0-9]+)*$') out.push(`pattern <code>${esc(s.pattern.length > 60 ? s.pattern.slice(0, 57) + '…' : s.pattern)}</code>`);
+  if (s.default !== undefined) out.push(`default <code>${esc(JSON.stringify(s.default))}</code>`);
+  return out;
+}
+function flatten(schema, prefix = '', required = []) {
+  const rows = [];
+  const s = schema?.anyOf ? schema.anyOf.find((x) => x.type === 'object') ?? schema : schema;
+  if (!s || s.type !== 'object' || !s.properties) return rows;
+  for (const [name, p] of Object.entries(s.properties)) {
+    const full = prefix + name;
+    rows.push({ name: full, type: typeOf(p), req: (s.required ?? []).includes(name), rules: rulesOf(p) });
+    const inner = p.type === 'array' ? p.items : p;
+    if (inner?.type === 'object' && inner.properties) rows.push(...flatten(inner, `${full}${p.type === 'array' ? '[]' : ''}.`));
+  }
+  return rows;
+}
+function sample(s, name = '') {
+  if (!s) return null;
+  if (s.default !== undefined) return s.default;
+  if (s.anyOf) return sample(s.anyOf.find((x) => x.type !== 'null') ?? s.anyOf[0], name);
+  if (s.enum) return s.enum[0];
+  if (s.const !== undefined) return s.const;
+  switch (Array.isArray(s.type) ? s.type[0] : s.type) {
+    case 'object': {
+      const o = {};
+      const req = s.required ?? [];
+      const keys = Object.keys(s.properties ?? {});
+      for (const k of keys.filter((k) => req.includes(k)).concat(req.length ? [] : keys.slice(0, 1))) o[k] = sample(s.properties[k], k);
+      return o;
+    }
+    case 'array': return s.items ? [sample(s.items, name)] : [];
+    case 'string':
+      if (s.format === 'uuid') return '7f3c2a10-5b1e-4c8d-9a2f-1e0d3c4b5a69';
+      if (s.format === 'email' || /email/.test(name)) return 'reader@example.com';
+      if (s.format === 'date') return '2026-11-26';
+      if (s.format === 'date-time') return '2026-11-26T10:00:00Z';
+      if (s.format === 'uri' || /url/.test(name)) return 'https://example.com';
+      if (s.pattern === '^[a-z0-9]+(?:-[a-z0-9]+)*$') return 'attention-mechanism';
+      if (/password/.test(name)) return 'correct-horse-battery';
+      if (/code/.test(name)) return '123456';
+      return name ? `${name.replace(/_/g, ' ')}` : 'text';
+    case 'integer': case 'number': return s.minimum ?? (s.exclusiveMinimum !== undefined ? s.exclusiveMinimum + 1 : 1);
+    case 'boolean': return true;
+  }
+  return null;
+}
+function curlFor(r) {
+  const base = G.project.baseUrl;
+  let url = r.url.replace(/:([a-zA-Z_]+)/g, (_, p) => {
+    const ps = r.schema.params?.properties?.[p];
+    return encodeURIComponent(String(sample(ps, p) ?? p));
+  }).replace('*', 'index.m3u8');
+  const q = r.schema.querystring;
+  if (q?.required?.length) url += '?' + q.required.map((k) => `${k}=${encodeURIComponent(sample(q.properties[k], k))}`).join('&');
+  const lines = [`curl -X ${r.method} '${base}${url}'`];
+  if (r.access === 'user' || r.access === 'moderator' || r.access === 'admin') lines.push(`  -H 'x-dev-user: ${G.project.devUser}'`);
+  if (r.schema.body) {
+    lines.push(`  -H 'content-type: application/json'`);
+    lines.push(`  -d '${JSON.stringify(sample(r.schema.body))}'`);
+  }
+  return lines.join(' \\\n');
+}
+
+// ------------------------------------------------------------ SVG helpers
+const NS = 'http://www.w3.org/2000/svg';
+const tw = (s, px = 13, mono = false) => String(s).length * px * (mono ? 0.6 : 0.56);
+const curve = (x1, y1, x2, y2) => {
+  const dx = Math.max(40, (x2 - x1) / 2);
+  return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
+};
+function focusable(svg, onPick) {
+  // Click a node to focus it and its edges; click again or press Escape to clear.
+  let current = null;
+  const apply = (id) => {
+    current = id;
+    svg.classList.toggle('focusing', !!id);
+    svg.querySelectorAll('.on').forEach((n) => n.classList.remove('on'));
+    if (id) {
+      const ids = new Set([id]);
+      svg.querySelectorAll('.edge').forEach((e) => {
+        const ends = (e.dataset.ends || '').split(' ');
+        if (ends.includes(id)) { e.classList.add('on'); ends.forEach((x) => ids.add(x)); }
+      });
+      svg.querySelectorAll('.node').forEach((n) => { if (ids.has(n.dataset.id)) n.classList.add('on'); });
+    }
+    onPick?.(id);
+  };
+  svg.addEventListener('click', (ev) => {
+    const node = ev.target.closest('.node');
+    if (!node) return apply(null);
+    if (node.dataset.href) { location.hash = node.dataset.href; return; }
+    apply(current === node.dataset.id ? null : node.dataset.id);
+  });
+  svg.addEventListener('keydown', (ev) => {
+    const node = ev.target.closest('.node');
+    if (ev.key === 'Escape') apply(null);
+    if (node && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); node.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
+  });
+  return apply;
+}
+
+// ------------------------------------------------------------ views
+const views = {};
+let teardown = null;
+
+views.home = () => {
+  const n = F.routes.length;
+  const tiers = G.access.map((a) => ({ ...a, n: F.routes.filter((r) => r.access === a.id).length }));
+  const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((m) => ({ m, n: F.routes.filter((r) => r.method === m).length }));
+  const tablesTouched = uniq(F.routes.flatMap((r) => Object.keys(r.facts.tables))).length;
+  const writers = F.routes.filter((r) => r.writes.length).length;
+  return `
+  <h1>${esc(G.project.title)}</h1>
+  <p class="lede">${md(G.project.lede)}</p>
+  <div class="stats">
+    <a class="stat" href="#endpoints" style="--c:var(--ink);text-decoration:none;color:inherit"><b>${n}</b><span>endpoints</span></a>
+    <div class="stat" style="--c:var(--accent)"><b>${byModule.size}</b><span>modules</span></div>
+    <div class="stat" style="--c:var(--green)"><b>${writers}</b><span>endpoints write data</span></div>
+    <div class="stat" style="--c:var(--a0)"><b>${tablesTouched}</b><span>of ${F.tables.length} tables touched</span></div>
+    <a class="stat" href="#events" style="--c:var(--amber);text-decoration:none;color:inherit"><b>${F.events.length}</b><span>outbox events</span></a>
+    <a class="stat" href="#worker" style="--c:var(--violet);text-decoration:none;color:inherit"><b>${F.loops.length}</b><span>worker loops</span></a>
+  </div>
+  <section class="block">
+    <h2>Who may call what</h2>
+    <div class="stack" role="img" aria-label="Endpoints by access">${tiers.filter((t) => t.n).map((t) => `<a class="x-${t.id}" style="flex:${t.n}" href="#endpoints?a=${t.id}" title="${esc(t.name)}: ${t.n}">${t.n}</a>`).join('')}</div>
+    <div class="legend">${tiers.map((t) => `<span class="x-${t.id}">${esc(t.name)} · ${t.n}</span>`).join('')}</div>
+    <div class="legend">${methods.map((m) => `<span class="m-${m.m}">${m.m} · ${m.n}</span>`).join('')}</div>
+  </section>
+  <section class="block">
+    <h2>Ways in</h2>
+    <div class="doors">
+      <a class="door" href="#map" style="--c:var(--a0)"><b>Map</b><span>The two processes, the route tree and which module touches which table.</span></a>
+      <a class="door" href="#endpoints" style="--c:var(--ink)"><b>Endpoints</b><span>All ${n}, searchable. Each one shows its flow, request fields, data and errors.</span></a>
+      <a class="door" href="#journey" style="--c:var(--accent)"><b>Journey</b><span>Follow one request step by step, from the client to the worker.</span></a>
+      <a class="door" href="#events" style="--c:var(--amber)"><b>Events</b><span>The outbox: which endpoints write each event and what the worker does with it.</span></a>
+      <a class="door" href="#worker" style="--c:var(--violet)"><b>Worker</b><span>The four background loops, how often they run and what they touch.</span></a>
+      <a class="door" href="#access" style="--c:var(--red)"><b>Access</b><span>The route tree's guards and every rate limit, strictest first.</span></a>
+    </div>
+  </section>
+  <section class="block">
+    <h2>New here? Start with these</h2>
+    <ol class="start">
+      <li><a href="#map">Map → System</a>: two Node processes, one Postgres. The API never does slow work; the worker does.</li>
+      <li><a href="#journey">Journey</a> with <code>${esc(G.journey.default)}</code>: one write, end to end, including the notification it causes.</li>
+      <li><a href="#map/modules">Map → Modules and tables</a>: click your module and see the tables it changes.</li>
+      <li><a href="#ref/conventions">Reference → Conventions</a>: public ids, pagination, 404 instead of 403, the error shape.</li>
+    </ol>
+  </section>`;
+};
+
+// ---------------- Map
+views.map = (sub = 'system') => {
+  const tabs = [['system', 'System'], ['modules', 'Modules and tables'], ['matrix', 'Matrix']];
+  const head = `<h1>Map</h1>
+  <p class="lede">${sub === 'system' ? 'Two Node.js processes share one PostgreSQL database, which is also the job queue. Click a module to open its endpoints.' : sub === 'modules' ? 'Each line is a module reaching a table through its endpoints. Click a module or a table to focus it.' : 'Modules against tables. A cell says whether any endpoint of the module writes (W) or only reads (R) the table; darker means more endpoints. Click a cell for the endpoints.'}</p>
+  <nav class="tabs">${tabs.map(([id, label]) => `<a href="#map${id === 'system' ? '' : '/' + id}" ${id === sub ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>`;
+  if (sub === 'modules') return head + bipartite();
+  if (sub === 'matrix') return head + matrix();
+  return head + systemMap();
+};
+
+function systemMap() {
+  const W = 1080;
+  const parts = [];
+  const node = (id, x, y, w, h, label, sub, opts = {}) => {
+    parts.push(`<g class="node" tabindex="0" role="link" data-id="${id}" ${opts.href ? `data-href="${esc(opts.href)}"` : ''} aria-label="${esc(label)}">
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" ${opts.c ? `style="stroke:${opts.c}"` : ''}/>
+      ${opts.c ? `<rect x="${x}" y="${y}" width="4" height="${h}" rx="1" style="fill:${opts.c};stroke:none"/>` : ''}
+      <text x="${x + 12}" y="${y + (sub ? h / 2 - 3 : h / 2 + 4.5)}" class="${opts.mono ? 'mono' : ''}">${esc(label)}</text>
+      ${sub ? `<text x="${x + 12}" y="${y + h / 2 + 13}" class="n">${esc(sub)}</text>` : ''}</g>`);
+  };
+  const edge = (a, b, d, label, lx, ly, cls = '') => {
+    parts.push(`<path class="edge ${cls}" data-ends="${a} ${b}" d="${d}" marker-end="url(#ah)"/>`);
+    if (label) parts.push(`<text class="elabel" x="${lx}" y="${ly}" text-anchor="middle">${esc(label)}</text>`);
+  };
+
+  // API process with its tiers
+  const ax = 250, aw = 520;
+  const tiers = [
+    { label: 'Outside /v1 · no sign-in or signed link', mods: ['core', 'storage', 'app'], c: 'var(--slate)' },
+    { label: '/v1/auth · public, per-IP limits', mods: ['auth'], c: 'var(--slate)' },
+    { label: '/v1 · authenticate', mods: G.modules.filter((m) => m.group === 'app' && m.id !== 'auth').map((m) => m.id), c: 'var(--accent)' },
+    { label: '/v1/admin · requireRole + two-factor', mods: G.modules.filter((m) => m.group === 'admin').map((m) => m.id), c: 'var(--red)' },
+  ];
+  let y = 70;
+  const tierBoxes = [];
+  for (const t of tiers) {
+    let cx = ax + 16, cy = y + 30;
+    const chips = [];
+    for (const id of t.mods) {
+      const m = MODS.get(id);
+      const n = byModule.get(id)?.length ?? 0;
+      const w = Math.max(70, tw(m.name, 12) + 44);
+      if (cx + w > ax + aw - 16) { cx = ax + 16; cy += 40; }
+      chips.push({ id, x: cx, y: cy, w, name: m.name, n });
+      cx += w + 8;
+    }
+    const h = cy - y + 46;
+    tierBoxes.push({ ...t, y, h, chips });
+    y += h + 10;
+  }
+  const apiBottom = y + 4;
+  parts.push(`<rect class="proc" x="${ax}" y="30" width="${aw}" height="${apiBottom - 30}" rx="6"/>`);
+  parts.push(`<text class="hd" x="${ax + 14}" y="52">API process · pnpm dev</text>`);
+  for (const t of tierBoxes) {
+    parts.push(`<rect class="tier" x="${ax + 8}" y="${t.y}" width="${aw - 16}" height="${t.h}" rx="4" style="stroke:${t.c}"/>`);
+    parts.push(`<text class="sub" x="${ax + 18}" y="${t.y + 18}" style="fill:${t.c};font-weight:600">${esc(t.label)}</text>`);
+    for (const c of t.chips) {
+      parts.push(`<g class="node" tabindex="0" role="link" data-id="m:${c.id}" data-href="#endpoints?m=${c.id}" aria-label="${esc(c.name)}, ${c.n} endpoints">
+        <rect x="${c.x}" y="${c.y}" width="${c.w}" height="30" rx="3"/>
+        <text x="${c.x + 10}" y="${c.y + 19.5}" style="font-size:12px">${esc(c.name)}</text>
+        <text x="${c.x + c.w - 10}" y="${c.y + 19.5}" class="n" text-anchor="end">${c.n}</text></g>`);
+    }
+  }
+
+  // Clients
+  node('client:app', 20, 120, 150, 52, 'Android app', 'React Native + Expo', { c: 'var(--ink)' });
+  node('client:admin', 20, 300, 150, 52, 'Admin panel', 'planned · same API', { c: 'var(--ink)' });
+  edge('client:app', 'api', curve(170, 146, ax, 146), 'HTTPS', 210, 138);
+  edge('client:admin', 'api', curve(170, 326, ax, tierBoxes[3].y + 30), 'HTTPS', 200, 318);
+
+  // Postgres
+  const px = 830, pw = 230;
+  const areaRows = F.areas.map((a, i) => ({ ...a, i }));
+  const ph = 60 + areaRows.length * 30;
+  const py = 60;
+  parts.push(`<path d="M${px},${py + 14} a${pw / 2},14 0 0,1 ${pw},0 v${ph} a${pw / 2},14 0 0,1 -${pw},0 z" class="box" style="stroke:var(--ink)"/>`);
+  parts.push(`<path d="M${px},${py + 14} a${pw / 2},14 0 0,0 ${pw},0" class="box" style="fill:none;stroke:var(--ink)"/>`);
+  parts.push(`<text class="hd" x="${px + 16}" y="${py + 50}">PostgreSQL · ${F.tables.length} tables</text>`);
+  areaRows.forEach((a, k) => {
+    const yy = py + 62 + k * 30;
+    parts.push(`<g class="node" tabindex="0" role="link" data-id="area:${a.id}" data-href="#map/modules" aria-label="${esc(a.name)}">
+      <rect x="${px + 12}" y="${yy}" width="${pw - 24}" height="24" rx="3" style="stroke:var(--a${a.i % 8})"/>
+      <rect x="${px + 12}" y="${yy}" width="4" height="24" style="fill:var(--a${a.i % 8});stroke:none"/>
+      <text x="${px + 24}" y="${yy + 16}" style="font-size:12px">${esc(a.name.length > 26 ? a.name.slice(0, 25) + '…' : a.name)}</text>
+      <text x="${px + pw - 20}" y="${yy + 16}" class="n" text-anchor="end">${a.tables.length}</text></g>`);
+  });
+  edge('api', 'pg', curve(ax + aw, 200, px, 200), 'Kysely', (ax + aw + px) / 2, 192);
+
+  // Worker
+  const wy = Math.max(apiBottom, py + ph + 30) + 50;
+  const wh = 170;
+  parts.push(`<rect class="proc" x="${ax}" y="${wy}" width="${aw}" height="${wh}" rx="6"/>`);
+  parts.push(`<text class="hd" x="${ax + 14}" y="${wy + 22}">Worker process · pnpm worker · one at a time</text>`);
+  F.loops.forEach((l, i) => {
+    const x = ax + 16 + (i % 2) * ((aw - 40) / 2 + 8);
+    const yy = wy + 38 + Math.floor(i / 2) * 62;
+    const ival = l.idleMs >= 3600000 ? `${l.idleMs / 3600000} h` : l.idleMs >= 60000 ? `${l.idleMs / 60000} min` : `${l.idleMs / 1000} s`;
+    node(`loop:${l.name}`, x, yy, (aw - 40) / 2, 52, `${l.name} loop`, `idle interval ${ival}`, { href: '#worker', c: 'var(--violet)', mono: true });
+  });
+  edge('pg', 'loop:outbox', `M${px + 30},${py + ph + 28} C${px + 30},${wy - 10} ${ax + aw + 40},${wy + 20} ${ax + aw},${wy + 20}`, '', 0, 0, 'async');
+  parts.push(`<text class="elabel" x="${px + 38}" y="${py + ph + 50}">claims outbox_events,</text><text class="elabel" x="${px + 38}" y="${py + ph + 64}">media_assets</text>`);
+  edge('api', 'pg', `M${ax + aw / 2},${apiBottom} L${ax + aw / 2},${wy}`, 'request writes change + event in one transaction', ax + aw / 2, apiBottom + 26, 'async');
+
+  // Outside services
+  const ex = 830, ey = wy - 10;
+  const outs = [
+    ['ext:email', 'Email', 'SMTP or .dev-mail files'],
+    ['ext:push', 'Push', 'log stand-in → FCM'],
+    ['ext:scholar', 'OpenAlex · S2 · HF', 'paper ingestion'],
+    ['ext:disk', 'MEDIA_DIR', 'raw/ processed/ work/'],
+  ];
+  outs.forEach(([id, label, sub], i) => node(id, ex, ey + i * 50 + 30, 230, 42, label, sub, { c: 'var(--a7)' }));
+  edge('loop:outbox', 'ext:email', curve(ax + aw, wy + 60, ex, ey + 51), '', 0, 0);
+  edge('loop:outbox', 'ext:push', curve(ax + aw, wy + 66, ex, ey + 101), '', 0, 0);
+  edge('loop:papers', 'ext:scholar', curve(ax + aw, wy + 128, ex, ey + 151), '', 0, 0);
+  edge('loop:media', 'ext:disk', `M${ax + aw},${wy + 140} C${ax + aw + 30},${wy + 140} ${ex - 40},${ey + 201} ${ex},${ey + 201}`, '', 0, 0);
+  // Storage stand-ins read and write MEDIA_DIR: round the outside of the diagram, not across it.
+  const sc = tierBoxes[0].chips.find((c) => c.id === 'storage');
+  const rx = ex + 230 + 18;
+  edge('m:storage', 'ext:disk', `M${sc.x + sc.w / 2},${sc.y} V14 H${rx} V${ey + 221} H${ex + 230}`, 'signed PUT uploads · media delivery', (sc.x + rx) / 2 + 60, 10, 'async');
+
+  const H = Math.max(wy + wh, ey + 260) + 20;
+  return `<div class="legend"><span class="line" style="--c:var(--muted)">request path</span><span class="dash" style="--c:var(--muted)">asynchronous or out of band</span><span style="--c:var(--violet)">worker loop</span><span style="--c:var(--accent)">signed-in tier</span><span style="--c:var(--red)">staff tier</span></div>
+  <div class="canvas"><svg class="dia" id="sysmap" viewBox="0 0 ${W + 20} ${H}" style="min-width:900px" role="group" aria-label="System map">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+    ${parts.join('')}</svg></div>
+  <div class="data-grid">
+    <div class="card"><h3>Request path stays fast</h3><p class="hint" style="margin:0">Transcoding, notifications, push, email and counters run in the worker. A request writes its change plus an outbox event in one transaction and returns.</p></div>
+    <div class="card"><h3>File bytes skip the API</h3><p class="hint" style="margin:0">Clients upload to a signed storage URL and play media from signed or public URLs. In development the API process serves those URLs as a stand-in for S3/R2 and a CDN.</p></div>
+    <div class="card"><h3>Outside services behind interfaces</h3><p class="hint" style="margin:0">${F.providers.map((p) => `<code>${esc(p.name)}</code>`).join(', ')}: each has a local implementation, so everything runs on one machine. See <a href="#ref/providers">Reference → Providers</a>.</p></div>
+  </div>`;
+}
+
+function moduleTables() {
+  // module → table → { ops, routes }
+  const map = new Map();
+  for (const r of F.routes) {
+    if (!map.has(r.module)) map.set(r.module, new Map());
+    const mt = map.get(r.module);
+    for (const [t, ops] of Object.entries(r.facts.tables)) {
+      if (!mt.has(t)) mt.set(t, { ops: new Set(), routes: [] });
+      ops.forEach((o) => mt.get(t).ops.add(o));
+      mt.get(t).routes.push({ r, ops });
+    }
+  }
+  return map;
+}
+
+function tableOrder() {
+  const listed = F.areas.flatMap((a) => a.tables);
+  return listed.concat(F.tables.filter((t) => !listed.includes(t)));
+}
+
+function bipartite() {
+  const MT = moduleTables();
+  const mods = modOrder.filter((id) => MT.get(id)?.size);
+  const tables = tableOrder().filter((t) => mods.some((m) => MT.get(m).has(t)));
+  const rowM = 34, rowT = 22;
+  const H = Math.max(mods.length * rowM, tables.length * rowT + F.areas.length * 10) + 60;
+  const mx = 20, mw = 210, tx = 720, twd = 210;
+  const tY = new Map();
+  let yy = 40, lastArea = null;
+  for (const t of tables) {
+    const a = AREA_OF.get(t)?.id ?? 'other';
+    if (lastArea !== null && a !== lastArea) yy += 10;
+    lastArea = a;
+    tY.set(t, yy);
+    yy += rowT;
+  }
+  const stepM = Math.max(rowM, (yy - 40 - 26) / Math.max(1, mods.length - 1));
+  const mY = new Map(mods.map((m, i) => [m, 40 + i * stepM]));
+  void H;
+  const parts = [];
+  for (const m of mods) {
+    for (const [t, v] of MT.get(m)) {
+      if (!tY.has(t)) continue;
+      const w = isWrite([...v.ops]);
+      parts.push(`<path class="edge ${w ? 'w' : 'r'}" data-ends="m:${m} t:${t}" data-write="${w}" d="${curve(mx + mw, mY.get(m) + 13, tx, tY.get(t) + 9)}" style="${w ? `stroke:${areaColor(t)}` : ''}"><title>${esc(MODS.get(m)?.name ?? m)} → ${t}: ${[...v.ops].join(', ')} (${plural(v.routes.length, 'endpoint')})</title></path>`);
+    }
+  }
+  for (const m of mods) {
+    const mod = MODS.get(m) ?? { name: m, group: 'edge' };
+    const c = mod.group === 'admin' ? 'var(--red)' : mod.group === 'app' ? 'var(--accent)' : 'var(--slate)';
+    parts.push(`<g class="node" tabindex="0" role="button" data-id="m:${m}" aria-label="${esc(mod.name)}">
+      <rect x="${mx}" y="${mY.get(m)}" width="${mw}" height="26" rx="3"/><rect x="${mx}" y="${mY.get(m)}" width="4" height="26" style="fill:${c};stroke:none"/>
+      <text x="${mx + 12}" y="${mY.get(m) + 17.5}" style="font-size:12.5px">${esc(mod.name)}</text>
+      <text x="${mx + mw - 8}" y="${mY.get(m) + 17.5}" class="n" text-anchor="end">${MT.get(m).size}</text></g>`);
+  }
+  for (const t of tables) {
+    parts.push(`<g class="node" tabindex="0" role="button" data-id="t:${t}" aria-label="${t}">
+      <rect x="${tx}" y="${tY.get(t)}" width="${twd}" height="18" rx="2" style="stroke:${areaColor(t)}"/>
+      <rect x="${tx}" y="${tY.get(t)}" width="4" height="18" style="fill:${areaColor(t)};stroke:none"/>
+      <text x="${tx + 11}" y="${tY.get(t) + 13}" class="mono" style="font-size:11.5px">${t}</text></g>`);
+  }
+  let lastA = null;
+  for (const t of tables) {
+    const a = AREA_OF.get(t);
+    if (a && a.id !== lastA) parts.push(`<text class="sub" x="${tx + twd + 10}" y="${tY.get(t) + 13}" style="fill:${areaColor(t)};font-weight:600">${esc(a.name)}</text>`);
+    lastA = a?.id;
+  }
+  parts.unshift(`<text class="hd" x="${mx}" y="22">Modules</text><text class="hd" x="${tx}" y="22">Tables, by schema area</text>`);
+  const svg = `<svg class="dia" id="bip" viewBox="0 0 1120 ${yy + 30}" style="min-width:900px" role="group" aria-label="Modules and tables">${parts.join('')}</svg>`;
+  setTimeout(() => {
+    const el = document.getElementById('bip');
+    if (!el) return;
+    const reads = document.getElementById('show-reads');
+    const plumbing = document.getElementById('hide-plumbing');
+    const refresh = () => {
+      el.querySelectorAll('.edge').forEach((e) => {
+        const t = e.dataset.ends.split(' ')[1].slice(2);
+        const hide = (!reads.checked && e.dataset.write === 'false') || (plumbing.checked && (t === 'outbox_events' || t === 'audit_log'));
+        e.style.display = hide ? 'none' : '';
+      });
+    };
+    reads.onchange = refresh;
+    plumbing.onchange = refresh;
+    refresh();
+    focusable(el, (id) => {
+      const panel = document.getElementById('bip-panel');
+      if (!id) { panel.innerHTML = '<p class="hint" style="margin:0">Click a module or a table.</p>'; return; }
+      if (id.startsWith('m:')) {
+        const m = id.slice(2);
+        const rows = [...MT.get(m)].sort((a, b) => Number(isWrite([...b[1].ops])) - Number(isWrite([...a[1].ops])));
+        panel.innerHTML = `<h3>${esc(MODS.get(m)?.name ?? m)}</h3><p class="hint">${md(MODS.get(m)?.desc ?? '')} <a href="#endpoints?m=${m}">${plural(byModule.get(m).length, 'endpoint')} →</a></p>
+          <ul class="tlist">${rows.map(([t, v]) => `<li><span class="sw" style="--c:${areaColor(t)}"></span><a href="${tableHref(t)}">${t}</a><span class="hint">${plural(v.routes.length, 'endpoint')}</span><span class="ops">${opsHtml([...v.ops])}</span></li>`).join('')}</ul>`;
+      } else {
+        const t = id.slice(2);
+        const rs = F.routes.filter((r) => r.facts.tables[t]);
+        panel.innerHTML = `<h3 class="t">${t}</h3><p class="hint">${esc(AREA_OF.get(t)?.name ?? '')} · <a href="${tableHref(t)}">open in the schema guide ↗</a></p>${miniEps(rs, (r) => opsHtml(r.facts.tables[t]))}`;
+      }
+    });
+  });
+  return `<div class="controls">
+      <label class="toggle"><input type="checkbox" id="show-reads"> Show reads too</label>
+      <label class="toggle"><input type="checkbox" id="hide-plumbing" checked> Hide outbox_events and audit_log</label>
+      <div class="legend" style="margin:0"><span class="line" style="--c:var(--a4)">writes (table's area colour)</span><span class="line" style="--c:var(--line-2)">reads only</span></div>
+    </div>
+    <div class="panel" id="bip-panel"><p class="hint" style="margin:0">Click a module or a table.</p></div>
+    <div class="canvas">${svg}</div>`;
+}
+
+function miniEps(rs, extra) {
+  if (!rs.length) return '<p class="empty">None.</p>';
+  return `<ul class="mini-eps">${rs.map((r) => `<li>${meth(r.method)}<a href="${r.href}">${esc(r.url)}</a>${extra ? extra(r) : ''}</li>`).join('')}</ul>`;
+}
+
+function matrix() {
+  const MT = moduleTables();
+  const tables = tableOrder().filter((t) => [...MT.values()].some((mt) => mt.has(t)));
+  const areaRuns = [];
+  for (const t of tables) {
+    const a = AREA_OF.get(t) ?? { id: 'other', name: 'Other', i: 7 };
+    if (areaRuns.length && areaRuns[areaRuns.length - 1].id === a.id) areaRuns[areaRuns.length - 1].n++;
+    else areaRuns.push({ ...a, n: 1 });
+  }
+  const max = Math.max(...[...MT.values()].flatMap((mt) => [...mt.values()].map((v) => v.routes.length)));
+  let body = '';
+  for (const g of G.groups) {
+    body += `<tr class="group"><th>${esc(g.name)}</th>${tables.map(() => '<td></td>').join('')}</tr>`;
+    for (const m of G.modules.filter((x) => x.group === g.id)) {
+      const mt = MT.get(m.id) ?? new Map();
+      body += `<tr><th>${esc(m.name)}<small>${byModule.get(m.id)?.length ?? 0}</small></th>${tables.map((t) => {
+        const v = mt.get(t);
+        if (!v) return '<td></td>';
+        const w = isWrite([...v.ops]);
+        const k = Math.round(18 + (v.routes.length / max) * 62);
+        return `<td><button class="${w ? 'w' : 'r'}" style="--c:${areaColor(t)};--k:${k}" data-m="${m.id}" data-t="${t}" title="${esc(m.name)} · ${t}: ${[...v.ops].join(', ')} · ${plural(v.routes.length, 'endpoint')}">${w ? 'W' : 'R'}</button></td>`;
+      }).join('')}</tr>`;
+    }
+  }
+  setTimeout(() => {
+    const wrap = document.querySelector('.matrix-wrap');
+    if (!wrap) return;
+    wrap.addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-m]');
+      if (!b) return;
+      wrap.querySelectorAll('[aria-pressed="true"]').forEach((x) => x.removeAttribute('aria-pressed'));
+      b.setAttribute('aria-pressed', 'true');
+      const v = MT.get(b.dataset.m).get(b.dataset.t);
+      document.getElementById('mx-panel').innerHTML = `<h3>${esc(MODS.get(b.dataset.m)?.name)} · <span class="t">${b.dataset.t}</span></h3>
+        <p class="hint">${opsHtml([...v.ops])} · <a href="${tableHref(b.dataset.t)}">table in the schema guide ↗</a></p>${miniEps(v.routes.map((x) => x.r), (r) => opsHtml(r.facts.tables[b.dataset.t]))}`;
+    });
+  });
+  return `<div class="legend"><span style="--c:var(--a4)">W: some endpoint inserts, updates or deletes (table's area colour)</span><span style="--c:var(--line-2)">R: read only</span></div>
+  <div class="panel" id="mx-panel"><p class="hint" style="margin:0">Click a cell.</p></div>
+  <div class="matrix-wrap"><table class="matrix">
+    <thead><tr><th style="height:26px"></th>${areaRuns.map((a) => `<th class="area" colspan="${a.n}" style="--c:var(--a${a.i % 8})" title="${esc(a.name)}"><span>${esc(a.name)}</span></th>`).join('')}</tr>
+    <tr class="names"><th></th>${tables.map((t) => `<th><span class="rot"><a href="${tableHref(t)}">${t}</a></span></th>`).join('')}</tr></thead>
+    <tbody>${body}</tbody></table></div>`;
+}
+
+// ---------------- Endpoints list
+const filterState = { q: '', m: new Set(), a: new Set(), x: new Set(), mod: null };
+views.endpoints = (_, params) => {
+  filterState.mod = params.get('m');
+  filterState.a = new Set(params.get('a') ? [params.get('a')] : []);
+  filterState.q = params.get('q') ?? filterState.q;
+  const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+  const extras = [['w', 'Writes data'], ['e', 'Emits events'], ['rl', 'Rate limited'], ['au', 'Audited']];
+  setTimeout(() => {
+    const input = document.getElementById('q');
+    if (!input) return;
+    input.value = filterState.q;
+    input.addEventListener('input', () => { filterState.q = input.value; renderList(); });
+    document.querySelectorAll('.fbtn').forEach((b) => b.addEventListener('click', () => {
+      const set = filterState[b.dataset.k];
+      set.has(b.dataset.v) ? set.delete(b.dataset.v) : set.add(b.dataset.v);
+      b.setAttribute('aria-pressed', set.has(b.dataset.v));
+      renderList();
+    }));
+    renderList();
+    if (!filterState.mod) input.focus({ preventScroll: true });
+  });
+  const mod = filterState.mod && MODS.get(filterState.mod);
+  return `${mod ? `<div class="crumbs"><a href="#endpoints">All endpoints</a><span aria-hidden="true">›</span><span>${esc(mod.name)}</span></div>` : ''}
+  <h1>${mod ? esc(mod.name) : 'Endpoints'}</h1>
+  <p class="lede">${mod ? md(mod.desc) : `All ${F.routes.length} routes the API registers, grouped by module. Search matches paths, descriptions, functions and table names. Press <span class="kbd">/</span> to search.`}</p>
+  <div class="toolbar">
+    <input class="search" id="q" type="search" placeholder="Search: like, papers, notifications, :slug…" aria-label="Search endpoints" autocomplete="off">
+    <div class="filters">
+      <span class="lab">Method</span>${methods.map((m) => `<button class="fbtn m-${m}" data-k="m" data-v="${m}" aria-pressed="${filterState.m.has(m)}">${m}</button>`).join('')}
+      <span class="lab">Access</span>${G.access.map((a) => `<button class="fbtn x-${a.id}" data-k="a" data-v="${a.id}" aria-pressed="${filterState.a.has(a.id)}">${esc(a.name)}</button>`).join('')}
+      <span class="lab">Has</span>${extras.map(([v, l]) => `<button class="fbtn" data-k="x" data-v="${v}" aria-pressed="${filterState.x.has(v)}">${l}</button>`).join('')}
+    </div>
+    <p class="count" id="count"></p>
+  </div>
+  <div id="list"></div>`;
+};
+
+function matches(r) {
+  const s = filterState;
+  if (s.mod && r.module !== s.mod) return false;
+  if (s.m.size && !s.m.has(r.method)) return false;
+  if (s.a.size && !s.a.has(r.access)) return false;
+  if (s.x.has('w') && !r.writes.length) return false;
+  if (s.x.has('e') && !r.facts.events.length) return false;
+  if (s.x.has('rl') && !r.rateLimit) return false;
+  if (s.x.has('au') && !r.facts.audits.length) return false;
+  if (s.q.trim()) {
+    const hay = [r.method, r.url, r.module, MODS.get(r.module)?.name, r.section, describe(r), ...Object.keys(r.facts.tables), ...r.facts.events, ...r.handlerCalls.map((c) => c.split('#')[1])].join(' ').toLowerCase();
+    if (!s.q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w))) return false;
+  }
+  return true;
+}
+
+function renderList() {
+  const list = document.getElementById('list');
+  if (!list) return;
+  let total = 0;
+  const html = [...byModule].map(([id, rs]) => {
+    const shown = rs.filter(matches);
+    total += shown.length;
+    if (!shown.length) return '';
+    const m = MODS.get(id) ?? { name: id, desc: '' };
+    let lastSec = null;
+    const items = shown.map((r) => {
+      const sec = r.section && r.section !== lastSec ? `<li class="sec">${esc(r.section)}</li>` : '';
+      lastSec = r.section ?? lastSec;
+      const marks = [
+        r.access !== 'user' ? accessBadge(r.access) : '',
+        r.writes.length ? `<span class="tag w" title="Writes ${r.writes.join(', ')}">writes ${r.writes.filter((t) => t !== 'outbox_events' && t !== 'audit_log').length || r.writes.length}</span>` : '',
+        r.facts.events.length ? `<span class="tag ev" title="${r.facts.events.join(', ')}">⚡ ${esc(r.facts.events.join(', '))}</span>` : '',
+        r.rateLimit ? `<span class="tag rl" title="Rate limit">${r.rateLimit.max}/${esc(r.rateLimit.timeWindow.replace('1 ', ''))} per ${r.rateLimit.per}</span>` : '',
+      ].join('');
+      const d = shortDoc(describe(r), 140);
+      return `${sec}<li><a href="${r.href}">${meth(r.method)}<span class="path">${pathHtml(r.url)}</span><span class="marks">${marks}</span>${d ? `<span class="desc">${md(d)}</span>` : ''}</a></li>`;
+    }).join('');
+    return `<section class="mod"><div class="mod-head"><h2>${filterState.mod ? 'Endpoints' : `<a href="#endpoints?m=${id}" style="color:inherit;text-decoration:none">${esc(m.name)}</a>`}</h2>${filterState.mod ? '' : `<p class="hint">${md(shortDoc(m.desc, 110))}</p>`}<span class="n">${shown.length}</span></div><ul class="eps">${items}</ul></section>`;
+  }).join('');
+  list.innerHTML = html || '<p class="empty">No endpoint matches. Clear a filter or the search.</p>';
+  document.getElementById('count').textContent = `${total} of ${filterState.mod ? byModule.get(filterState.mod).length : F.routes.length} shown`;
+}
+
+// ---------------- Endpoint page
+function stagesFor(r) {
+  const S = G.stages;
+  const staff = r.access === 'admin' || r.access === 'moderator';
+  const signed = r.access === 'user' || staff;
+  const parts = Object.keys(r.schema);
+  const tables = Object.entries(r.facts.tables);
+  const writes = tables.filter(([, o]) => isWrite(o));
+  const reads = tables.filter(([, o]) => !isWrite(o));
+  const fns = r.handlerCalls.map((id) => FN.get(id)).filter(Boolean);
+  return [
+    { id: 'front', h: 'Front door', c: 'var(--ink)', b: 'Fastify', t: 'request id · CORS · compress · ETag' },
+    { id: 'auth', h: 'Sign-in', c: 'var(--accent)', on: signed || r.access === 'token', b: signed ? 'authenticate' : r.access === 'token' ? 'signed token in path' : 'not needed', t: signed ? 'JWT + live session + active account' : r.access === 'token' ? 'HMAC token, checked in the handler' : 'public route' },
+    { id: 'role', h: 'Staff', c: 'var(--red)', on: staff, b: staff ? `requireRole('${r.access}')` : 'not a staff route', t: staff ? 'role + two-factor sign-in' : '' },
+    { id: 'limit', h: 'Rate limit', c: 'var(--amber)', on: !!r.rateLimit, b: r.rateLimit ? `${r.rateLimit.max} / ${r.rateLimit.timeWindow}` : 'no limit', t: r.rateLimit ? `per ${r.rateLimit.per === 'ip' ? 'IP address' : 'signed-in user'}` : '' },
+    { id: 'validate', h: 'Validate', c: 'var(--violet)', on: parts.length > 0, b: parts.length ? 'zod' : 'no input', t: parts.join(' · ') },
+    { id: 'handler', h: 'Handler', c: 'var(--ink)', b: r.file.split('/').pop(), t: fns.length ? fns.map((f) => f.name + '()').join(', ') : 'inline', href: srcHref(r.file, r.line) },
+    { id: 'db', h: 'Postgres', c: 'var(--green)', on: tables.length > 0, b: tables.length ? `${plural(writes.length, 'write')} · ${plural(reads.length, 'read')}` : 'no tables', t: writes.map(([t]) => t).slice(0, 4).join(', ') + (writes.length > 4 ? '…' : '') },
+    { id: 'response', h: 'Response', c: 'var(--blue)', b: r.success.join(' / '), t: `${plural(uniq(r.facts.errors.concat(r.guardErrors).map((e) => e.code)).length, 'error code')}`, end: true },
+  ];
+}
+function flowHtml(r, now) {
+  const st = stagesFor(r);
+  const evs = r.facts.events.filter((e) => e !== 'search.sync');
+  const after = r.facts.events.length ? `<div class="after">after the response · worker</div><div class="flow">${r.facts.events.map((e) => {
+    const h = HANDLER.get(e);
+    const eff = h ? [...h.facts.notifications.map((n) => `notification: ${n}`), ...h.facts.providers.filter((p) => p !== 'storage'), ...Object.entries(h.facts.tables).filter(([, o]) => isWrite(o)).map(([t]) => t)] : [];
+    return `<div class="stage${now === 'outbox' ? ' now' : ''}" style="--c:var(--amber)"><h4>Outbox event</h4><b><a href="#events/${e}">${esc(e)}</a></b><span class="t">${e === 'search.sync' ? 'no consumer yet (future search indexer)' : esc(uniq(eff).join(' · ') || 'handled by the worker')}</span></div>`;
+  }).join('')}</div>` : '';
+  void evs;
+  return `<div class="flow">${st.map((s) => `<div class="stage${s.on === false ? ' off' : ''}${now === s.id ? ' now' : ''}${s.end ? ' end' : ''}" style="--c:${s.c}"><h4>${esc(s.h)}</h4><b class="${['handler'].includes(s.id) ? 't' : ''}">${s.href ? `<a href="${s.href}">${esc(s.b)}</a>` : esc(s.b)}</b><span class="t">${esc(s.t)}</span></div>`).join('')}</div>${after}`;
+}
+
+function fieldsHtml(r) {
+  const parts = [['params', 'Path parameters'], ['querystring', 'Query string'], ['body', 'JSON body']];
+  const blocks = parts.filter(([k]) => r.schema[k]).map(([k, label]) => {
+    const rows = flatten(r.schema[k]);
+    return `<h3 style="margin-top:22px">${label}</h3>${rows.length ? `<table class="fields"><thead><tr><th>Field</th><th>Type</th><th>Rules</th></tr></thead><tbody>${rows.map((f) => `<tr><td class="f">${esc(f.name)}${f.req ? '<span class="req">REQUIRED</span>' : ''}</td><td class="ty">${esc(f.type)}</td><td class="c">${f.rules.join(' · ') || '—'}</td></tr>`).join('')}</tbody></table>` : `<p class="hint">${esc(typeOf(r.schema[k]))}</p>`}`;
+  });
+  const curl = curlFor(r);
+  return `${blocks.length ? blocks.join('') : '<p class="empty">This endpoint takes no parameters, query string or body.</p>'}
+    <div class="codehead"><h3>Try it locally</h3><button class="copy" data-copy="curl">Copy</button></div>
+    <pre class="code" id="curl">${esc(curl)}</pre>
+    <p class="hint" style="margin-top:8px">${r.access === 'public' || r.access === 'token' ? 'No sign-in needed.' : `Dev runs with <code>DEV_AUTH_BYPASS</code>: a request without <code>Authorization</code> acts as <code>DEV_AUTH_USER</code>, or the username in <code>x-dev-user</code>.${r.access !== 'user' ? ' The seeded admin counts as two-factor signed in.' : ''}`} Sample values come from the schema; ids are placeholders.</p>`;
+}
+
+function dataHtml(r) {
+  const t = Object.entries(r.facts.tables).sort((a, b) => Number(isWrite(b[1])) - Number(isWrite(a[1])) || a[0].localeCompare(b[0]));
+  const g = r.guards.flatMap((x) => Object.keys(F.guards[x]?.tables ?? {}));
+  return `<div class="data-grid">
+    <div class="card"><h3>Tables · ${t.length}</h3>${t.length ? `<ul class="tlist">${t.map(([n, ops]) => `<li><span class="sw" style="--c:${areaColor(n)}"></span><a href="${tableHref(n)}">${n}</a><span class="ops">${opsHtml(ops)}</span></li>`).join('')}</ul>` : '<p class="empty">None.</p>'}
+      ${g.length ? `<p class="hint" style="margin:10px 0 0">Plus the sign-in check: ${uniq(g).map((x) => `<code>${x}</code>`).join(', ')} (one indexed query).</p>` : ''}</div>
+    <div class="card"><h3>Outbox events</h3>${r.facts.events.length ? `<div class="chips">${r.facts.events.map((e) => `<a class="chip" href="#events/${e}">⚡ ${esc(e)}</a>`).join('')}</div>${r.facts.searchSync.length ? `<p class="hint" style="margin:8px 0 0">search.sync for: ${r.facts.searchSync.map((x) => `<code>${esc(x)}</code>`).join(', ')}</p>` : ''}` : '<p class="empty">None: nothing happens after the response.</p>'}
+      <h3 style="margin-top:16px">Audit log</h3>${r.facts.audits.length ? `<div class="chips">${r.facts.audits.map((a) => `<span class="chip">${esc(a)}</span>`).join('')}</div>` : '<p class="empty">Not audited.</p>'}
+      <h3 style="margin-top:16px">Outside services</h3>${r.facts.providers.length ? `<div class="chips">${r.facts.providers.map((p) => `<span class="chip">${esc(p)}</span>`).join('')}</div>` : '<p class="empty">None.</p>'}</div>
+  </div>
+  ${Object.keys(r.facts.tables).some((x) => x === 'blocks' || x === 'follows') && r.method === 'GET' ? '<p class="hint" style="margin-top:14px">Reads of <code>blocks</code> and <code>follows</code> here are the visibility rules from <code>db/visibility.ts</code>: blocks both ways, private accounts, drafts and deleted rows.</p>' : ''}`;
+}
+
+function errorsHtml(r) {
+  const val = Object.keys(r.schema).length ? [{ status: 400, code: 'VALIDATION_ERROR', message: 'Invalid request (details lists each problem)', from: 'zod' }] : [];
+  const rl = r.rateLimit ? [{ status: 429, code: 'FST_ERR_RATE_LIMIT', message: `Rate limit exceeded (${r.rateLimit.max} per ${r.rateLimit.timeWindow})`, from: 'rate limit' }] : [];
+  const all = [...r.guardErrors.map((e) => ({ ...e, from: 'guard' })), ...rl, ...val, ...r.facts.errors.map((e) => ({ ...e, from: 'code' }))];
+  const seen = new Set();
+  const list = all.filter((e) => { const k = e.status + e.code + e.message; if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => a.status - b.status);
+  return `<p class="hint">Every error is <code>{ error: { code, message, request_id, details? } }</code>. Database constraint failures map to 409 ALREADY_EXISTS / IN_USE and 400 INVALID_REFERENCE / INVALID_DATA (<a href="#ref/errors">all codes</a>).</p>
+  <ul class="errs">${list.map((e) => `<li class="s${String(e.status)[0]}"><span class="st">${e.status}</span><span class="cd">${esc(e.code)}<small>${esc(e.from)}</small></span><span>${esc(e.message)}</span></li>`).join('')}</ul>`;
+}
+
+const trivial = (f) => !f.calls.length && !Object.keys(f.own.tables).length && !f.own.events.length && !f.own.errors.length;
+function treeHtml(ids, depth = 0, seen = new Set()) {
+  if (!ids.length || depth > 7) return '';
+  const helpers = ids.map((id) => FN.get(id)).filter((f) => f && trivial(f));
+  const main = ids.filter((id) => FN.get(id) && !trivial(FN.get(id)));
+  const tail = helpers.length ? `<li><span class="hint">helpers: ${helpers.map((f) => `<a class="src" href="${srcHref(f.file, f.line)}">${esc(f.name)}()</a>`).join(', ')}</span></li>` : '';
+  return `<ul class="tree"${depth ? '' : ' style="padding:0"'}>${main.map((id) => {
+    const f = FN.get(id);
+    if (!f) return '';
+    const own = Object.entries(f.own.tables);
+    const interesting = own.length || f.own.events.length || f.own.errors.length || f.calls.length;
+    const again = seen.has(id);
+    const next = new Set(seen).add(id);
+    return `<li><div class="fn"><span class="nm${interesting ? '' : ' dim'}">${esc(f.name)}()</span>${srcLink(f.file, f.line)}
+      ${f.doc && depth < 3 ? `<span class="doc">${md(shortDoc(f.doc, 200))}</span>` : ''}
+      ${own.length || f.own.events.length ? `<span class="own">${own.map(([t, ops]) => `<span class="mini" style="--c:${areaColor(t)}">${t} ${ops.map((o) => `<span class="op ${o}">${o[0].toUpperCase()}</span>`).join('')}</span>`).join('')}${f.own.events.map((e) => `<span class="mini" style="--c:var(--amber)">⚡ ${esc(e)}</span>`).join('')}</span>` : ''}
+    </div>${again ? '' : treeHtml(f.calls, depth + 1, next)}</li>`;
+  }).join('')}${tail}</ul>`;
+}
+
+views.ep = (rest) => {
+  const [keyPart, tab = 'flow'] = rest.split('@');
+  const m = keyPart.match(/^([A-Z]+)(\/.*)$/);
+  const r = m && ROUTE.get(`${m[1]} ${m[2]}`);
+  if (!r) return `<h1>Not found</h1><p>No endpoint <code>${esc(rest)}</code>. <a href="#endpoints">All endpoints</a></p>`;
+  const mod = MODS.get(r.module);
+  const tabs = [['flow', 'Flow'], ['request', 'Request'], ['data', 'Data', Object.keys(r.facts.tables).length], ['errors', 'Errors', uniq(r.facts.errors.concat(r.guardErrors).map((e) => e.code)).length], ['code', 'Code path', r.handlerCalls.length]];
+  const body = { flow: () => flowHtml(r) + flowNotes(r), request: () => fieldsHtml(r), data: () => dataHtml(r), errors: () => errorsHtml(r), code: () => `<p class="hint">The functions the handler calls, and what they call in turn, with the tables each one touches itself. Small helpers that touch nothing are listed at the end of their level.</p>${r.handlerCalls.length ? treeHtml(r.handlerCalls) : '<p class="empty">The handler does its work inline.</p>'}` }[tab] ?? (() => '');
+  const siblings = byModule.get(r.module);
+  const idx = siblings.indexOf(r);
+  const prev = siblings[idx - 1], next = siblings[idx + 1];
+  setTimeout(() => {
+    document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => {
+      navigator.clipboard?.writeText(document.getElementById(b.dataset.copy).textContent).then(() => { b.textContent = 'Copied'; b.classList.add('done'); setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('done'); }, 1500); });
+    }));
+  });
+  return `<div class="crumbs"><a href="#endpoints">Endpoints</a><span aria-hidden="true">›</span><a href="#endpoints?m=${r.module}">${esc(mod?.name ?? r.module)}</a>${r.section ? `<span aria-hidden="true">›</span><span>${esc(r.section)}</span>` : ''}</div>
+  <div class="ep-title">${meth(r.method, true)}<span class="path">${pathHtml(r.url)}</span></div>
+  ${describe(r) ? `<p class="lede">${md(describe(r))}${!r.doc ? ' <span class="hint">(from the service function)</span>' : ''}</p>` : ''}
+  <ul class="facts">
+    <li>${accessBadge(r.access)}</li>
+    <li>Success <b>${r.success.join(', ')}</b></li>
+    <li>${r.rateLimit ? `Limit <b>${r.rateLimit.max} / ${esc(r.rateLimit.timeWindow)}</b> per ${r.rateLimit.per}` : 'No rate limit'}</li>
+    <li>${r.line ? srcLink(r.file, r.line) : `<span class="hint">${esc(r.plugin)}</span>`}</li>
+    ${r.plugin.startsWith('lifecycleRoutes') ? `<li><span class="hint">shared ${esc(r.plugin)}</span></li>` : ''}
+  </ul>
+  <nav class="tabs">${tabs.map(([id, label, n]) => `<a href="${r.href}${id === 'flow' ? '' : '@' + id}" ${id === tab ? 'aria-current="page"' : ''}>${label}${n ? `<small>${n}</small>` : ''}</a>`).join('')}</nav>
+  ${body()}
+  <div class="tour-nav">${prev ? `<a class="btn" href="${prev.href}">← ${prev.method} ${esc(prev.url)}</a>` : '<span></span>'}${next ? `<a class="btn" href="${next.href}">${next.method} ${esc(next.url)} →</a>` : '<span></span>'}</div>`;
+};
+function flowNotes(r) {
+  return `<p class="hint" style="margin-top:6px">Dashed stages don't apply to this endpoint. <a href="#journey/0/${r.method}${r.url}">Walk through it step by step →</a></p>`;
+}
+
+// ---------------- Journey
+views.journey = (rest) => {
+  let step = 0, key = G.journey.default;
+  const m = (rest || '').match(/^(\d+)\/([A-Z]+)(\/.*)$/);
+  if (m) { step = Number(m[1]); key = `${m[2]} ${m[3]}`; }
+  const r = ROUTE.get(key) ?? F.routes[0];
+  const steps = journeySteps(r);
+  step = Math.min(Math.max(step, 0), steps.length - 1);
+  const s = steps[step];
+  const href = (i) => `#journey/${i}/${r.method}${r.url}`;
+  setTimeout(() => {
+    const sel = document.getElementById('jpick');
+    sel?.addEventListener('change', () => { location.hash = `#journey/0/${sel.value.replace(' ', '')}`; });
+    teardown = (() => {
+      const onKey = (e) => {
+        if (e.target.closest('input,select,textarea')) return;
+        if (e.key === 'ArrowRight' && step < steps.length - 1) location.hash = href(step + 1);
+        if (e.key === 'ArrowLeft' && step > 0) location.hash = href(step - 1);
+      };
+      document.addEventListener('keydown', onKey);
+      return () => document.removeEventListener('keydown', onKey);
+    })();
+  });
+  const opts = [...byModule].map(([id, rs]) => `<optgroup label="${esc(MODS.get(id)?.name ?? id)}">${rs.map((x) => `<option value="${esc(x.key)}" ${x === r ? 'selected' : ''}>${esc(x.key)}</option>`).join('')}</optgroup>`).join('');
+  return `<div class="pick"><span>Follow</span><select class="big-select" id="jpick" aria-label="Endpoint to follow">${opts}</select></div>
+  <nav class="row-progress" style="--n:${steps.length}" aria-label="Steps">${steps.map((x, i) => `<a href="${href(i)}" class="${i < step ? 'done' : i === step ? 'now' : ''}" title="${esc(x.title)}" aria-label="Step ${i + 1}: ${esc(x.title)}"></a>`).join('')}</nav>
+  <p class="step-count">Step ${step + 1} of ${steps.length} · <span class="kbd">←</span> <span class="kbd">→</span> to move</p>
+  <h1>${esc(s.title)}</h1>
+  ${flowHtml(r, s.stage)}
+  <div style="margin-top:22px">${s.body}</div>
+  <div class="tour-nav"><a class="btn" href="${href(step - 1)}" aria-disabled="${step === 0}">← Back</a>${step < steps.length - 1 ? `<a class="btn primary" href="${href(step + 1)}">Next: ${esc(steps[step + 1].title)} →</a>` : `<a class="btn primary" href="${r.href}">Open the endpoint page →</a>`}</div>`;
+};
+
+function journeySteps(r) {
+  const S = G.stages;
+  const fileNote = (st) => (st.file ? `<p class="hint">${srcLink(st.file)}</p>` : '');
+  const staff = r.access === 'admin' || r.access === 'moderator';
+  const signed = r.access === 'user' || staff;
+  const steps = [];
+  steps.push({ title: 'The client sends the request', stage: null, body: `<p>${md(describe(r) || 'The app calls this endpoint.')}</p><pre class="code">${esc(curlFor(r))}</pre>` });
+  steps.push({ title: S.front.name, stage: 'front', body: `<p>${md(S.front.text)}</p>${fileNote(S.front)}` });
+  if (signed) {
+    const g = F.guards.authenticate;
+    steps.push({ title: 'authenticate: who is calling?', stage: 'auth', body: `<p>${md(S.auth.text)}</p><div class="chips">${Object.entries(g?.tables ?? {}).map(([t, o]) => tableChip(t, o)).join('')}</div><p class="hint" style="margin-top:10px">${srcLink(g.file, g.line)} · fails with ${uniq(g.errors.map((e) => `${e.status} ${e.code}`)).join(', ')}</p>` });
+  } else {
+    steps.push({ title: r.access === 'token' ? 'The token in the path is the permission' : 'No sign-in on this route', stage: 'auth', body: r.access === 'token' ? '<p>Storage and media URLs carry an HMAC-signed token (derived key per purpose, with an expiry). The handler verifies it; there is no session.</p>' : '<p>This route sits outside the authenticate hook. Public routes that could be abused (sign-in, sign-up, reset) are rate limited per IP instead.</p>' });
+  }
+  if (staff) steps.push({ title: `requireRole('${r.access}')`, stage: 'role', body: `<p>${md(S.role.text)}</p>${fileNote(S.role)}` });
+  if (r.rateLimit) steps.push({ title: `Rate limit: ${r.rateLimit.max} per ${r.rateLimit.timeWindow}`, stage: 'limit', body: `<p>${md(S.limit.text)}</p><p>This route allows <b>${r.rateLimit.max}</b> requests per <b>${esc(r.rateLimit.timeWindow)}</b> per ${r.rateLimit.per === 'ip' ? 'IP address' : 'signed-in user'}.</p>${fileNote(S.limit)}` });
+  if (Object.keys(r.schema).length) steps.push({ title: 'zod checks the input', stage: 'validate', body: `<p>${md(S.validate.text)}</p>${fieldsHtml(r).split('<div class="codehead">')[0]}` });
+  steps.push({ title: 'The handler calls a service', stage: 'handler', body: `<p>${md(S.handler.text)} ${md(S.service.text)}</p><p class="hint">Route: ${r.line ? srcLink(r.file, r.line) : esc(r.plugin)}</p>${r.handlerCalls.length ? treeHtml(r.handlerCalls) : '<p class="empty">This handler works inline.</p>'}` });
+  const t = Object.entries(r.facts.tables);
+  if (t.length) steps.push({ title: 'PostgreSQL', stage: 'db', body: `<p>${md(S.db.text)}</p><div class="data-grid"><div class="card"><h3>Writes</h3><div class="chips">${t.filter(([, o]) => isWrite(o)).map(([n, o]) => tableChip(n, o)).join('') || '<span class="hint">Nothing: a read-only endpoint.</span>'}</div></div><div class="card"><h3>Reads</h3><div class="chips">${t.filter(([, o]) => !isWrite(o)).map(([n, o]) => tableChip(n, o)).join('') || '<span class="hint">—</span>'}</div></div></div>` });
+  steps.push({ title: `Response: ${r.success.join(' / ')}`, stage: 'response', body: `<p>${md(S.response.text)}</p>${errorsHtml(r)}` });
+  for (const e of r.facts.events) {
+    const h = HANDLER.get(e);
+    const ev = F.events.find((x) => x.name === e);
+    steps.push({ title: `After commit: ${e}`, stage: 'outbox', body: `<p>${md(ev?.doc ?? '')}</p><p>${md(S.outbox.text)}</p>${h ? `<div class="data-grid"><div class="card"><h3>Worker handler</h3><p style="margin:0">${srcLink('apps/api/src/worker/outbox.ts', h.line, `worker/outbox.ts:${h.line}`)}</p>${h.doc ? `<p class="hint" style="margin:6px 0 0">${md(h.doc)}</p>` : ''}</div><div class="card"><h3>Effects</h3><div class="chips">${h.facts.notifications.map((n) => `<span class="chip">notification: ${esc(n)}</span>`).join('')}${h.facts.providers.filter((p) => p !== 'storage').map((p) => `<span class="chip">${esc(p)}</span>`).join('')}${Object.entries(h.facts.tables).filter(([, o]) => isWrite(o)).map(([n, o]) => tableChip(n, o)).join('')}</div></div></div>` : '<p class="hint">No consumer yet.</p>'}` });
+  }
+  return steps;
+}
+
+// ---------------- Events
+views.events = (focus) => {
+  // Columns: emitting modules → events → effects
+  const evs = F.events;
+  const emitMods = new Map();
+  for (const e of evs) {
+    for (const r of EMITTERS.get(e.name)) {
+      const k = `m:${r.module}`;
+      if (!emitMods.has(k)) emitMods.set(k, { id: k, label: MODS.get(r.module)?.name ?? r.module, ev: new Map() });
+      const em = emitMods.get(k).ev;
+      em.set(e.name, (em.get(e.name) ?? 0) + 1);
+    }
+  }
+  for (const l of F.loops) for (const e of l.facts.events) {
+    const k = `loop:${l.name}`;
+    if (!emitMods.has(k)) emitMods.set(k, { id: k, label: `${l.name} loop (worker)`, ev: new Map() });
+    emitMods.get(k).ev.set(e, 1);
+  }
+  const rank = (id) => (id.startsWith('loop:') ? 999 : modOrder.indexOf(id.slice(2)));
+  const left = [...emitMods.values()].sort((a, b) => rank(a.id) - rank(b.id));
+  const effects = new Map();
+  const addEff = (id, label, c, ev) => { if (!effects.has(id)) effects.set(id, { id, label, c, ev: new Set() }); effects.get(id).ev.add(ev); };
+  for (const h of F.eventHandlers) {
+    for (const n of h.facts.notifications) addEff('n:notifications', 'notifications rows', areaColor('notifications'), h.event);
+    for (const p of h.facts.providers) if (p !== 'storage') addEff(`p:${p}`, p === 'push' ? 'push to devices' : p === 'email' ? 'email' : p, 'var(--a7)', h.event);
+    for (const [t, o] of Object.entries(h.facts.tables)) if (isWrite(o) && t !== 'notifications' && t !== 'outbox_events') addEff(`t:${t}`, `${t} (${o.filter((x) => x !== 'read').join(', ')})`, areaColor(t), h.event);
+  }
+  const right = [...effects.values()].sort((a, b) => a.id.localeCompare(b.id));
+  const rowL = 34, rowE = 46, rowR = 34;
+  const H = Math.max(left.length * rowL, evs.length * rowE, right.length * rowR) + 60;
+  const lx = 20, lw = 230, ex = 410, ew = 220, rx = 800, rw = 270;
+  const yL = (i) => 40 + i * rowL + (H - 60 - left.length * rowL) / 2;
+  const yE = (i) => 40 + i * rowE + (H - 60 - evs.length * rowE) / 2;
+  const yR = (i) => 40 + i * rowR + (H - 60 - right.length * rowR) / 2;
+  const parts = [`<text class="hd" x="${lx}" y="24">Written by</text><text class="hd" x="${ex}" y="24">Event</text><text class="hd" x="${rx}" y="24">Worker does</text>`];
+  left.forEach((l, i) => evs.forEach((e, j) => {
+    const n = l.ev.get(e.name);
+    if (n) parts.push(`<path class="edge" data-ends="${l.id} e:${e.name}" d="${curve(lx + lw, yL(i) + 13, ex, yE(j) + 17)}"><title>${esc(l.label)} → ${e.name}: ${plural(n, 'endpoint')}</title></path>`);
+  }));
+  right.forEach((rr, i) => evs.forEach((e, j) => {
+    if (rr.ev.has(e.name)) parts.push(`<path class="edge async" data-ends="e:${e.name} ${rr.id}" d="${curve(ex + ew, yE(j) + 17, rx, yR(i) + 13)}" style="stroke:${rr.c}"/>`);
+  }));
+  left.forEach((l, i) => parts.push(`<g class="node" tabindex="0" role="button" data-id="${l.id}"><rect x="${lx}" y="${yL(i)}" width="${lw}" height="26" rx="3"/><text x="${lx + 10}" y="${yL(i) + 17.5}" style="font-size:12.5px">${esc(l.label)}</text></g>`));
+  evs.forEach((e, j) => parts.push(`<g class="node" tabindex="0" role="button" data-id="e:${e.name}"><rect x="${ex}" y="${yE(j)}" width="${ew}" height="34" rx="3" style="stroke:var(--amber)"/><rect x="${ex}" y="${yE(j)}" width="4" height="34" style="fill:var(--amber);stroke:none"/><text x="${ex + 12}" y="${yE(j) + 15}" class="mono">${esc(e.name)}</text><text x="${ex + 12}" y="${yE(j) + 28}" class="n">${EMITTERS.get(e.name).length ? plural(EMITTERS.get(e.name).length, 'endpoint') : F.loops.filter((l) => l.facts.events.includes(e.name)).map((l) => `${l.name} loop`).join(', ') || 'no writer'} · entity ${esc(e.entity ?? '?')}</text></g>`));
+  right.forEach((rr, i) => parts.push(`<g class="node" tabindex="0" role="button" data-id="${rr.id}"><rect x="${rx}" y="${yR(i)}" width="${rw}" height="26" rx="3" style="stroke:${rr.c}"/><rect x="${rx}" y="${yR(i)}" width="4" height="26" style="fill:${rr.c};stroke:none"/><text x="${rx + 12}" y="${yR(i) + 17.5}" class="mono" style="font-size:11.5px">${esc(rr.label)}</text></g>`));
+  setTimeout(() => {
+    const svg = document.getElementById('evmap');
+    if (!svg) return;
+    const apply = focusable(svg, (id) => {
+      if (id?.startsWith('e:')) history.replaceState(null, '', `#events/${id.slice(2)}`);
+      document.querySelectorAll('.evcard').forEach((c) => (c.style.outline = id && c.id === `ev-${id.slice(2)}` ? '2px solid var(--accent)' : ''));
+      if (id?.startsWith('e:')) document.getElementById(`ev-${id.slice(2)}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    if (focus) apply(`e:${focus}`);
+  });
+  return `<h1>Events</h1>
+  <p class="lede">A request never sends a notification, bumps a counter or emails anyone itself. It writes an <code>outbox_events</code> row in the same transaction as its change; the worker's outbox loop picks it up (<a href="#worker">Worker</a>). Click an event to trace it.</p>
+  <div class="legend"><span class="line" style="--c:var(--muted)">writes the event (in the request's transaction)</span><span class="dash" style="--c:var(--muted)">worker, after commit</span></div>
+  <div class="canvas"><svg class="dia" id="evmap" viewBox="0 0 1090 ${H}" style="min-width:900px" role="group" aria-label="Events">${parts.join('')}</svg></div>
+  <section class="block"><h2>Delivery rules</h2><ul class="bul">
+    <li>The worker <b>claims</b> an event (sets <code>processed_at</code> only if still empty) and does its database work in one transaction, so counters and notification rows apply exactly once.</li>
+    <li>Push and email run <b>after</b> that commit, best effort: a failure is logged, not retried.</li>
+    <li>Counters move ±1 per event; the hourly maintenance job recounts them to repair drift.</li>
+    <li>Toggle rows (likes, follows) write an event only when the state really changes; only the first like or follow ever notifies.</li>
+  </ul></section>
+  <section class="block"><h2>Every event</h2>
+  ${evs.map((e) => {
+    const h = HANDLER.get(e.name);
+    const em = EMITTERS.get(e.name);
+    const loopEm = F.loops.filter((l) => l.facts.events.includes(e.name)).map((l) => `${l.name} loop`);
+    return `<div class="card evcard" id="ev-${e.name}" style="margin-bottom:14px;scroll-margin-top:80px">
+      <div class="fn"><span class="nm" style="font-size:1.05rem">⚡ ${esc(e.name)}</span><span class="hint">entity: ${esc(e.entity ?? '?')} · payload <code>${esc(e.payload)}</code></span></div>
+      ${e.doc ? `<p style="margin:6px 0 10px;color:var(--ink-2)">${md(e.doc)}</p>` : ''}
+      <div class="data-grid">
+        <div><h3 style="font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Written by · ${em.length + loopEm.length}</h3>${loopEm.length ? `<p class="hint" style="margin:0 0 4px">${loopEm.join(', ')}</p>` : ''}${miniEps(em)}</div>
+        <div><h3 style="font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Worker handler</h3>${h ? `<p style="margin:0 0 6px">${srcLink('apps/api/src/worker/outbox.ts', h.line, `worker/outbox.ts:${h.line}`)}</p>${h.doc ? `<p class="hint">${md(h.doc)}</p>` : ''}<div class="chips">${h.facts.notifications.map((n) => `<span class="chip">notification: ${esc(n)}</span>`).join('')}${h.facts.providers.filter((p) => p !== 'storage').map((p) => `<span class="chip">${esc(p)}</span>`).join('')}${Object.entries(h.facts.tables).map(([t, o]) => tableChip(t, o)).join('')}</div>` : '<p class="empty">None.</p>'}</div>
+      </div></div>`;
+  }).join('')}</section>`;
+};
+
+// ---------------- Worker
+views.worker = () => {
+  const colors = ['var(--a0)', 'var(--amber)', 'var(--green)', 'var(--violet)'];
+  const span = 60000;
+  const rows = F.loops.map((l, i) => {
+    const c = colors[i % colors.length];
+    const ticks = l.idleMs <= span ? Array.from({ length: Math.floor(span / l.idleMs) + 1 }, (_, k) => `<i style="left:${((k * l.idleMs) / span) * 100}%"></i>`).join('') : '';
+    const label = l.idleMs >= 3600000 ? `${l.idleMs / 3600000} h` : l.idleMs >= 60000 ? `${l.idleMs / 60000} min` : `${l.idleMs / 1000} s`;
+    const pulse = l.idleMs <= span ? `<span class="pulse" style="--d:${Math.max(l.idleMs, 1000) / 1000}s;--to:${(l.idleMs / span) * 100}%"></span>` : '';
+    return `<div class="tl-row" style="--c:${c}"><b>${esc(l.name)}<small>every ${label} when idle</small></b><div class="tl-track">${ticks}${pulse}${l.idleMs > span ? '<span class="hint" style="position:absolute;right:0;bottom:2px">once an hour, off this scale →</span>' : ''}</div></div>`;
+  }).join('');
+  const cards = F.loops.map((l, i) => {
+    const c = colors[i % colors.length];
+    const entry = FN.get(l.entry[0]);
+    const stepIds = l.name === 'outbox' ? [] : entry?.calls ?? [];
+    const steps = stepIds.map((id) => FN.get(id)).filter((f) => f && (f.doc || Object.keys(f.own.tables).length || f.calls.length));
+    const tables = Object.entries(l.facts.tables);
+    return `<div class="loop" style="--c:${c};--cs:color-mix(in srgb,${c} 14%,transparent)">
+      <h3>${esc(l.name)} <small>${l.idleMs >= 3600000 ? `${l.idleMs / 3600000} h` : l.idleMs >= 60000 ? `${l.idleMs / 60000} min` : `${l.idleMs / 1000} s`} idle</small></h3>
+      <p>${md(G.worker.loops[l.name] ?? l.doc ?? '')}</p>
+      <p class="hint" style="margin:0 0 6px">Entry: ${entry ? `<code>${esc(entry.name)}()</code> ${srcLink(entry.file, entry.line)}` : '—'} · started at ${srcLink('apps/api/src/worker.ts', l.line, `worker.ts:${l.line}`)}</p>
+      ${l.name === 'outbox' ? `<ol class="steps">${F.eventHandlers.map((h) => `<li><span class="nm"><a href="#events/${h.event}" style="color:inherit">${esc(h.event)}</a></span> ${srcLink('apps/api/src/worker/outbox.ts', h.line, `:${h.line}`)}<span class="d">${esc(uniq([...h.facts.notifications.map((n) => 'notify ' + n), ...h.facts.providers.filter((p) => p !== 'storage'), ...Object.entries(h.facts.tables).filter(([, o]) => isWrite(o)).map(([t, o]) => `${t} ${o.filter((x) => x !== 'read').join('/')}`)]).join(' · ') || 'nothing yet')}</span></li>`).join('')}</ol>` : steps.length ? `<ol class="steps">${steps.map((f) => `<li><span class="nm">${esc(f.name)}()</span> ${srcLink(f.file, f.line, `:${f.line}`)}${f.doc ? `<span class="d">${md(shortDoc(f.doc, 170))}</span>` : ''}</li>`).join('')}</ol>` : ''}
+      <div class="chips">${tables.map(([t, o]) => tableChip(t, o)).join('')}${l.facts.providers.map((p) => `<span class="chip">${esc(p)}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+  return `<h1>Worker</h1>
+  <p class="lede">${md(G.worker.facts[0])} It runs four loops side by side. Each repeats its work at once while there is work and sleeps its idle interval when there is none.</p>
+  <div class="timeline" aria-label="Idle intervals over one minute">${rows}<div class="tl-axis"><span></span><div><span>0 s</span><span>15 s</span><span>30 s</span><span>45 s</span><span>60 s</span></div></div></div>
+  <ul class="bul">${G.worker.facts.slice(1).map((f) => `<li>${md(f)}</li>`).join('')}</ul>
+  <div class="loops">${cards}</div>`;
+};
+
+// ---------------- Access
+views.access = () => {
+  // A plugin's routes, plus the shared lifecycleRoutes(…) it registers (same module, plugin named after the helper).
+  const pluginRoutes = (name) => {
+    const own = F.routes.filter((r) => r.plugin === name);
+    const mod = own[0]?.module;
+    return own.concat(F.routes.filter((r) => r.plugin.startsWith('lifecycleRoutes') && r.module === mod));
+  };
+  const plug = (p) => {
+    const rs = pluginRoutes(p.name);
+    return `<a class="plug" href="#endpoints?m=${rs[0]?.module ?? ''}" title="${esc(p.doc ?? p.file)}">${esc(p.name)}<i>${rs.length}</i></a>`;
+  };
+  const P = (filter) => F.plugins.filter(filter);
+  const g = (p) => p.guards.join(' ');
+  const tree = `
+  <div class="rt x-public" style="--c:var(--line-2);--cs:var(--bg)"><div class="rt-h"><b>/</b><span class="hint">root · no guard</span></div>
+    <div class="plugs"><a class="plug" href="#ep/GET/health">GET /health<i>db check</i></a>${P((p) => p.prefix === '/' ).map(plug).join('')}<a class="plug" href="#ep/GET/media/public/*">@fastify/static<i>/media/public</i></a></div>
+    <div class="rt x-public"><div class="rt-h"><b>/v1</b><span class="g">no guard</span><span class="hint">versioned API</span></div>
+      <div class="plugs">${P((p) => p.prefix === '/v1' && !p.guards.length).map(plug).join('')}${P((p) => p.prefix === '/v1/auth').map((p) => plug(p) + '<span class="hint" style="align-self:center">at /v1/auth, per-IP limits</span>').join('')}</div>
+      <div class="rt x-user"><div class="rt-h"><b>/v1</b><span class="g">onRequest: authenticate</span><span class="hint">${md(ACCESS.get('user').desc)}</span></div>
+        <div class="plugs">${P((p) => p.prefix === '/v1' && g(p) === 'authenticate').map(plug).join('')}</div>
+        <div class="rt x-user" style="--c:var(--line-2)"><div class="rt-h"><b>/v1/admin</b><span class="hint">adminRoutes</span></div>
+          <div class="rt x-moderator"><div class="rt-h"><b>/v1/admin</b><span class="g">+ requireRole('moderator')</span><span class="hint">${md(ACCESS.get('moderator').desc)}</span></div><div class="plugs">${P((p) => g(p).includes('requireRole(moderator)')).map(plug).join('')}</div></div>
+          <div class="rt x-admin"><div class="rt-h"><b>/v1/admin</b><span class="g">+ requireRole('admin')</span><span class="hint">${md(ACCESS.get('admin').desc)}</span></div><div class="plugs">${P((p) => g(p).includes('requireRole(admin)')).map(plug).join('')}</div></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  const limited = F.routes.filter((r) => r.rateLimit).map((r) => ({ r, pm: perMinute(r.rateLimit) })).sort((a, b) => a.pm - b.pm);
+  const maxLog = Math.log10(Math.max(...limited.map((x) => x.pm)) * 1.2);
+  const minLog = Math.log10(Math.min(...limited.map((x) => x.pm)) / 2);
+  const bars = limited.map(({ r, pm }) => `<li><span class="lbl">${meth(r.method)}<a href="${r.href}" title="${esc(r.url)}">${esc(r.url)}</a></span><span class="track"><span class="fill" style="display:block;width:${((Math.log10(pm) - minLog) / (maxLog - minLog)) * 100}%;--c:${r.rateLimit.per === 'ip' ? 'var(--slate)' : 'var(--amber)'}"></span></span><span class="v">${r.rateLimit.max} / ${esc(r.rateLimit.timeWindow)} · ${r.rateLimit.per}</span></li>`).join('');
+  return `<h1>Access</h1>
+  <p class="lede">Guards are hooks on plugin scopes in <code>app.ts</code> and <code>admin.routes.ts</code>, so a route's access follows from where it is registered. Click a plugin for its endpoints.</p>
+  ${tree}
+  <section class="block"><h2>Rate limits <small>${limited.length} routes, strictest first · bar length on a log scale of requests per minute</small></h2>
+  <div class="legend"><span style="--c:var(--slate)">per IP (before sign-in)</span><span style="--c:var(--amber)">per signed-in user</span></div>
+  <ul class="bars">${bars}</ul>
+  <p class="hint" style="margin-top:12px">${md(G.stages.limit.text)} Failed sign-ins also add a growing per-account delay (<code>auth/login-throttle.ts</code>).</p></section>`;
+};
+
+// ---------------- Reference
+views.ref = (sub = 'errors') => {
+  const tabs = [['errors', 'Errors'], ['config', 'Configuration'], ['providers', 'Providers'], ['conventions', 'Conventions'], ['about', 'About this page']];
+  let body = '';
+  if (sub === 'errors') {
+    const codes = new Map();
+    const add = (e, r, from) => {
+      const k = `${e.status} ${e.code}`;
+      if (!codes.has(k)) codes.set(k, { status: e.status, code: e.code, messages: new Set(), routes: new Set(), from });
+      codes.get(k).messages.add(e.message);
+      if (r) codes.get(k).routes.add(r);
+    };
+    for (const r of F.routes) { r.facts.errors.forEach((e) => add(e, r, 'code')); r.guardErrors.forEach((e) => add(e, r, 'guard')); }
+    F.globalErrors.forEach((e) => add(e, null, 'error handler'));
+    const list = [...codes.values()].sort((a, b) => a.status - b.status || b.routes.size - a.routes.size);
+    body = `<p class="hint">Codes thrown in the code (found by following each handler), by the guards, and by the global error handler (<code>lib/error-handler.ts</code>). Rate limits answer 429 through the same handler.</p>
+    ${list.map((c) => `<details class="s${String(c.status)[0]}"><summary><span class="st">${c.status}</span><span class="cd">${esc(c.code)}</span><span class="ms">${esc([...c.messages][0])}${c.messages.size > 1 ? ` <span class="hint">+${c.messages.size - 1} more</span>` : ''}</span><span class="n">${c.routes.size ? plural(c.routes.size, 'endpoint') : esc(c.from)}</span></summary><div class="inner">
+      ${c.messages.size > 1 ? `<ul class="bul" style="margin-bottom:10px">${[...c.messages].map((m) => `<li>${esc(m)}</li>`).join('')}</ul>` : ''}${c.routes.size ? miniEps([...c.routes]) : `<p class="hint" style="margin:0">Any endpoint, from ${esc(c.from)}.</p>`}</div></details>`).join('')}`;
+  } else if (sub === 'config') {
+    body = `<p class="hint">Validated with zod at start-up in ${srcLink('apps/api/src/config/env.ts')}; <code>.env.example</code> has comments and defaults.</p>
+    <table class="env"><thead><tr><th>Variable</th><th>Default</th><th>Rule</th></tr></thead><tbody>${F.env.map((v) => `<tr><td>${esc(v.name)}${v.optional ? ' <span class="hint">optional</span>' : ''}</td><td>${v.default ? `<code>${esc(v.default)}</code>` : '—'}</td><td><code>${esc(v.rule)}</code>${v.doc ? `<div class="hint">${md(v.doc)}</div>` : ''}</td></tr>`).join('')}</tbody></table>`;
+  } else if (sub === 'providers') {
+    body = `<p class="hint">Every outside dependency sits behind an interface with a local implementation (${srcLink('apps/api/src/providers/index.ts')}). Tests replace them with fakes.</p>
+    <ul class="rules">${F.providers.map((p) => `<li><b class="t">${esc(p.name)}</b><span>${p.methods.map((m) => `<code>${esc(m)}()</code>`).join(' ')}${p.doc ? ` · ${md(p.doc)}` : ''}</span><div style="margin-top:4px">${srcLink(p.file ?? 'apps/api/src/providers/index.ts', p.line)}</div></li>`).join('')}
+    <li><b class="t">Storage</b><span><code>LocalDiskStorage</code>: signed upload URLs, raw and processed files under MEDIA_DIR. An <code>S3Storage</code> class replaces it in production.</span><div style="margin-top:4px">${srcLink('apps/api/src/lib/storage.ts')}</div></li></ul>`;
+  } else if (sub === 'conventions') {
+    body = `<ul class="rules">${G.conventions.map((c) => `<li><b>${esc(c.name)}</b><span>${md(c.text)}</span></li>`).join('')}</ul>
+    <section class="block"><h2>Layering</h2><div class="flow">${['Route: HTTP only', 'zod schema', 'Service: SQL + rules', 'db/visibility.ts', 'Kysely → Postgres', 'emit() → outbox'].map((x, i, a) => `<div class="stage${i === a.length - 1 ? ' end' : ''}" style="--c:var(--a${i})"><b>${esc(x)}</b></div>`).join('')}</div></section>`;
+  } else {
+    body = `<p>This page is generated. Nothing in it is typed by hand except the module descriptions and the narrative in <code>.api-guide/guide.json</code>.</p>
+    <ul class="bul">
+      <li><b>Routes</b> come from the real app: <code>.api-guide/extract.mts</code> builds it with <code>buildApp()</code> (no listening, no database queries) and records every route Fastify registers, with its zod schemas as JSON Schema and its rate limit.</li>
+      <li><b>Everything else</b> (functions called, tables, events, errors, audit actions, worker loops) comes from parsing <code>apps/api/src</code> and following each handler through the code. It reads code, not runtime behaviour, so a branch that never runs still counts.</li>
+      <li>Read at <b>${esc(new Date(F.readAt).toLocaleString())}</b>. ${F.check.routesRuntime} routes registered, ${F.check.routesStatic} found in source${F.check.onlyRuntime.length ? ` (registered only: ${F.check.onlyRuntime.map((x) => `<code>${esc(x)}</code>`).join(', ')}, served by a plugin)` : ''}${F.check.onlyStatic.length ? `; <b>in source but not registered: ${F.check.onlyStatic.map((x) => `<code>${esc(x)}</code>`).join(', ')}</b>` : ''}.</li>
+    </ul>
+    <h3 style="margin-top:22px">Regenerate after changing the backend</h3>
+    <pre class="code">node .api-guide/run.mjs</pre>
+    <p class="hint" style="margin-top:8px">See <code>.api-guide/README.md</code>. The database schema has its own guide: <a href="schema-guide.html">schema-guide.html</a>.</p>`;
+  }
+  return `<h1>Reference</h1><nav class="tabs">${tabs.map(([id, label]) => `<a href="#ref/${id}" ${id === sub ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>${body}`;
+};
+
+// ------------------------------------------------------------ router
+function route() {
+  if (teardown) { teardown(); teardown = null; }
+  const raw = decodeURIComponent(location.hash.slice(1) || '/');
+  const [pathPart, query = ''] = raw.split('?');
+  const params = new URLSearchParams(query);
+  let name = 'home', arg = '';
+  if (pathPart.startsWith('ep/')) { name = 'ep'; arg = pathPart.slice(3); }
+  else if (pathPart.startsWith('journey')) { name = 'journey'; arg = pathPart.slice(8); }
+  else {
+    const [head, ...rest] = pathPart.replace(/^\//, '').split('/');
+    if (views[head]) { name = head; arg = rest.join('/') || undefined; }
+  }
+  const navName = name === 'ep' ? 'endpoints' : name;
+  document.querySelectorAll('nav.main a[data-v]').forEach((a) => { if (a.dataset.v !== navName) a.removeAttribute('aria-current'); else a.setAttribute('aria-current', 'page'); });
+  app.className = name === 'journey' || name === 'ref' && arg === 'about' ? 'narrow' : '';
+  app.innerHTML = views[name](arg, params);
+  app.classList.remove('view-in'); void app.offsetWidth; app.classList.add('view-in');
+  if (!(name === 'events' && arg)) window.scrollTo({ top: 0 });
+  document.title = `${name === 'home' ? '' : (document.querySelector('#app h1')?.textContent || document.querySelector('.ep-title')?.textContent || name) + ' · '}Doshomik backend guide`;
+}
+window.addEventListener('hashchange', route);
+document.addEventListener('keydown', (e) => {
+  if (e.key === '/' && !e.target.closest('input,select,textarea')) {
+    e.preventDefault();
+    if (!document.getElementById('q')) location.hash = '#endpoints';
+    setTimeout(() => document.getElementById('q')?.focus());
+  }
+});
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const cur = document.documentElement.dataset.theme || (dark ? 'dark' : 'light');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('api-guide-theme', next); } catch (e) {}
+});
+document.getElementById('footer').innerHTML = `Generated from <code>apps/api</code> on ${esc(new Date(F.readAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }))} · ${F.routes.length} endpoints · <a href="#ref/about">how this page is made</a> · <a href="schema-guide.html">schema guide</a>`;
+route();
+</script>
+</body>
+</html>

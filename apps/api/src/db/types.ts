@@ -55,6 +55,8 @@ export interface Blocks {
   blocked_id: number;
   blocker_id: number;
   created_at: Generated<Timestamp>;
+  is_active: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface Comments {
@@ -185,6 +187,10 @@ export interface OutboxEvents {
 
 export interface PaperCards {
   created_at: Generated<Timestamp>;
+  data_source: string | null;
+  evaluation: string | null;
+  extra_questions: Generated<string[]>;
+  figures: Generated<Json>;
   findings: string | null;
   glossary: Generated<Json>;
   key_idea: string | null;
@@ -211,6 +217,24 @@ export interface PaperEdges {
   updated_at: Generated<Timestamp>;
 }
 
+export interface PaperMetadata {
+  arxiv_id: string | null;
+  doi: string | null;
+  openalex_id: string | null;
+  openalex_topics: Generated<Json>;
+  paper_id: number;
+  s2_id: string | null;
+  tldr: string | null;
+}
+
+export interface PaperMetrics {
+  citation_count: number | null;
+  hf_trending_at: Timestamp | null;
+  hf_upvotes: number | null;
+  paper_id: number;
+  trend_rank: number | null;
+}
+
 export interface PaperPrerequisites {
   label: string | null;
   learn_item_id: number | null;
@@ -225,40 +249,20 @@ export interface PaperPrerequisites {
 
 export interface Papers {
   abstract: string | null;
-  arxiv_id: string | null;
   authors: string | null;
-  citation_count: number | null;
   code_url: string | null;
   created_at: Generated<Timestamp>;
   created_by: number | null;
-  data_source: string | null;
-  doi: string | null;
-  evaluation: string | null;
   field_id: number;
-  figures: Generated<Json>;
-  hf_trending_at: Timestamp | null;
-  hf_upvotes: number | null;
   id: Generated<number>;
-  limitations: string | null;
-  main_idea: string | null;
-  method_steps: Generated<string[]>;
-  openalex_id: string | null;
-  openalex_topics: Generated<Json>;
   paper_url: string;
   pdf_url: string | null;
   public_id: Generated<string>;
   published_at: Timestamp | null;
   published_on: Timestamp | null;
-  research_questions: Generated<string[]>;
-  results: string | null;
-  s2_id: string | null;
   search_vector: string | null;
   status: Generated<string>;
-  sync_error: string | null;
-  synced_at: Timestamp | null;
   title: string;
-  tldr: string | null;
-  trend_rank: number | null;
   updated_at: Generated<Timestamp>;
   updated_by: number | null;
   venue: string | null;
@@ -269,6 +273,12 @@ export interface PaperSaves {
   created_at: Generated<Timestamp>;
   paper_id: number;
   user_id: number;
+}
+
+export interface PaperSync {
+  paper_id: number;
+  sync_error: string | null;
+  synced_at: Timestamp | null;
 }
 
 export interface PostLikes {
@@ -486,8 +496,11 @@ export interface DB {
   outbox_events: OutboxEvents;
   paper_cards: PaperCards;
   paper_edges: PaperEdges;
+  paper_metadata: PaperMetadata;
+  paper_metrics: PaperMetrics;
   paper_prerequisites: PaperPrerequisites;
   paper_saves: PaperSaves;
+  paper_sync: PaperSync;
   papers: Papers;
   post_likes: PostLikes;
   posts: Posts;

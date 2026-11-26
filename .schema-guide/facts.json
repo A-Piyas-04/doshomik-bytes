@@ -4,7 +4,7 @@
     "kind": "postgres",
     "name": "doshomik_guide",
     "server": "PostgreSQL 18.1",
-    "readAt": "2026-11-24T11:01:55.374Z"
+    "readAt": "2026-11-26T06:47:26.591Z"
   },
   "tables": [
     {
@@ -242,6 +242,18 @@
         },
         {
           "name": "created_at",
+          "type": "timestamptz",
+          "notNull": true,
+          "default": "now()"
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "notNull": true,
+          "default": "true"
+        },
+        {
+          "name": "updated_at",
           "type": "timestamptz",
           "notNull": true,
           "default": "now()"
@@ -1463,6 +1475,26 @@
           "type": "timestamptz",
           "notNull": true,
           "default": "now()"
+        },
+        {
+          "name": "extra_questions",
+          "type": "text[]",
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        {
+          "name": "data_source",
+          "type": "text"
+        },
+        {
+          "name": "evaluation",
+          "type": "text"
+        },
+        {
+          "name": "figures",
+          "type": "jsonb",
+          "notNull": true,
+          "default": "'[]'::jsonb"
         }
       ],
       "primaryKey": [
@@ -1616,6 +1648,140 @@
           "name": "paper_edges_source_check",
           "expr": "source = ANY (ARRAY['semantic_scholar'::text, 'openalex'::text, 'staff'::text])",
           "column": "source"
+        }
+      ]
+    },
+    {
+      "name": "paper_metadata",
+      "columns": [
+        {
+          "name": "paper_id",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "doi",
+          "type": "text"
+        },
+        {
+          "name": "arxiv_id",
+          "type": "text"
+        },
+        {
+          "name": "openalex_id",
+          "type": "text"
+        },
+        {
+          "name": "s2_id",
+          "type": "text"
+        },
+        {
+          "name": "openalex_topics",
+          "type": "jsonb",
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        {
+          "name": "tldr",
+          "type": "text"
+        }
+      ],
+      "primaryKey": [
+        "paper_id"
+      ],
+      "uniques": [
+        [
+          "arxiv_id"
+        ],
+        [
+          "doi"
+        ],
+        [
+          "openalex_id"
+        ],
+        [
+          "s2_id"
+        ]
+      ],
+      "foreignKeys": [
+        {
+          "name": "paper_metadata_paper_id_fkey",
+          "columns": [
+            "paper_id"
+          ],
+          "table": "papers",
+          "refColumns": [
+            "id"
+          ],
+          "onDelete": "cascade"
+        }
+      ],
+      "indexes": [],
+      "checks": []
+    },
+    {
+      "name": "paper_metrics",
+      "columns": [
+        {
+          "name": "paper_id",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "citation_count",
+          "type": "integer"
+        },
+        {
+          "name": "hf_upvotes",
+          "type": "integer"
+        },
+        {
+          "name": "hf_trending_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "trend_rank",
+          "type": "integer"
+        }
+      ],
+      "primaryKey": [
+        "paper_id"
+      ],
+      "uniques": [],
+      "foreignKeys": [
+        {
+          "name": "paper_metrics_paper_id_fkey",
+          "columns": [
+            "paper_id"
+          ],
+          "table": "papers",
+          "refColumns": [
+            "id"
+          ],
+          "onDelete": "cascade"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "paper_metrics_trend_idx",
+          "columns": [
+            "COALESCE(trend_rank, 2147483647)",
+            "paper_id"
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "name": "paper_metrics_citation_count_check",
+          "expr": "citation_count >= 0"
+        },
+        {
+          "name": "paper_metrics_hf_upvotes_check",
+          "expr": "hf_upvotes >= 0"
+        },
+        {
+          "name": "paper_metrics_trend_rank_check",
+          "expr": "trend_rank > 0"
         }
       ]
     },
@@ -1805,6 +1971,51 @@
       "checks": []
     },
     {
+      "name": "paper_sync",
+      "columns": [
+        {
+          "name": "paper_id",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "synced_at",
+          "type": "timestamptz"
+        },
+        {
+          "name": "sync_error",
+          "type": "text"
+        }
+      ],
+      "primaryKey": [
+        "paper_id"
+      ],
+      "uniques": [],
+      "foreignKeys": [
+        {
+          "name": "paper_sync_paper_id_fkey",
+          "columns": [
+            "paper_id"
+          ],
+          "table": "papers",
+          "refColumns": [
+            "id"
+          ],
+          "onDelete": "cascade"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "paper_sync_due_idx",
+          "columns": [
+            "synced_at",
+            "paper_id"
+          ]
+        }
+      ],
+      "checks": []
+    },
+    {
       "name": "papers",
       "columns": [
         {
@@ -1835,44 +2046,6 @@
           "name": "paper_url",
           "type": "text",
           "notNull": true
-        },
-        {
-          "name": "research_questions",
-          "type": "text[]",
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        {
-          "name": "main_idea",
-          "type": "text"
-        },
-        {
-          "name": "data_source",
-          "type": "text"
-        },
-        {
-          "name": "method_steps",
-          "type": "text[]",
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        {
-          "name": "results",
-          "type": "text"
-        },
-        {
-          "name": "figures",
-          "type": "jsonb",
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        {
-          "name": "limitations",
-          "type": "text"
-        },
-        {
-          "name": "evaluation",
-          "type": "text"
         },
         {
           "name": "created_at",
@@ -1928,61 +2101,11 @@
           "type": "date"
         },
         {
-          "name": "doi",
-          "type": "text"
-        },
-        {
-          "name": "arxiv_id",
-          "type": "text"
-        },
-        {
-          "name": "openalex_id",
-          "type": "text"
-        },
-        {
-          "name": "s2_id",
-          "type": "text"
-        },
-        {
           "name": "pdf_url",
           "type": "text"
         },
         {
           "name": "code_url",
-          "type": "text"
-        },
-        {
-          "name": "tldr",
-          "type": "text"
-        },
-        {
-          "name": "citation_count",
-          "type": "integer"
-        },
-        {
-          "name": "hf_upvotes",
-          "type": "integer"
-        },
-        {
-          "name": "hf_trending_at",
-          "type": "timestamptz"
-        },
-        {
-          "name": "trend_rank",
-          "type": "integer"
-        },
-        {
-          "name": "openalex_topics",
-          "type": "jsonb",
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        {
-          "name": "synced_at",
-          "type": "timestamptz"
-        },
-        {
-          "name": "sync_error",
           "type": "text"
         },
         {
@@ -1995,19 +2118,7 @@
       ],
       "uniques": [
         [
-          "arxiv_id"
-        ],
-        [
-          "doi"
-        ],
-        [
-          "openalex_id"
-        ],
-        [
           "public_id"
-        ],
-        [
-          "s2_id"
         ]
       ],
       "foreignKeys": [
@@ -2057,41 +2168,13 @@
           "columns": [
             "search_vector"
           ]
-        },
-        {
-          "name": "papers_sync_idx",
-          "columns": [
-            "synced_at",
-            "id"
-          ],
-          "where": "doi IS NOT NULL OR arxiv_id IS NOT NULL"
-        },
-        {
-          "name": "papers_trend_idx",
-          "columns": [
-            "COALESCE(trend_rank, 2147483647)",
-            "id"
-          ],
-          "where": "status = 'published'::text"
         }
       ],
       "checks": [
         {
-          "name": "papers_citation_count_check",
-          "expr": "citation_count >= 0"
-        },
-        {
-          "name": "papers_hf_upvotes_check",
-          "expr": "hf_upvotes >= 0"
-        },
-        {
           "name": "papers_status_check",
           "expr": "status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])",
           "column": "status"
-        },
-        {
-          "name": "papers_trend_rank_check",
-          "expr": "trend_rank > 0"
         }
       ]
     },

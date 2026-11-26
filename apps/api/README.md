@@ -128,11 +128,11 @@ What the worker does:
 | GET / PUT | `/me/interests` | `{ fields: [slug] }` from onboarding |
 | GET | `/me/follow-requests` | Pending requests to a private account |
 | POST / DELETE | `/me/follow-requests/:id/accept`, `/me/follow-requests/:id` | Accept / decline (`:id` = requester) |
-| GET | `/me/blocks`, `/me/saved`, `/me/courses` | Blocked users, saved posts, courses in progress |
+| GET | `/me/blocks`, `/me/saved`, `/me/courses` | Active blocks (`blocked_at` = when the current block began), saved posts, courses in progress |
 | GET | `/users/suggestions`, `/users/:id`, `/users/:id/posts`, `/users/:id/papers` | Profile has `follow_status`: `none`, `pending` or `accepted` |
 | PUT / DELETE | `/users/:id/follow` | Returns `{ status: accepted }`, or `pending` for a private account |
-| PUT / DELETE | `/users/:id/block` | Hides both users from each other everywhere, ends follows |
-| POST | `/reports` | `{ target_type: user, post, comment or trail; target_id; reason; details? }` |
+| PUT / DELETE | `/users/:id/block` | Hides both users from each other everywhere, ends follows. Unblocking keeps the row as inactive; blocking again reactivates it |
+| POST | `/reports` | `{ target_type: user, post, comment or trail; target_id; reason; details? }`. The target must exist in that type's table and be visible to the reporter (a live comment in a visible thread; an active user), else `404`; reporting yourself is `400 SELF_REPORT` |
 
 **Media and social**
 
@@ -162,7 +162,7 @@ What the worker does:
 | GET | `/me/practice/history`, `/me/practice/stats` | Stats give accuracy per topic and `streak_days` |
 | GET | `/quizzes?topic=`, `/quizzes/:id` | |
 | GET | `/fields`, `/fields/:slug/roadmap` | Fields are the topic chips, in `position` order |
-| GET | `/papers?field=&q=&interests=true&sort=trend\|newest` | Default order is the trend rank kept by the worker. `q` searches title, authors and the card question in English and Bangla |
+| GET | `/papers?field=&q=&interests=true&sort=trend\|newest` | Default order is the trend rank kept by the worker. `q` searches title, authors and the cards' questions and key idea in English and Bangla |
 | GET | `/papers/:id` | Adds `cards` (`en`, `bn`), `links` (`open_url`, `pdf_url`, `code_url`), metadata, and `my_reading` (step and private note) |
 | GET | `/papers/:id/learn-first` | `ready` / `total`, `ai_suggested`, and per topic `label`, `why`, `link` (lesson, note, quiz or reel), `known`, `done` |
 | GET | `/papers/:id/related`, `/papers/:id/lineage?limit=3` | Related by shared topics; lineage = `builds_on` and `built_on_by` with citation `intent` |
@@ -199,7 +199,7 @@ What the worker does:
 | admin | POST · PATCH · DELETE | `/admin/topics[/:slug]`, `/admin/fields[/:slug]` |
 | admin | PUT | `/admin/courses/:id/items { item_ids }`, `/admin/quizzes/:id/questions { question_ids }`, `/admin/papers/:id/prerequisites { topics }` or `{ items: [{ topic, label?, why?, link?, suggested_by? }] }`, `/admin/fields/:slug/roadmap { steps }` |
 | admin | POST | `/admin/papers/import { field, arxiv_id or doi }` (draft; the worker fills metadata), `/admin/papers/:id/sync` (queue a refresh) |
-| admin | GET · PUT · DELETE | `/admin/papers/:id/cards`, `/admin/papers/:id/cards/:lang` (`en` or `bn`) |
+| admin | GET · PUT · DELETE | `/admin/papers/:id/cards`, `/admin/papers/:id/cards/:lang` (`en` or `bn`). PUT `{ question?, extra_questions?, problem?, key_idea?, data_source?, method_steps?, findings?, evaluation?, figures?, takeaway?, limitations?, glossary?, source? }`. The paper's summary fields (`research_questions`, `main_idea`, `results`…) in `/admin/papers` read and write the English card |
 | admin | PUT · DELETE | `/admin/paper-edges { citing_paper_id, cited_paper_id, intent }`: the only way to mark a citation `contrasting` |
 | admin | GET · PUT | `/admin/users?q=`, `/admin/users/:id/status`, `/admin/users/:id/role` |
 | admin | GET | `/admin/audit-log` |

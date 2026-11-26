@@ -1,0 +1,121 @@
+{
+  "project": {
+    "name": "Doshomik",
+    "title": "Doshomik backend guide",
+    "baseUrl": "http://localhost:3000",
+    "devUser": "admin",
+    "lede": "How the API in apps/api is put together: every endpoint, what it checks, what it reads and writes, and what happens after it returns. Generated from the running route table and the source code."
+  },
+  "groups": [
+    { "id": "edge", "name": "Outside /v1", "desc": "Health check, the storage and CDN stand-ins, and share-link fallbacks." },
+    { "id": "app", "name": "App API", "desc": "What the Android app calls. Everything except sign-in needs a signed-in user." },
+    { "id": "admin", "name": "Admin API", "desc": "The admin panel. Staff role plus two-factor sign-in." }
+  ],
+  "modules": [
+    { "id": "core", "group": "edge", "name": "System", "desc": "GET /health runs `select 1` against Postgres." },
+    { "id": "storage", "group": "edge", "name": "Storage stand-ins", "desc": "What S3/R2 and the CDN do in production: signed PUT uploads and media delivery, served from MEDIA_DIR. File bytes never go through /v1 handlers." },
+    { "id": "app", "group": "edge", "name": "App links and config", "desc": "Minimum app versions, Android App Links and the Play Store fallback for share links." },
+    { "id": "auth", "group": "app", "name": "Sign-in and sessions", "desc": "Sign-up, login (with optional TOTP step), Google, token refresh with reuse detection, email verification, password reset, devices and two-factor setup." },
+    { "id": "users", "group": "app", "name": "Accounts and people", "desc": "Your own account, interests, follow requests, blocks; other people's profiles, follows and suggestions." },
+    { "id": "media", "group": "app", "name": "Uploads", "desc": "Signed upload URL, then /complete hands the file to the media worker." },
+    { "id": "posts", "group": "app", "name": "Posts and feed", "desc": "Feed, reels, profiles' posts, saved posts, creating posts, likes and saves." },
+    { "id": "comments", "group": "app", "name": "Comments", "desc": "Comment threads on posts and papers, replies, deleting." },
+    { "id": "learn", "group": "app", "name": "Learn", "desc": "Topics, learn items, courses and progress; 'I know this' and completed items for Learn first." },
+    { "id": "practice", "group": "app", "name": "Practice", "desc": "Questions, answers, quizzes, history and streak stats." },
+    { "id": "research", "group": "app", "name": "Research", "desc": "Fields and roadmaps, the paper collection, lineage, related papers, saves, the reading tracker, notes and My papers." },
+    { "id": "trails", "group": "app", "name": "Trails", "desc": "User-made reading lists of papers." },
+    { "id": "notifications", "group": "app", "name": "Notifications", "desc": "The in-app list and unread count. The rows are written by the worker." },
+    { "id": "search", "group": "app", "name": "Search", "desc": "Grouped search over people, posts, topics, learn items, courses and papers, and autocomplete." },
+    { "id": "reports", "group": "app", "name": "Reports", "desc": "Report a post, comment or user to the moderators." },
+    { "id": "admin.moderation", "group": "admin", "name": "Moderation", "desc": "The reports queue (moderators and admins)." },
+    { "id": "admin.learn", "group": "admin", "name": "Learn content", "desc": "Topics, learn items and courses: drafts, publishing, ordering." },
+    { "id": "admin.practice", "group": "admin", "name": "Practice content", "desc": "Questions and quizzes." },
+    { "id": "admin.research", "group": "admin", "name": "Research content", "desc": "Fields, roadmaps, papers (import by arXiv id or DOI), Paper Cards, Learn first lists and lineage edges." },
+    { "id": "admin.staff", "group": "admin", "name": "Staff and accounts", "desc": "Find accounts, suspend, change roles, read the audit log." }
+  ],
+  "access": [
+    { "id": "public", "name": "Public", "desc": "No sign-in. Sign-in routes are rate limited per IP." },
+    { "id": "token", "name": "Signed link", "desc": "The token in the path is the permission (HMAC, short-lived)." },
+    { "id": "user", "name": "Signed in", "desc": "authenticate: a valid access token, a live session and an active account." },
+    { "id": "moderator", "name": "Moderator", "desc": "requireRole('moderator'): moderator or admin, with two-factor sign-in." },
+    { "id": "admin", "name": "Admin", "desc": "requireRole('admin'): admin, with two-factor sign-in." }
+  ],
+  "stages": {
+    "front": {
+      "name": "Fastify front door",
+      "file": "apps/api/src/app.ts",
+      "text": "Every request gets a server-made UUID request id (client ids are ignored), CORS, compression and ETags. onSend adds x-request-id and x-content-type-options: nosniff, plus HSTS in production. Signed tokens in /storage/raw and /media/s paths are redacted from the logs."
+    },
+    "auth": {
+      "name": "authenticate",
+      "file": "apps/api/src/lib/auth.ts",
+      "text": "Verifies the HS256 access token (15 minutes), then one indexed query checks the session is not revoked or expired and the account is active, so signing out or suspension takes effect at once. Sets request.auth = { userId, role, sessionId, mfaEnabled }. With DEV_AUTH_BYPASS a request with no Authorization header acts as DEV_AUTH_USER, or the username in x-dev-user."
+    },
+    "role": {
+      "name": "requireRole",
+      "file": "apps/api/src/lib/auth.ts",
+      "text": "Staff routes: admins may do anything moderators can. Without two-factor sign-in the answer is 403 MFA_REQUIRED."
+    },
+    "limit": {
+      "name": "Rate limit",
+      "file": "apps/api/src/lib/rate-limits.ts",
+      "text": "@fastify/rate-limit, opted into per route, checked in preHandler so per-user limits know the user. Counters are in memory per process until Redis exists. Over the limit: 429. Off in tests."
+    },
+    "validate": {
+      "name": "zod validation",
+      "file": "apps/api/src/lib/validation.ts",
+      "text": "fastify-type-provider-zod parses params, query string and body before the handler runs. A failure is 400 VALIDATION_ERROR with one entry per problem in details. Ids are UUIDs (publicId); topics and fields use slugs."
+    },
+    "handler": {
+      "name": "Route handler",
+      "text": "Routes do HTTP only: they take the parsed input, call a service with internal ids and map the rows to the public shape (public UUIDs, never internal ids)."
+    },
+    "service": {
+      "name": "Services",
+      "text": "Services own the SQL and the rules. They take a Db (the pool or a transaction). Queries that return user or team content build their WHERE clause from db/visibility.ts: blocks both ways, private accounts, drafts, deleted rows."
+    },
+    "db": {
+      "name": "PostgreSQL",
+      "file": "apps/api/src/db/index.ts",
+      "text": "Kysely over pg with a statement timeout. A write that needs follow-up work inserts its outbox event in the same transaction, so the event exists exactly when the change committed."
+    },
+    "response": {
+      "name": "Response",
+      "file": "apps/api/src/lib/error-handler.ts",
+      "text": "JSON with public ids. Lists are { items, next_cursor } with an encrypted keyset cursor. Errors are always { error: { code, message, request_id, details? } }, never a stack trace. Something you may not see is 404, not 403."
+    },
+    "outbox": {
+      "name": "Outbox → worker",
+      "file": "apps/api/src/worker/outbox.ts",
+      "text": "After the response, the worker (a separate process) claims the event and does its database work in one transaction: counters ±1, notification rows. Push and email run after that commit, best effort. A failing event is retried, up to 10 attempts."
+    }
+  },
+  "worker": {
+    "file": "apps/api/src/worker.ts",
+    "facts": [
+      "A separate process: pnpm worker. The API never waits on it.",
+      "One worker at a time: it takes a Postgres advisory lock at start-up and a second copy exits.",
+      "Each loop repeats its work at once while there is work, and sleeps its idle interval when there is none.",
+      "A loop error is logged and the loop carries on. SIGINT or SIGTERM lets the current work finish first."
+    ],
+    "loops": {
+      "media": "Processes the oldest upload in status processing: ffprobe and sharp checks, metadata stripped, WebP variants or an HLS ladder and poster, then status ready and a media.ready event. Its own loop so a long transcode never delays notifications.",
+      "outbox": "Up to 50 pending events per batch, each claimed and handled in one transaction. Push and email are sent after commit.",
+      "papers": "Paper ingestion for the Research tab: up to 10 due papers from OpenAlex and Semantic Scholar, Hugging Face trending every 6 hours, then the trend rank. Off with PAPER_SYNC_ENABLED=false.",
+      "maintenance": "Hourly: purge deleted accounts and posts after 30 days, recount stored counters, re-rank the collection, delete abandoned uploads, old sessions, used codes and old events."
+    }
+  },
+  "conventions": [
+    { "name": "Versioned", "text": "Everything the app calls is under /v1. Installed app versions stay around for months; GET /v1/app/config can require an update." },
+    { "name": "Public ids only", "text": "Requests and responses use UUIDs (public_id) or slugs. Internal numeric ids never leave the server, not even inside access tokens." },
+    { "name": "Pagination", "text": "Lists return { items, next_cursor }. Keyset pagination on (created_at, id), or on rank, with an AES-GCM encrypted cursor. A tampered cursor is 400 INVALID_CURSOR." },
+    { "name": "404, not 403", "text": "Something the caller may not see (a private account's post, a draft, a blocked user) answers 404, so its existence is not revealed." },
+    { "name": "One error shape", "text": "{ error: { code, message, request_id, details? } }. The code is stable; the client branches on it. request_id finds the full error in the logs." },
+    { "name": "Toggle writes", "text": "Likes, saves, follows and similar are PUT to turn on and DELETE to turn off, both idempotent, answering 204." },
+    { "name": "Side effects through the outbox", "text": "Counters, notifications, push and email are never done in the request. The request writes an outbox event in its transaction; the worker does the rest." },
+    { "name": "Audit", "text": "Every admin action writes an audit_log row in the same transaction (lib/audit.ts)." }
+  ],
+  "journey": {
+    "default": "POST /v1/posts/:id/comments"
+  }
+}

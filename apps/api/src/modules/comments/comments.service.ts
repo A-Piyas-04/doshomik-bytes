@@ -98,14 +98,14 @@ export async function deleteComment(userId: number, commentPublicId: string): Pr
   });
 }
 
-/** A comment whose thread the viewer may see, or 404. */
-async function visibleComment(viewerId: number, commentPublicId: string) {
+/** A comment whose thread the viewer may see (live or deleted), or 404. */
+export async function visibleComment(viewerId: number, commentPublicId: string) {
   const comment = found(
     await db
       .selectFrom('comments as c')
       .leftJoin('posts as post', 'post.id', 'c.post_id')
       .leftJoin('papers as paper', 'paper.id', 'c.paper_id')
-      .select(['c.id', 'post.public_id as post_public_id', 'paper.public_id as paper_public_id'])
+      .select(['c.id', 'c.user_id', 'c.deleted_at', 'post.public_id as post_public_id', 'paper.public_id as paper_public_id'])
       .where('c.public_id', '=', commentPublicId)
       .executeTakeFirst(),
     'Comment',

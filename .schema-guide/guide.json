@@ -1,7 +1,7 @@
 {
   "project": {
     "name": "Doshomik",
-    "source": "the SQL migrations in `apps/api/migrations/` (read from a database migrated with all six)",
+    "source": "the SQL migrations in `apps/api/migrations/` (read from a database migrated with all seven)",
     "code": ["sql", "kysely"]
   },
   "areas": [
@@ -45,7 +45,7 @@
       "id": "research",
       "name": "Research",
       "desc": "The curated paper collection, Paper Cards, lineage, Learn first, saves, the reading tracker, roadmaps and trails.",
-      "tables": ["fields", "papers", "paper_cards", "paper_edges", "paper_prerequisites", "paper_saves", "reading_passes", "research_outputs", "trails", "trail_items", "roadmap_steps", "user_papers", "user_fields"]
+      "tables": ["fields", "papers", "paper_metadata", "paper_metrics", "paper_sync", "paper_cards", "paper_edges", "paper_prerequisites", "paper_saves", "reading_passes", "research_outputs", "trails", "trail_items", "roadmap_steps", "user_papers", "user_fields"]
     },
     {
       "id": "system",
@@ -114,11 +114,18 @@
       "badges": ["composite PK", "toggle row"]
     },
     "blocks": {
-      "purpose": "One row per user who blocked another.",
+      "purpose": "One row per user who has blocked another, kept after an unblock.",
+      "columns": {
+        "created_at": "The first block; kept when blocking again",
+        "is_active": "false after an unblock; blocking again sets it back",
+        "updated_at": "When the current state began"
+      },
       "notes": [
         "Applies both ways in every visibility check.",
+        "A toggle row: unblocking sets `is_active = false` instead of deleting. Only active rows count; every check filters on `is_active`.",
         "Blocking also sets follows in both directions to `inactive`."
-      ]
+      ],
+      "badges": ["composite PK", "toggle row"]
     },
     "reports": {
       "purpose": "One row per report of a user, post, comment or trail.",
@@ -126,7 +133,10 @@
         "target_id": "Internal id of the row named by `target_type`. No foreign key on purpose: the report outlives its target",
         "reviewed_by": "The moderator who resolved it"
       },
-      "notes": ["Resolving a report can dismiss it, remove the content, or suspend the responsible user."]
+      "notes": [
+        "Resolving a report can dismiss it, remove the content, or suspend the responsible user.",
+        "The API checks that the target exists in the table `target_type` names, and that the reporter may see it, before filing a report."
+      ]
     },
     "media_assets": {
       "purpose": "One row per uploaded image or video.",
@@ -262,37 +272,73 @@
         "field_id": "Its one chip",
         "title": "Empty for an import until the first sync",
         "paper_url": "The original's abstract page: the main **Open** action. We never host a PDF",
-        "research_questions": "Part of the Prototype 2 structured summary. The English Paper Card was backfilled from it",
         "status": "draft → published → archived",
         "abstract": "From OpenAlex, or staff",
         "venue": "From OpenAlex, or staff",
         "published_on": "Drives the \"New\" badge (within 30 days)",
-        "doi": "Lower case, without the resolver",
-        "arxiv_id": "Without the version",
         "pdf_url": "Open-access PDF from Semantic Scholar",
         "code_url": "Linked code repository from Hugging Face",
-        "tldr": "Semantic Scholar's one-line TLDR (English)",
-        "citation_count": "Semantic Scholar, else OpenAlex. Refreshed every sync",
-        "hf_upvotes": "Hugging Face daily papers upvotes",
-        "hf_trending_at": "The last day the paper was on Hugging Face daily papers",
-        "trend_rank": "1..n over published papers: the default order. Recomputed hourly and after each sync",
-        "openalex_topics": "`[{id, name, score}]`, for staff choosing the field",
-        "synced_at": "Last ingestion attempt. NULL = queued",
-        "sync_error": "The last ingestion error",
-        "search_vector": "Title, authors, main idea and both card questions. Built only by `refresh_paper_search(paper_id)`"
+        "search_vector": "Title, authors, and the questions and key idea of both Paper Cards. Built only by `refresh_paper_search(paper_id)`"
       },
       "notes": [
         "Ingested fields are written only by the worker. Descriptive fields are filled only when empty, so staff edits win.",
-        "The app never calls a scholarly API; requests read only this table and its neighbours."
+        "The app never calls a scholarly API; requests read only this table and its neighbours.",
+        "Its outside ids, metrics and ingestion state are in three one-to-one tables created with it: [[paper_metadata]], [[paper_metrics]] and [[paper_sync]]. Its structured explanation is in [[paper_cards]]."
       ]
+    },
+    "paper_metadata": {
+      "purpose": "One row per paper: its outside identifiers and what OpenAlex and Semantic Scholar say about it.",
+      "columns": {
+        "paper_id": "Also the primary key: one row per paper, deleted with it",
+        "doi": "Lower case, without the resolver",
+        "arxiv_id": "Without the version",
+        "openalex_id": "e.g. `W2626778328`",
+        "s2_id": "Semantic Scholar paperId",
+        "openalex_topics": "`[{id, name, score}]`, for staff choosing the field",
+        "tldr": "Semantic Scholar's one-line TLDR (English)"
+      },
+      "notes": [
+        "Each id is unique: importing or editing a paper with an id already in the collection answers `409`.",
+        "The worker matches references against these ids to build [[paper_edges]]."
+      ]
+    },
+    "paper_metrics": {
+      "purpose": "One row per paper: how popular it is and its place in the default Research order.",
+      "columns": {
+        "paper_id": "Also the primary key: one row per paper, deleted with it",
+        "citation_count": "Semantic Scholar, else OpenAlex. Refreshed every sync",
+        "hf_upvotes": "Hugging Face daily papers upvotes",
+        "hf_trending_at": "The last day the paper was on Hugging Face daily papers",
+        "trend_rank": "1..n over published papers: the default order. Recomputed hourly and after each sync. NULL = not ranked (drafts, archived, or not ranked yet), sorted last"
+      },
+      "notes": ["Written only by the worker. Lists join it for every paper they show."]
+    },
+    "paper_sync": {
+      "purpose": "One row per paper: its place in the ingestion queue.",
+      "columns": {
+        "paper_id": "Also the primary key: one row per paper, deleted with it",
+        "synced_at": "Last ingestion attempt. NULL = queued",
+        "sync_error": "The last ingestion error; NULL after a clean sync"
+      },
+      "notes": ["Only papers with a DOI or arXiv id in [[paper_metadata]] are picked. Each is refreshed every 7 days; **Sync now** sets `synced_at` back to NULL."]
     },
     "paper_cards": {
       "purpose": "One row per paper and language: its Paper Card.",
       "columns": {
         "question": "Searched, in both languages",
+        "extra_questions": "Further research questions, in order. Searched",
+        "key_idea": "Searched, in both languages",
+        "data_source": "The data or benchmarks the paper uses",
+        "method_steps": "In order",
+        "evaluation": "How the results were measured",
+        "figures": "`[{url, caption}]`. Images are uploads with purpose `paper_figure`",
         "glossary": "`[{term, definition}]`",
         "source": "staff · ai"
-      }
+      },
+      "notes": [
+        "The only home of a paper's structured explanation. The Prototype 2 summary fields of the paper APIs (`research_questions`, `main_idea`, `results`…) read and write the English card.",
+        "Migration 006 moved the old summary columns of [[papers]] here. Where a card and the old summary disagreed, the losing text is in [[audit_log]] (action `paper.summary_migration`)."
+      ]
     },
     "paper_edges": {
       "purpose": "One row per citation between two papers in the collection.",
@@ -413,9 +459,9 @@
     "notifications_user_id_created_at_idx": "The notifications inbox",
     "notifications_unread_idx": "The unread badge on every app open. The query writes `NOT n.is_read` to match it",
     "saved_posts_user_id_created_at_idx": "Saved posts, newest first",
-    "papers_trend_idx": "The Research list in trend order (keyset page)",
+    "paper_metrics_trend_idx": "The Research list in trend order (keyset page). Replaces `papers_trend_idx`",
     "papers_search_idx": "Paper search (GIN on `search_vector`)",
-    "papers_sync_idx": "Papers due for ingestion",
+    "paper_sync_due_idx": "Papers due for ingestion, never-synced first. Replaces `papers_sync_idx`",
     "papers_field_id_idx": "Papers by field (the chip filter)",
     "learn_items_topic_id_idx": "Learn items by topic",
     "learn_items_to_tsvector_idx": "Full-text search on title and body",
@@ -452,9 +498,9 @@
     "media_assets_size_bytes_check": "Sizes are positive",
     "paper_edges_check": "No self-citation",
     "paper_prerequisites_one_link": "At most one link per prerequisite",
-    "papers_citation_count_check": "Citation counts are never negative",
-    "papers_hf_upvotes_check": "Upvotes are never negative",
-    "papers_trend_rank_check": "Trend ranks start at 1",
+    "paper_metrics_citation_count_check": "Citation counts are never negative",
+    "paper_metrics_hf_upvotes_check": "Upvotes are never negative",
+    "paper_metrics_trend_rank_check": "Trend ranks start at 1",
     "reading_passes_check": "Explored time is set exactly while step ≥ 1",
     "reading_passes_check1": "Studied time is set exactly while step ≥ 2",
     "reading_passes_check2": "Reproduced time is set exactly while step ≥ 3",
@@ -465,19 +511,19 @@
   "joinExample": ["users", "papers"],
   "highlight": {
     "label": "new",
-    "short": "added in migration 005",
-    "note": "Added for the Research tab (Group A) in migration `…005`.",
-    "tables": ["paper_cards", "paper_edges", "paper_saves", "reading_passes", "research_outputs", "trails", "trail_items", "user_known_topics", "learn_item_completions"],
+    "short": "added in migration 005 or 006",
+    "note": "Added for the Research tab (Group A) in migration `…005`, or by the database refactoring in `…006`.",
+    "tables": ["paper_cards", "paper_edges", "paper_saves", "reading_passes", "research_outputs", "trails", "trail_items", "user_known_topics", "learn_item_completions", "paper_metadata", "paper_metrics", "paper_sync"],
     "columns": [
       "fields.position",
       "posts.topic_id",
-      "papers.abstract", "papers.venue", "papers.published_on", "papers.doi", "papers.arxiv_id", "papers.openalex_id", "papers.s2_id",
-      "papers.pdf_url", "papers.code_url", "papers.tldr", "papers.citation_count", "papers.hf_upvotes", "papers.hf_trending_at",
-      "papers.trend_rank", "papers.openalex_topics", "papers.synced_at", "papers.sync_error", "papers.search_vector",
+      "papers.abstract", "papers.venue", "papers.published_on", "papers.pdf_url", "papers.code_url", "papers.search_vector",
+      "blocks.is_active", "blocks.updated_at",
+      "paper_cards.extra_questions", "paper_cards.data_source", "paper_cards.evaluation", "paper_cards.figures",
       "paper_prerequisites.label", "paper_prerequisites.why", "paper_prerequisites.learn_item_id", "paper_prerequisites.quiz_id",
       "paper_prerequisites.reel_post_id", "paper_prerequisites.suggested_by"
     ],
-    "indexes": ["papers_trend_idx", "papers_search_idx", "papers_sync_idx", "posts_topic_idx", "paper_edges_cited_idx", "paper_saves_user_idx", "reading_passes_read_idx", "research_outputs_user_idx", "trails_creator_idx", "trails_published_idx", "trail_items_paper_idx"]
+    "indexes": ["paper_metrics_trend_idx", "papers_search_idx", "paper_sync_due_idx", "posts_topic_idx", "paper_edges_cited_idx", "paper_saves_user_idx", "reading_passes_read_idx", "research_outputs_user_idx", "trails_creator_idx", "trails_published_idx", "trail_items_paper_idx"]
   },
   "tour": [
     {
@@ -562,9 +608,10 @@
       "title": "The research collection",
       "text": [
         "Staff import a paper by arXiv id or DOI. The worker fills its metadata from OpenAlex, Semantic Scholar and Hugging Face, and ranks the list.",
-        "Each paper has a Paper Card per language, and citation lineage to other papers in the collection."
+        "Each paper has a Paper Card per language, and citation lineage to other papers in the collection.",
+        "Outside ids, metrics and the ingestion queue sit in three one-to-one tables beside [[papers]], so each changes on its own schedule."
       ],
-      "tables": ["fields", "papers", "paper_cards", "paper_edges"]
+      "tables": ["fields", "papers", "paper_metadata", "paper_metrics", "paper_sync", "paper_cards", "paper_edges"]
     },
     {
       "title": "What a reader keeps",
@@ -597,6 +644,7 @@
             { "title": "Soft delete", "text": "`deleted_at` hides a row at once; the hourly job purges it later.", "tables": ["users", "posts", "comments"] },
             { "title": "Stored counters", "text": "Moved ±1 by the worker, exactly once per outbox event, and recounted hourly by the repair job.", "tables": ["posts", "users"] },
             { "title": "Ordered children", "text": "`position` is in the primary key and deferrable, so a whole list can be reordered in one transaction.", "tables": ["course_items", "quiz_questions", "roadmap_steps", "trail_items"] },
+            { "title": "One-to-one companion tables", "text": "`paper_id` is both primary key and foreign key, with `ON DELETE CASCADE`. The API creates all three with the paper, so lists can use inner joins.", "tables": ["paper_metadata", "paper_metrics", "paper_sync"] },
             { "title": "References with no foreign key", "text": "`reports.target_id`, `outbox_events.entity_id` and `audit_log.entity_id` have no foreign key on purpose: these rows must outlive their targets.", "tables": ["reports", "outbox_events", "audit_log"] },
             { "title": "Search expressions must match the indexes", "text": "The full-text expressions in `apps/api/src/db/search.ts` must match the index expressions exactly, or Postgres won't use the indexes. The same goes for partial-index predicates." }
           ]
@@ -628,7 +676,7 @@
               ["Sessions", "Expired or revoked more than 30 days ago"],
               ["Email codes", "Expired or used more than 7 days ago"],
               ["Outbox events", "Processed more than 30 days ago. Events with 10 failed attempts stay for inspection"],
-              ["Inactive likes and follows", "Kept: they prevent re-notification"],
+              ["Inactive likes, follows and blocks", "Kept: they prevent re-notification"],
               ["Raw uploads", "Deleted as soon as processing ends"]
             ],
             "prose": [1]
@@ -652,7 +700,7 @@
     {
       "id": "migrations",
       "title": "Migrations",
-      "desc": "The six SQL files and the rules for adding more",
+      "desc": "The seven SQL files and the rules for adding more",
       "sections": [
         {
           "table": {
@@ -663,7 +711,8 @@
               ["`…002_prototype-2-backfill.sql`", "Slugs `NOT NULL`; post media moved into `media_assets`"],
               ["`…003_sessions-public-id-and-2fa.sql`", "Session public ids, two-factor columns, four indexes"],
               ["`…004_toggles-and-stored-counts.sql`", "Toggle rows for likes and follows, stored follow counts"],
-              ["`…005_research-collection.sql`", "Research tab Group A: 9 new tables, paper metadata and search"]
+              ["`…005_research-collection.sql`", "Research tab Group A: 9 new tables, paper metadata and search"],
+              ["`…006_papers-split-and-block-toggle.sql`", "Block toggle rows; papers split into `paper_metadata`, `paper_metrics` and `paper_sync`; the old summary moved into `paper_cards`; search rebuilt from the cards"]
             ],
             "prose": [1]
           }

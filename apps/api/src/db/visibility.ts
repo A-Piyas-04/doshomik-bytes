@@ -13,13 +13,14 @@ export function isActiveUser(u: string): Condition {
   return sql`${col(u, 'status')} = 'active'`;
 }
 
-/** Neither the viewer nor the user (by id column) has blocked the other. */
+/** Neither the viewer nor the user (by id column) has blocked the other. An unblock keeps the row with is_active = false. */
 export function notBlocked(viewerId: number, userIdColumn: string): Condition {
   const userId = sql.ref(userIdColumn);
   return sql`NOT EXISTS (
     SELECT 1 FROM blocks b
-    WHERE (b.blocker_id = ${viewerId} AND b.blocked_id = ${userId})
-       OR (b.blocker_id = ${userId} AND b.blocked_id = ${viewerId})
+    WHERE b.is_active
+      AND ((b.blocker_id = ${viewerId} AND b.blocked_id = ${userId})
+        OR (b.blocker_id = ${userId} AND b.blocked_id = ${viewerId}))
   )`;
 }
 

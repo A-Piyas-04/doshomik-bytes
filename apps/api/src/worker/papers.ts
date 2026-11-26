@@ -9,6 +9,8 @@ import { RateLimitedError, type S2Reference } from '../providers/scholarly';
 
 // Paper ingestion (Research tab A1, A6). The worker fills our tables from OpenAlex, Semantic
 // Scholar and Hugging Face; the API only ever reads them. Every job here is safe to repeat.
+// Since migration 006 a paper's data is spread by responsibility: descriptive fields on papers,
+// outside ids and TLDR on paper_metadata, counts and rank on paper_metrics, the queue on paper_sync.
 
 /** How often a paper's metadata, citation count and references are refreshed. */
 const REFRESH_DAYS = 7;
@@ -42,13 +44,15 @@ type DuePaper = { id: number; doi: string | null; arxiv_id: string | null; opena
 /** Papers never synced (imports, or "sync now") first, then the stalest. */
 export async function syncDuePapers(log: Logger, limit = BATCH): Promise<number> {
   const papers: DuePaper[] = await db
-    .selectFrom('papers')
-    .select(['id', 'doi', 'arxiv_id', 'openalex_id', 's2_id'])
-    // Same predicate and order as papers_sync_idx.
-    .where(sql<boolean>`(doi IS NOT NULL OR arxiv_id IS NOT NULL)`)
-    .where((eb) => eb.or([eb('synced_at', 'is', null), eb('synced_at', '<', new Date(Date.now() - REFRESH_DAYS * 86_400_000))]))
-    .orderBy(sql`synced_at NULLS FIRST`)
-    .orderBy('id')
+    .selectFrom('paper_sync as ps')
+    .innerJoin('paper_metadata as pmd', 'pmd.paper_id', 'ps.paper_id')
+    .select(['ps.paper_id as id', 'pmd.doi', 'pmd.arxiv_id', 'pmd.openalex_id', 'pmd.s2_id'])
+    // Only papers with an identifier can be looked up.
+    .where((eb) => eb.or([eb('pmd.doi', 'is not', null), eb('pmd.arxiv_id', 'is not', null)]))
+    .where((eb) => eb.or([eb('ps.synced_at', 'is', null), eb('ps.synced_at', '<', new Date(Date.now() - REFRESH_DAYS * 86_400_000))]))
+    // Same order as paper_sync_due_idx.
+    .orderBy(sql`ps.synced_at NULLS FIRST`)
+    .orderBy('ps.paper_id')
     .limit(limit)
     .execute();
 
@@ -63,7 +67,11 @@ export async function syncDuePapers(log: Logger, limit = BATCH): Promise<number>
         break; // leave the rest for the next round
       }
       log.warn({ err: error, paperId: paper.id }, 'Paper sync failed');
-      await db.updateTable('papers').set({ synced_at: new Date(), sync_error: String((error as Error).message).slice(0, 500) }).where('id', '=', paper.id).execute();
+      await db
+        .updateTable('paper_sync')
+        .set({ synced_at: new Date(), sync_error: String((error as Error).message).slice(0, 500) })
+        .where('paper_id', '=', paper.id)
+        .execute();
       done++;
     }
   }
@@ -92,19 +100,28 @@ export async function syncPaper(paper: DuePaper): Promise<void> {
         venue: sql`coalesce(venue, ${work?.venue ?? s2?.venue ?? null})`,
         abstract: sql`coalesce(abstract, ${work?.abstract ?? null})`,
         published_on: sql`coalesce(published_on, ${work?.publishedOn ?? null}::date)`,
+        pdf_url: sql`coalesce(pdf_url, ${s2?.pdfUrl ?? null})`,
+      })
+      .where('id', '=', paper.id)
+      .execute();
+    await trx
+      .updateTable('paper_metadata')
+      .set({
         doi: sql`coalesce(doi, ${work?.doi ?? s2?.doi ?? null})`,
         arxiv_id: sql`coalesce(arxiv_id, ${s2?.arxivId ?? null})`,
         openalex_id: sql`coalesce(${work?.openalexId ?? null}, openalex_id)`,
         s2_id: sql`coalesce(${s2?.s2Id ?? null}, s2_id)`,
-        pdf_url: sql`coalesce(pdf_url, ${s2?.pdfUrl ?? null})`,
         tldr: sql`coalesce(${s2?.tldr ?? null}, tldr)`,
-        citation_count: sql`coalesce(${s2?.citationCount ?? work?.citationCount ?? null}::int, citation_count)`,
         openalex_topics: work ? JSON.stringify(work.topics) : sql`openalex_topics`,
-        synced_at: new Date(),
-        sync_error: null,
       })
-      .where('id', '=', paper.id)
+      .where('paper_id', '=', paper.id)
       .execute();
+    await trx
+      .updateTable('paper_metrics')
+      .set({ citation_count: sql`coalesce(${s2?.citationCount ?? work?.citationCount ?? null}::int, citation_count)` })
+      .where('paper_id', '=', paper.id)
+      .execute();
+    await trx.updateTable('paper_sync').set({ synced_at: new Date(), sync_error: null }).where('paper_id', '=', paper.id).execute();
     await replaceEdges(trx, paper.id, references, work?.referencedWorks ?? []);
     await refreshPaperSearch(trx, paper.id);
   });
@@ -132,8 +149,8 @@ async function replaceEdges(trx: Db, citingId: number, references: S2Reference[]
   const ours =
     s2Ids.length || dois.length || arxivIds.length || openalexWorks.length
       ? await trx
-          .selectFrom('papers')
-          .select(['id', 's2_id', 'doi', 'arxiv_id', 'openalex_id'])
+          .selectFrom('paper_metadata')
+          .select(['paper_id as id', 's2_id', 'doi', 'arxiv_id', 'openalex_id'])
           .where((eb) =>
             eb.or([
               ...(s2Ids.length ? [eb('s2_id', 'in', s2Ids)] : []),
@@ -214,14 +231,23 @@ export async function syncTrending(log: Logger): Promise<number> {
   const rows = [...seen.entries()].map(
     ([arxivId, v]) => sql`(${arxivId}::text, ${v.upvotes}::int, ${v.repo}::text, ${v.listedAt}::timestamptz)`,
   );
-  const result = await sql`
-    UPDATE papers p SET
-      hf_upvotes = v.upvotes,
-      hf_trending_at = greatest(coalesce(p.hf_trending_at, v.listed_at), v.listed_at),
-      code_url = coalesce(p.code_url, v.repo)
-    FROM (VALUES ${sql.join(rows)}) AS v(arxiv_id, upvotes, repo, listed_at)
-    WHERE p.arxiv_id = v.arxiv_id`.execute(db);
-  return Number(result.numAffectedRows ?? 0);
+  // Matched through paper_metadata.arxiv_id; the counts go to paper_metrics, a missing code link to papers.
+  const { rows: updated } = await sql<{ n: number }>`
+    WITH v (arxiv_id, upvotes, repo, listed_at) AS (VALUES ${sql.join(rows)}),
+    matched AS (SELECT pmd.paper_id, v.upvotes, v.repo, v.listed_at FROM v JOIN paper_metadata pmd ON pmd.arxiv_id = v.arxiv_id),
+    code AS (
+      UPDATE papers p SET code_url = m.repo
+      FROM matched m WHERE p.id = m.paper_id AND p.code_url IS NULL AND m.repo IS NOT NULL
+    ),
+    metrics AS (
+      UPDATE paper_metrics pm SET
+        hf_upvotes = m.upvotes,
+        hf_trending_at = greatest(coalesce(pm.hf_trending_at, m.listed_at), m.listed_at)
+      FROM matched m WHERE pm.paper_id = m.paper_id
+      RETURNING 1
+    )
+    SELECT count(*)::int AS n FROM metrics`.execute(db);
+  return updated[0]?.n ?? 0;
 }
 
 /**
@@ -229,19 +255,24 @@ export async function syncTrending(log: Logger): Promise<number> {
  * last PAPER_TRENDING_DAYS first (most upvoted first), then by citation count, then newest.
  */
 export async function rankPapers(): Promise<void> {
-  const trending = sql`(p2.hf_trending_at >= now() - make_interval(days => ${PAPER_TRENDING_DAYS}))`;
+  const trending = sql`(m2.hf_trending_at >= now() - make_interval(days => ${PAPER_TRENDING_DAYS}))`;
   await sql`
-    UPDATE papers p SET trend_rank = r.rank
+    UPDATE paper_metrics pm SET trend_rank = r.rank
     FROM (
       SELECT p2.id, row_number() OVER (ORDER BY
         ${trending} IS TRUE DESC,
-        CASE WHEN ${trending} THEN p2.hf_upvotes END DESC NULLS LAST,
-        p2.citation_count DESC NULLS LAST,
+        CASE WHEN ${trending} THEN m2.hf_upvotes END DESC NULLS LAST,
+        m2.citation_count DESC NULLS LAST,
         p2.published_on DESC NULLS LAST,
         p2.id DESC) AS rank
       FROM papers p2
+      JOIN paper_metrics m2 ON m2.paper_id = p2.id
       WHERE p2.status = 'published'
     ) r
-    WHERE r.id = p.id AND p.trend_rank IS DISTINCT FROM r.rank`.execute(db);
-  await db.updateTable('papers').set({ trend_rank: null }).where('status', '!=', 'published').where('trend_rank', 'is not', null).execute();
+    WHERE r.id = pm.paper_id AND pm.trend_rank IS DISTINCT FROM r.rank`.execute(db);
+  // Only published papers keep a rank (the list query still checks papers.status).
+  await sql`
+    UPDATE paper_metrics pm SET trend_rank = NULL
+    FROM papers p
+    WHERE p.id = pm.paper_id AND p.status <> 'published' AND pm.trend_rank IS NOT NULL`.execute(db);
 }

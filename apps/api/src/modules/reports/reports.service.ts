@@ -1,21 +1,37 @@
 import type { ReportReason, ReportTargetType } from '@doshomik/shared';
 import { db } from '../../db';
 import { isActiveUser } from '../../db/visibility';
-import { notFound } from '../../lib/errors';
+import { badRequest, HttpError, notFound } from '../../lib/errors';
+import { visibleComment } from '../comments/comments.service';
 import { visiblePost } from '../posts/posts.service';
 import { visibleTrailId } from '../trails/trails.service';
 
-/** Resolves what a user may report: an active user, a post or trail they can see, or a live comment. */
+/**
+ * Resolves what a user may report to its internal id. reports.target_id has no foreign key (it
+ * points at users, posts, comments or trails, and must outlive its target), so this is where a
+ * target is checked: it exists in the table its type names, and the reporter may see it.
+ *   user    an active account other than the reporter's own (blocked users can still be reported)
+ *   post    a post the reporter can see
+ *   comment a live comment in a thread the reporter can see (also by someone the reporter blocked)
+ *   trail   a published trail the reporter can see, or their own
+ */
 async function targetId(reporterId: number, type: ReportTargetType, publicId: string): Promise<number> {
   if (type === 'post') return (await visiblePost(reporterId, publicId)).id;
   if (type === 'trail') return visibleTrailId(reporterId, publicId);
 
-  const row =
-    type === 'user'
-      ? await db.selectFrom('users as u').select('u.id').where('u.public_id', '=', publicId).where(isActiveUser('u')).executeTakeFirst()
-      : await db.selectFrom('comments').select('id').where('public_id', '=', publicId).where('deleted_at', 'is', null).executeTakeFirst();
-  if (!row) throw notFound(type === 'user' ? 'User' : 'Comment');
-  return row.id;
+  if (type === 'comment') {
+    // A hidden thread is reported as a missing comment, not a missing post or paper.
+    const comment = await visibleComment(reporterId, publicId).catch((error: unknown) => {
+      throw error instanceof HttpError && error.statusCode === 404 ? notFound('Comment') : error;
+    });
+    if (comment.deleted_at) throw notFound('Comment');
+    return comment.id;
+  }
+
+  const user = await db.selectFrom('users as u').select('u.id').where('u.public_id', '=', publicId).where(isActiveUser('u')).executeTakeFirst();
+  if (!user) throw notFound('User');
+  if (user.id === reporterId) throw badRequest('You cannot report yourself', 'SELF_REPORT');
+  return user.id;
 }
 
 /** Files a report for the moderation queue. Reporting the same thing twice keeps one open report. */

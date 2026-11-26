@@ -5,6 +5,7 @@ import argon2 from 'argon2';
 import { sql } from 'kysely';
 import { db, type Db } from '../db';
 import { slugify } from '../lib/validation';
+import { createPaperCompanions } from '../modules/research/research.service';
 import * as data from './seed-data';
 
 function requireEnv(name: string): string {
@@ -85,18 +86,30 @@ async function seedContent(trx: Db, adminId: number) {
     )
     .execute();
 
-  const paperId = idLookup(
+  // Each paper with its companion rows and its English Paper Card, which holds the summary (migration 006).
+  const papers: { id: number; title: string }[] = [];
+  for (const { field, prerequisites: _, arxiv_id, research_questions, main_idea, data_source, method_steps, results, limitations, evaluation, ...paper } of data.papers) {
+    const row = await trx.insertInto('papers').values({ ...paper, ...live, field_id: fieldId(field) }).returning(['id', 'title']).executeTakeFirstOrThrow();
+    await createPaperCompanions(trx, row.id, { arxiv_id });
     await trx
-      .insertInto('papers')
-      .values(data.papers.map(({ field, prerequisites: _, ...paper }) => ({ ...paper, ...live, field_id: fieldId(field) })))
-      .returning(['id', 'title'])
-      .execute(),
-    'title',
-  );
-  // English Paper Cards from the summaries, then each paper's search document (migration 005).
-  await sql`
-    INSERT INTO paper_cards (paper_id, lang, question, key_idea, method_steps, findings, limitations)
-    SELECT id, 'en', research_questions[1], main_idea, method_steps, results, limitations FROM papers`.execute(trx);
+      .insertInto('paper_cards')
+      .values({
+        paper_id: row.id,
+        lang: 'en',
+        question: research_questions[0] ?? null,
+        extra_questions: research_questions.slice(1),
+        key_idea: main_idea,
+        data_source,
+        method_steps,
+        findings: results,
+        limitations,
+        evaluation,
+        updated_by: adminId,
+      })
+      .execute();
+    papers.push(row);
+  }
+  const paperId = idLookup(papers, 'title');
   await sql`SELECT refresh_paper_search(id) FROM papers`.execute(trx);
   await trx
     .insertInto('paper_prerequisites')

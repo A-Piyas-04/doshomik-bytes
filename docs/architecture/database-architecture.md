@@ -1,6 +1,6 @@
 # Database architecture
 
-Status as of Nov 23, 2026 (Prototype 2 backend plus the Research tab's Group A, after migration `…005`). Source of truth: the SQL files in [`apps/api/migrations/`](../../apps/api/migrations/). Generated TypeScript types: [`apps/api/src/db/types.ts`](../../apps/api/src/db/types.ts). A step-by-step guide to the same schema (a guided tour, then tables by area, then reference pages) is in [`Schema-Explorer.html`](Schema-Explorer.html).
+Status as of Nov 26, 2026 (Prototype 2 backend plus the Research tab's Group A, after migration `…006`, the database refactoring: [report](../database-refactoring-report.md)). Source of truth: the SQL files in [`apps/api/migrations/`](../../apps/api/migrations/). Generated TypeScript types: [`apps/api/src/db/types.ts`](../../apps/api/src/db/types.ts). A guide to the same schema, generated from the live database (a guided tour, tables by area, diagrams and reference pages), is [`docs/schema-guide.html`](../schema-guide.html).
 
 Related: [Backend architecture](backend-architecture.md) · [Implementation notes and decisions](../prototype-2-implementation-notes.md) · [API reference](../../apps/api/README.md)
 
@@ -26,8 +26,8 @@ Related: [Backend architecture](backend-architecture.md) · [Implementation note
 | --- | --- |
 | Engine | PostgreSQL 16+ (tested on 18; works on 13+, `gen_random_uuid()` is built in) |
 | Extensions and configurations | `pg_trgm` (fuzzy search on usernames and topic names); text search configuration `bangla` (a copy of `simple`) |
-| Tables | 39, in 8 domains |
-| Foreign keys | 76: 51 cascade, 22 set null, 3 restrict |
+| Tables | 42, in 8 domains |
+| Foreign keys | 79: 54 cascade, 22 set null, 3 restrict |
 | Functions | `refresh_paper_search(paper_id)`: the one definition of a paper's search document |
 | Query layer | Kysely (typed SQL builder), `pg` driver, one connection pool per process |
 | Migrations | node-pg-migrate, plain SQL files, each run in its own transaction |
@@ -36,11 +36,11 @@ Related: [Backend architecture](backend-architecture.md) · [Implementation note
 
 There is no Redis, Elasticsearch or separate queue. Postgres also serves as:
 
-- the **job queue**: `outbox_events`, `media_assets` rows with `status = 'processing'`, and papers due for ingestion (`papers.synced_at`);
+- the **job queue**: `outbox_events`, `media_assets` rows with `status = 'processing'`, and papers due for ingestion (`paper_sync.synced_at`);
 - the **search engine**: `tsvector` GIN and trigram indexes;
 - the **audit store**: `audit_log`.
 
-The app never calls a scholarly API. OpenAlex, Semantic Scholar and Hugging Face data is ingested by the worker into `papers` and `paper_edges` ([backend §7.1](backend-architecture.md#71-paper-ingestion-research-tab)); requests read only our tables.
+The app never calls a scholarly API. OpenAlex, Semantic Scholar and Hugging Face data is ingested by the worker into `papers`, its companions `paper_metadata` and `paper_metrics`, `paper_sync` (the queue) and `paper_edges` ([backend §7.1](backend-architecture.md#71-paper-ingestion-research-tab)); requests read only our tables.
 
 ## 2. Conventions
 
@@ -52,19 +52,20 @@ The app never calls a scholarly API. OpenAlex, Semantic Scholar and Hugging Face
 | Enums | `text` columns with `CHECK (... IN (...))`, not Postgres enum types. They are easier to change in a migration. The same lists are in [`packages/shared/src/index.ts`](../../packages/shared/src/index.ts), so change both together. |
 | Timestamps | `timestamptz`. `created_at DEFAULT now()` everywhere; `updated_at` on mutable rows, set by the application, not by triggers. |
 | Soft delete | `deleted_at` on `users`, `posts` and `comments`. Rows are hidden at once and purged later (§9). |
-| Toggle rows | A relationship whose creation has side effects (a notification, a counter) keeps **one row per pair** and flips a state instead of being deleted and re-inserted: `post_likes.is_active` and `follows.status = 'inactive'`. Only the first activation ever notifies (§5). |
+| Toggle rows | A relationship whose creation has side effects (a notification, a counter) keeps **one row per pair** and flips a state instead of being deleted and re-inserted: `post_likes.is_active`, `follows.status = 'inactive'` and `blocks.is_active` **(006)**. Only the first activation ever notifies (§5). |
 | Stored counters | `posts.like_count`, `posts.comment_count`, `users.follower_count`, `users.following_count`. Moved **±1** by the worker, exactly once per outbox event, and recounted hourly by the repair job (§5). |
-| Ingested fields | Paper metadata from outside sources (`citation_count`, `hf_upvotes`, `tldr`, ids) is written only by the worker. Descriptive fields it fills only when empty, so staff edits win (§6.1). |
+| Ingested fields | Paper data from outside sources (`paper_metadata`: ids, TLDR, topics; `paper_metrics`: counts and rank) is written only by the worker. Descriptive fields it fills only when empty, so staff edits win (§6.1). |
 | Languages | Content that exists per language has a `lang` column, `en` or `bn` (`paper_cards`, `trails`). |
 | Publishing workflow | Team content (`papers`, `courses`, `learn_items`, `questions`, `quizzes`) has `status` `draft` → `published` → `archived`. Most also have `published_at`, `created_by` and `updated_by`. User-made trails have `draft` → `published`, and `removed` by a moderator. |
 | Storage keys, not URLs | `media_assets` stores `raw_key`, `playback_key` and `thumbnail_key`. URLs are built at read time, so changing storage provider changes no data. |
+| One-to-one companions **(006)** | `paper_metadata`, `paper_metrics` and `paper_sync` have `paper_id` as primary key **and** foreign key (`ON DELETE CASCADE`). The API creates all three with the paper, so reads use inner joins. Each holds data with its own writer and schedule. |
 | Join tables | Composite primary keys, e.g. `follows (follower_id, following_id)`, `reading_passes (user_id, paper_id)`. |
 | Ordered children | `position smallint` in the primary key (`course_items`, `roadmap_steps`, `quiz_questions`, `trail_items`), made `DEFERRABLE INITIALLY DEFERRED` so a whole list can be reordered in one transaction. |
 | Polymorphic references | `reports.target_id`, `outbox_events.entity_id` and `audit_log.entity_id` have **no foreign key** on purpose: these rows must outlive their targets. |
 
 ## 3. Entity–relationship diagram
 
-Keys and relationships only; columns are listed in §4. `||--o{` means one-to-many. `users` is the hub: 37 foreign keys from 29 tables point at it; `papers` is the second hub of the Research tab.
+Keys and relationships only; columns are listed in §4. `||--o{` means one-to-many. `users` is the hub: 37 foreign keys from 29 tables point at it; `papers` is the second hub of the Research tab. `||--||` is one-to-one.
 
 ```mermaid
 erDiagram
@@ -107,6 +108,9 @@ erDiagram
     fields ||--o{ roadmap_steps : "roadmap"
     fields ||--o{ user_fields : ""
     fields ||--o{ trails : "chip of"
+    papers ||--|| paper_metadata : "ids, TLDR"
+    papers ||--|| paper_metrics : "counts, rank"
+    papers ||--|| paper_sync : "ingestion queue"
     papers ||--o{ paper_cards : "card in en / bn"
     papers ||--o{ paper_edges : "cites / cited by"
     papers ||--o{ roadmap_steps : "step of"
@@ -144,7 +148,7 @@ erDiagram
     }
 ```
 
-Not shown: `created_by` and `updated_by` on team content, `paper_cards.updated_by`, and `reports.target_id` (polymorphic, no FK). The full list of foreign keys with their delete rules is in §8 and, filterable, in the [Schema Explorer](Schema-Explorer.html#ref/links).
+Not shown: `created_by` and `updated_by` on team content, `paper_cards.updated_by`, and `reports.target_id` (polymorphic, no FK). The full list of foreign keys with their delete rules is in §8 and, filterable, in the [schema guide](../schema-guide.html).
 
 ## 4. Tables by domain
 
@@ -202,8 +206,8 @@ The API reports `inactive` as `follow_status: "none"`. Every privacy check tests
 
 | Table | Key | Columns | Notes |
 | --- | --- | --- | --- |
-| `blocks` | PK (blocker_id, blocked_id) | created_at | Applies both ways in every visibility check; blocking also ends follows in both directions (sets them `inactive`) |
-| `reports` | id PK | reporter_id, target_type `user` · `post` · `comment` · `trail` **(005)**, target_id (no FK), reason, details, status `open` · `actioned` · `dismissed`, reviewed_by, reviewed_at | Reasons: `spam`, `harassment`, `nudity`, `violence`, `misinformation`, `other` |
+| `blocks` | PK (blocker_id, blocked_id) | created_at (the first block), is_active **(006)**, updated_at **(006)** (when the current state began) | A toggle row (§5.4): unblocking sets `is_active = false`, blocking again reactivates the row. Only active rows apply, both ways, in every visibility check; blocking also ends follows in both directions (sets them `inactive`) |
+| `reports` | id PK | reporter_id, target_type `user` · `post` · `comment` · `trail` **(005)**, target_id (no FK), reason, details, status `open` · `actioned` · `dismissed`, reviewed_by, reviewed_at | Reasons: `spam`, `harassment`, `nudity`, `violence`, `misinformation`, `other`. `target_id` has no FK, so the API checks the target before filing (§8) |
 
 ### 4.3 Media
 
@@ -289,23 +293,23 @@ The API reports `inactive` as `follow_status: "none"`. Every privacy check tests
 | field_id | FK → fields, restrict | Its chip (one per paper) |
 | title, authors, year | text, text, smallint | `title` is empty for an import until the first sync |
 | paper_url | text | The original's abstract page: the main **Open** action (A10). We never host a PDF |
-| research_questions, main_idea, data_source, method_steps, results, figures, limitations, evaluation | | The Prototype 2 structured summary, unchanged. The English Paper Card was backfilled from it |
 | status, published_at, created_by, updated_by, created_at, updated_at | | Publishing columns |
 | abstract, venue **(005)** | text | From OpenAlex, or staff |
 | published_on **(005)** | date | Drives the "New" badge (within 30 days) |
-| doi, arxiv_id, openalex_id, s2_id **(005)** | text U | Identifiers. DOI lower case without the resolver; arXiv id without version |
 | pdf_url, code_url **(005)** | text | Open-access PDF (Semantic Scholar); linked code repository (Hugging Face) |
-| tldr **(005)** | text | Semantic Scholar's one-line TLDR (English) |
-| citation_count **(005)** | integer | Semantic Scholar, else OpenAlex |
-| hf_upvotes, hf_trending_at **(005)** | integer, timestamptz | Upvotes and the last day the paper was on Hugging Face daily papers |
-| trend_rank **(005)** | integer | 1..n over published papers: the default order (§6.1) |
-| openalex_topics **(005)** | jsonb | `[{id, name, score}]`, for staff reference when choosing the field |
-| synced_at, sync_error **(005)** | timestamptz, text | Last ingestion attempt (`NULL` = queued) and its error |
-| search_vector **(005)** | tsvector | Title, authors, main idea and both card questions (§6.2) |
+| search_vector **(005)** | tsvector | Title, authors, and the questions and key idea of both cards (§6.2) |
+
+Migration `…006` moved everything else off `papers`: the outside data to three one-to-one companions, and the Prototype 2 structured summary (`research_questions`, `main_idea`, `data_source`, `method_steps`, `results`, `figures`, `limitations`, `evaluation`) into the English `paper_cards` row.
+
+| Table | Columns | Notes |
+| --- | --- | --- |
+| `paper_metadata` **(006)** | paper_id PK/FK cascade; `doi`, `arxiv_id`, `openalex_id`, `s2_id` (each text U); `openalex_topics jsonb` (`[{id, name, score}]`); `tldr` | Outside identifiers and source data. DOI lower case without the resolver; arXiv id without version (normalised by the API) |
+| `paper_metrics` **(006)** | paper_id PK/FK cascade; `citation_count`, `hf_upvotes` (≥ 0), `hf_trending_at`, `trend_rank` (> 0) | Popularity and the default order (§6.1). `trend_rank` NULL = not ranked (drafts, archived, or not yet) |
+| `paper_sync` **(006)** | paper_id PK/FK cascade; `synced_at`, `sync_error` | The ingestion queue: `synced_at` NULL = queued |
 
 | Table | Key | Columns / notes |
 | --- | --- | --- |
-| `paper_cards` **(005)** | PK (paper_id, lang); paper cascade | The Paper Card per language (`en`, `bn`): `question` (searched), `problem`, `key_idea`, `method_steps text[]`, `findings`, `takeaway`, `limitations`, `glossary jsonb` (`[{term, definition}]`), `source` `staff` · `ai`, `updated_by` (set null) |
+| `paper_cards` **(005)** | PK (paper_id, lang); paper cascade | The Paper Card per language (`en`, `bn`), the **only** home of a paper's structured explanation: `question` (searched), `extra_questions text[]` **(006)** (further research questions, searched), `problem`, `key_idea` (searched), `data_source` **(006)**, `method_steps text[]`, `findings`, `evaluation` **(006)**, `figures jsonb` **(006)** (`[{url, caption}]`), `takeaway`, `limitations`, `glossary jsonb` (`[{term, definition}]`), `source` `staff` · `ai`, `updated_by` (set null). The API's Prototype 2 summary fields read and write the English card |
 | `paper_edges` **(005)** | PK (citing_paper_id, cited_paper_id), both cascade; `CHECK` not self | Citation lineage inside the collection: `intent` `background` · `supporting` · `contrasting` (NULL = unknown), `s2_intents text[]` (Semantic Scholar's own labels), `is_influential`, `source` `semantic_scholar` · `openalex` · `staff` |
 | `paper_prerequisites` | PK (paper_id, topic_id), both cascade | "Learn first" concepts with `position`; **(005)** `label`, `why`, a typed link (at most one of `learn_item_id`, `quiz_id`, `reel_post_id`, each set null), `suggested_by` `staff` · `ai` |
 | `paper_saves` **(005)** | PK (user_id, paper_id), both cascade | The bookmark. `created_at` orders Saved and picks Up next |
@@ -322,7 +326,7 @@ The API reports `inactive` as `follow_status: "none"`. Every privacy check tests
 | Table | Purpose | Notes |
 | --- | --- | --- |
 | `outbox_events` | Work for the background worker, written **in the same transaction** as the change | `event_type`, `entity_type`, `entity_id`, `payload jsonb`, `attempts`, `processed_at`. The worker claims an event by setting `processed_at` only while it is still NULL (§5). Event types are listed in [backend architecture §6](backend-architecture.md#6-outbox-events) |
-| `audit_log` | Every admin and security action | `actor_id` (set null), `action` (e.g. `paper.publish`, `paper.import`, `paper.card`, `paper.edge`, `user.suspend`, `user.purge`), `entity_type`, `entity_id`, `changes jsonb`, `ip inet` |
+| `audit_log` | Every admin and security action | `actor_id` (set null), `action` (e.g. `paper.publish`, `paper.import`, `paper.card`, `paper.edge`, `user.suspend`, `user.purge`; `paper.summary_migration` from migration `…006`, with `actor_id` NULL), `entity_type`, `entity_id`, `changes jsonb`, `ip inet` |
 
 ## 5. Write paths and efficiency
 
@@ -371,7 +375,8 @@ DELETE /posts/:id/like  UPDATE … SET is_active = false WHERE is_active
 - **Interests** (`user_fields`): saving writes only the difference.
 - **Unread badge**: `notifications_unread_idx (user_id) WHERE NOT is_read`.
 - **Redundant index dropped**: the Prototype 1 `posts (created_at DESC) WHERE type = 'reel'`.
-- **Left as they are**: `saved_posts` and `paper_saves` (no side effects; a re-save moves to the top, which rewrites the indexed `created_at` anyway), `user_papers`, `course_progress` and `reading_passes` (already one upsert per row), `blocks` (rare), `question_attempts` (append-only history).
+- **Blocks** **(006)**: one row per pair, like likes. Unblock is `UPDATE … SET is_active = false WHERE is_active`; a reblock is `INSERT … ON CONFLICT DO UPDATE SET is_active = true WHERE NOT is_active`, which keeps `created_at`. Neither column is indexed, so a toggle is a HOT update. `notBlocked()` in `src/db/visibility.ts` and the notification check filter on `is_active`.
+- **Left as they are**: `saved_posts` and `paper_saves` (no side effects; a re-save moves to the top, which rewrites the indexed `created_at` anyway), `user_papers`, `course_progress` and `reading_passes` (already one upsert per row), `question_attempts` (append-only history).
 
 ## 6. The Research tab's data
 
@@ -385,21 +390,25 @@ flowchart LR
     oa["OpenAlex"] --> worker
     s2["Semantic Scholar"] --> worker
     hf["Hugging Face daily papers"] --> worker
-    worker["Worker papers loop"] -->|"metadata, citations,<br/>TLDR, trending"| papers
+    worker["Worker papers loop"] -->|"title, venue, abstract…<br/>(when empty)"| papers
+    worker -->|"ids, TLDR, topics"| meta[(paper_metadata)]
+    worker -->|"citations, upvotes,<br/>trend_rank 1..n"| metrics[(paper_metrics)]
+    worker -->|"synced_at, sync_error"| sync[(paper_sync)]
     worker -->|references| edges[(paper_edges)]
-    worker -->|"trend_rank 1..n"| papers
     papers --> api["API: GET /papers<br/>(reads only Postgres)"]
+    meta --> api
+    metrics --> api
 ```
 
 | Data | Written by | Rule |
 | --- | --- | --- |
-| Title, authors, year, venue, abstract, publication date, PDF link | Staff, or the worker when empty | Staff edits win |
-| Citation count, TLDR, OpenAlex and S2 ids, OpenAlex topics | Worker, every sync (7 days) | Always refreshed |
-| `hf_upvotes`, `hf_trending_at`, `code_url` (if empty) | Worker, every 6 hours | Matched by arXiv id over the last 7 days of daily papers |
-| `trend_rank` | Worker after each sync, and hourly maintenance | Trending on Hugging Face in the last 14 days first (most upvotes first), then most cited, then newest. Dense 1..n over published papers |
+| Title, authors, year, venue, abstract, publication date, PDF link (`papers`) | Staff, or the worker when empty | Staff edits win |
+| TLDR, OpenAlex and S2 ids, OpenAlex topics (`paper_metadata`); citation count (`paper_metrics`) | Worker, every sync (7 days, queued in `paper_sync`) | Always refreshed. Only papers with a DOI or arXiv id are queued |
+| `hf_upvotes`, `hf_trending_at` (`paper_metrics`), `papers.code_url` (if empty) | Worker, every 6 hours | Matched by arXiv id over the last 7 days of daily papers |
+| `paper_metrics.trend_rank` | Worker after each sync, and hourly maintenance | Trending on Hugging Face in the last 14 days first (most upvotes first), then most cited, then newest. Dense 1..n over published papers |
 | "New" badge | Computed | `published_on` within the last 30 days |
 
-`GET /papers` orders by `coalesce(trend_rank, 2147483647), id`, a keyset page on `papers_trend_idx`; the chip filter is `field_id`. The paper's **Open** button is `paper_url` (the arXiv abstract page or the DOI); `pdf_url` and `code_url` are extra links.
+`GET /papers` joins `paper_metrics` and orders by `coalesce(pm.trend_rank, 2147483647), pm.paper_id`, a keyset page read in order from `paper_metrics_trend_idx` (the status filter is checked on `papers`); the chip filter is `field_id`. The paper's **Open** button is `paper_url` (the arXiv abstract page or the DOI); `pdf_url` and `code_url` are extra links.
 
 ### 6.2 Search (A2)
 
@@ -408,11 +417,11 @@ flowchart LR
 ```
 setweight(to_tsvector('english', title), 'A')
 || setweight(to_tsvector('english', authors), 'B')
-|| setweight(to_tsvector('english', main_idea || ' ' || English card question), 'C')
-|| setweight(to_tsvector('bangla',  Bangla card question), 'C')
+|| setweight(to_tsvector('english', English card: question, extra_questions, key_idea), 'C')
+|| setweight(to_tsvector('bangla',  Bangla card:  question, extra_questions, key_idea), 'C')
 ```
 
-The query is `websearch_to_tsquery('english', q) || websearch_to_tsquery('bangla', q)`, so a Bangla query finds an English-titled paper through its Bangla card. The API calls the function in the same transaction as every change to a paper or its cards, and the worker after every sync. `bangla` is PostgreSQL's `simple` configuration (lower-case, no stemming). How Bangla words are split depends on the server's locale; with a C locale every Bangla letter and sign stays in the word. GIN index: `papers_search_idx`.
+The query is `websearch_to_tsquery('english', q) || websearch_to_tsquery('bangla', q)`, so a Bangla query finds an English-titled paper through its Bangla card. Since `…006` the educational text comes only from `paper_cards` (it used `papers.main_idea` before), and every document was rebuilt by the migration. The API calls the function in the same transaction as every change to a paper or its cards, and the worker after every sync. `bangla` is PostgreSQL's `simple` configuration (lower-case, no stemming). How Bangla words are split depends on the server's locale; with a C locale every Bangla letter and sign stays in the word. GIN index: `papers_search_idx`.
 
 ### 6.3 Saves, the reading tracker and My papers (A3–A5)
 
@@ -476,9 +485,10 @@ Besides primary keys and unique constraints:
 | Comments per post and paper; replies | `comments (post_id, created_at)`, `comments (paper_id, created_at)`, `comments (parent_id)` |
 | Notifications inbox; unread badge **(004)** | `notifications (user_id, created_at DESC)`, `notifications_unread_idx (user_id) WHERE NOT is_read` |
 | Saved posts | `saved_posts (user_id, created_at DESC)` |
-| Research collection in trend order **(005)** | `papers_trend_idx ((coalesce(trend_rank, 2147483647)), id) WHERE status = 'published'` |
+| Research collection in trend order **(006)** | `paper_metrics_trend_idx ((coalesce(trend_rank, 2147483647)), paper_id)`. Replaces `papers_trend_idx`, whose `WHERE status = 'published'` could not follow (status stays on `papers`); only published papers keep a rank |
 | Paper search **(005)** | `papers_search_idx` GIN on `search_vector` (replaced the Prototype 1 title + main idea expression index) |
-| Papers due for ingestion **(005)** | `papers_sync_idx (synced_at NULLS FIRST, id) WHERE doi IS NOT NULL OR arxiv_id IS NOT NULL` |
+| Papers due for ingestion **(006)** | `paper_sync_due_idx (synced_at NULLS FIRST, paper_id)`. Replaces `papers_sync_idx`; the identifier predicate is checked on `paper_metadata` through its primary key |
+| One-to-one lookups **(006)** | the primary keys of `paper_metadata`, `paper_metrics`, `paper_sync`; unique `doi`, `arxiv_id`, `openalex_id`, `s2_id` on `paper_metadata` |
 | Papers by field; content by topic | `papers (field_id)`, `learn_items (topic_id)`, `questions (topic_id)` |
 | "Built on by" **(005)** | `paper_edges_cited_idx (cited_paper_id)` |
 | Saved papers and Up next **(005)** | `paper_saves_user_idx (user_id, created_at)` |
@@ -510,14 +520,16 @@ Besides primary keys and unique constraints:
 - **Reading steps.** `step BETWEEN 0 AND 3`, and each step's time is set exactly when the step is reached (`(step >= 1) = (explored_at IS NOT NULL)`, likewise for studied and reproduced). Note ≤ 400 characters.
 - **Prerequisite link.** `num_nonnulls(learn_item_id, quiz_id, reel_post_id) <= 1`.
 - **Edges.** No self-citation; intent and source from fixed lists.
-- **Counts.** `citation_count >= 0`, `hf_upvotes >= 0`, `trend_rank > 0`.
+- **Counts** (`paper_metrics`). `citation_count >= 0`, `hf_upvotes >= 0`, `trend_rank > 0`.
 - **No self-follow or self-block** (CHECKs).
+
+**Polymorphic report targets.** `reports.target_id` has no FK on purpose (four possible tables, and the report must outlive its target). Before filing, the API (`src/modules/reports/reports.service.ts`) looks the public id up in the table `target_type` names: an active user other than the reporter, a post the reporter can see, a live comment in a visible thread by someone not blocked either way, or a trail the reporter can see. Anything else is `404` (`400 SELF_REPORT` for oneself). `audit_log` and `outbox_events` keep their own unchecked references.
 
 **Foreign keys by delete rule**
 
 | Rule | Foreign keys |
 | --- | --- |
-| **cascade** (51): the child row goes with the parent | User-owned rows (`sessions`, `auth_identities`, `auth_tokens`, `follows` ×2, `blocks` ×2, `posts`, `post_likes`, `saved_posts`, `notifications` ×2, `user_papers`, `user_fields`, `course_progress`, `question_attempts`, `paper_saves`, `reading_passes`, `research_outputs`, `trails`, `user_known_topics`, `learn_item_completions`); post children (`post_likes`, `saved_posts`, `comments`, `notifications`); paper children (`paper_cards`, `paper_edges` ×2, `paper_saves`, `reading_passes`, `trail_items`, `user_papers`, `paper_prerequisites`, `roadmap_steps`, `comments`); ordered children (`course_items` ×2, `quiz_questions` ×2, `roadmap_steps.field_id`, `trail_items.trail_id`, `paper_prerequisites.topic_id`); `comments.parent_id`, `notifications.comment_id`, `questions.topic_id`, `question_attempts.question_id`, `course_progress.course_id`, `user_fields.field_id`, `user_known_topics.topic_id`, `learn_item_completions.learn_item_id` |
+| **cascade** (54): the child row goes with the parent | User-owned rows (`sessions`, `auth_identities`, `auth_tokens`, `follows` ×2, `blocks` ×2, `posts`, `post_likes`, `saved_posts`, `notifications` ×2, `user_papers`, `user_fields`, `course_progress`, `question_attempts`, `paper_saves`, `reading_passes`, `research_outputs`, `trails`, `user_known_topics`, `learn_item_completions`); post children (`post_likes`, `saved_posts`, `comments`, `notifications`); paper children (`paper_metadata`, `paper_metrics`, `paper_sync`, `paper_cards`, `paper_edges` ×2, `paper_saves`, `reading_passes`, `trail_items`, `user_papers`, `paper_prerequisites`, `roadmap_steps`, `comments`); ordered children (`course_items` ×2, `quiz_questions` ×2, `roadmap_steps.field_id`, `trail_items.trail_id`, `paper_prerequisites.topic_id`); `comments.parent_id`, `notifications.comment_id`, `questions.topic_id`, `question_attempts.question_id`, `course_progress.course_id`, `user_fields.field_id`, `user_known_topics.topic_id`, `learn_item_completions.learn_item_id` |
 | **set null** (22): the row survives, the link is forgotten | `comments.user_id`, `media_assets.owner_id`, `reports.reporter_id`/`reviewed_by`, `audit_log.actor_id`, `created_by`/`updated_by` on papers, courses, learn items and questions, `quizzes.created_by`, `paper_cards.updated_by`, `learn_items.topic_id`, `quizzes.topic_id`, `posts.topic_id`, `trails.field_id`, `paper_prerequisites.learn_item_id`/`quiz_id`/`reel_post_id` |
 | **restrict** (3, `NO ACTION`): delete refused while referenced → `409 IN_USE` | `posts.media_id`, `learn_items.media_id` → `media_assets`; `papers.field_id` → `fields` |
 
@@ -534,9 +546,9 @@ The worker's hourly maintenance ([`src/worker/maintenance.ts`](../../apps/api/sr
 | Deleted accounts | `status = 'deleted'` hides them at once. After `ACCOUNT_PURGE_DAYS` (30): their comments are blanked into `[deleted]` placeholders, the user row is deleted (cascading), their post and avatar media rows and files are removed, and a `user.purge` audit entry is written |
 | Deleted posts | Hidden at once; after 30 days the row and its media are deleted |
 | Stored counters | Post like/comment counts and user follower/following counts recounted wherever they drifted |
-| Research order | `trend_rank` recomputed hourly (and after each ingestion round) |
+| Research order | `paper_metrics.trend_rank` recomputed hourly (and after each ingestion round) |
 | Paper metadata | Refreshed from the sources every 7 days per paper; a failed sync keeps its error and is retried after 7 days or on "sync now" |
-| Inactive likes and follows | Kept: they are what prevents re-notification. Removed with the user or post |
+| Inactive likes, follows and blocks | Kept: they are what prevents re-notification (and keep a block's first date). Removed with the user or post |
 | Reading passes, saves, outputs, trails | Kept until the user (or the paper) is deleted |
 | Abandoned uploads | `uploading` or `failed` assets older than 1 day that no post or learn item uses |
 | Sessions | Expired or revoked more than 30 days ago |
@@ -554,11 +566,12 @@ The worker's hourly maintenance ([`src/worker/maintenance.ts`](../../apps/api/sr
 | `1795305600003_sessions-public-id-and-2fa.sql` | `sessions.public_id`, `users.totp_secret` and `totp_enabled_at`, and four indexes for the feed, reels, saves and follow requests |
 | `1795305600004_toggles-and-stored-counts.sql` | Toggle rows for likes and follows, stored follow counts, the unread and suggestion indexes; drops the redundant Prototype 1 reels index |
 | `1795305600005_research-collection.sql` | Research tab Group A: the `bangla` configuration; `fields.position`; paper metadata and `search_vector` with `refresh_paper_search()`; `paper_cards` (English backfilled), `paper_saves` and `reading_passes` (backfilled from `user_papers`), `research_outputs`, `paper_edges`, `trails`, `trail_items`; prerequisite links, `posts.topic_id`, `user_known_topics`, `learn_item_completions`; trails in reports. 9 new tables |
+| `1795305600006_papers-split-and-block-toggle.sql` | Database refactoring: `blocks.is_active` and `updated_at` (toggle rows); `paper_metadata`, `paper_metrics`, `paper_sync` split off `papers` with their indexes and checks; the Prototype 2 summary columns moved into `paper_cards` (four new card columns; conflicts archived in `audit_log`); `refresh_paper_search()` reads the cards. 3 new tables |
 
 Rules:
 
 - **Never edit a migration that has been applied.** Add a new one. The project skill [`.claude/skills/doshomik-migration`](../../.claude/skills/doshomik-migration/SKILL.md) has the checklist.
-- Every migration has a working `-- Down Migration`, checked with up → down → up. The `…002` down migration loses data for Prototype 2 uploads; `…004` and `…005` down migrations drop what didn't exist before them (inactive likes and follows; trails, passes, cards, edges).
+- Every migration has a working `-- Down Migration`, checked with up → down → up. The `…002` down migration loses data for Prototype 2 uploads; `…004`, `…005` and `…006` down migrations drop what didn't exist before them (inactive likes, follows and blocks; trails, passes, cards, edges; the four new card columns, after copying the English card back into the summary columns).
 - After changing the schema, run `pnpm db:types` to regenerate `src/db/types.ts`, and update the enum lists in `packages/shared` if a CHECK changed.
 
 ## 11. Known gaps and planned changes

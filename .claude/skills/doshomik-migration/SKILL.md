@@ -15,6 +15,7 @@ description: How to change the Doshomik Bytes database schema with node-pg-migra
 | `…003_sessions-public-id-and-2fa.sql` | Additions: `sessions.public_id`, `users.totp_*`, indexes |
 | `…004_toggles-and-stored-counts.sql` | Toggle rows (`post_likes.is_active`, `follows.status = 'inactive'`), stored `users.follower_count`/`following_count`, unread and suggestion indexes, drops the redundant Prototype 1 reels index |
 | `…005_research-collection.sql` | Research tab Group A: paper metadata, `paper_cards`, `bangla` search config and `refresh_paper_search()`, `paper_saves`, `reading_passes`, `research_outputs`, `paper_edges`, `trails`, Learn before reading links, `user_known_topics`, `learn_item_completions` |
+| `…006_papers-split-and-block-toggle.sql` | `blocks.is_active`/`updated_at` (toggle rows); `paper_metadata`, `paper_metrics`, `paper_sync` (one-to-one, `paper_id` PK/FK cascade, created with each paper by `createPaperCompanions`); the old summary columns moved into `paper_cards`; `refresh_paper_search()` reads the cards. 42 tables |
 
 Never edit the Prototype v1 doc or the Prototype 2 doc.
 
@@ -28,6 +29,8 @@ Never edit the Prototype v1 doc or the Prototype 2 doc.
   - Value lists as `CHECK (col IN (...))`. Update the list in `packages/shared/src/index.ts` in the same change.
   - `created_at` and `updated_at timestamptz NOT NULL DEFAULT now()`.
   - Team content gets `status` (`draft`/`published`/`archived`), `published_at`, `created_by` and `updated_by`.
+  - Paper data goes where its kind lives: outside ids and source data in `paper_metadata`, counts and rank in `paper_metrics`, queue state in `paper_sync`, explanations in `paper_cards`. Any code that inserts a paper calls `createPaperCompanions` in the same transaction.
+  - Undoable relationships with side effects are toggle rows (`post_likes.is_active`, `follows.status`, `blocks.is_active`): reads filter on the state, which stays out of indexes.
 - **Index expressions must match the queries exactly.** Search conditions live in `src/db/search.ts`; visibility conditions in `src/db/visibility.ts`.
 - Every migration has a working `-- Down Migration`.
 
