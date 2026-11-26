@@ -10,19 +10,38 @@ The backend: a Fastify API and a background worker on PostgreSQL (39 tables, via
 Requirements:
 
 - Node.js 22+ and pnpm
-- PostgreSQL 16+ with a `dev` role: `CREATE ROLE dev LOGIN PASSWORD 'dev' CREATEDB;`
+- PostgreSQL 18 **binaries** at `E:\PostgreSQL\bin` (set `PG_BIN` if they are elsewhere). No running
+  service, role or password is needed — see below.
 - FFmpeg (`ffmpeg` and `ffprobe` on PATH)
 
 ```sh
 pnpm install                      # from the repo root
 cd apps/api
 cp .env.example .env              # then set APP_SECRET and SEED_ADMIN_PASSWORD
-createdb -U dev -h localhost doshomik
+pnpm db:up                        # start the development database (first run creates it)
 pnpm db:migrate                   # Prototype 1 schema, Prototype 2 migration, backfill, additions
 pnpm db:seed                      # first admin + starter content
 pnpm dev                          # API on http://localhost:3000
 pnpm worker                       # in a second terminal: media, notifications, email, paper ingestion, maintenance
 ```
+
+### The development database needs no password
+
+`pnpm db:up` runs **its own** PostgreSQL cluster on port **55433**, created with `trust`
+authentication: local connections are accepted without a password, so there is no role or password
+to manage. It is separate from any PostgreSQL service on the machine and never touches it. Its files
+live in `E:\Projects\doshomik-dev-data`, outside the repo so Metro does not watch them.
+
+| Script | What it does |
+| --- | --- |
+| `pnpm db:up` | Start it. Creates the cluster and both databases on the first run. Safe to re-run; needed once per reboot |
+| `pnpm db:down` | Stop it |
+| `pnpm db:status` | Running or not |
+| `pnpm db:reset` | Delete everything and start empty (then migrate and seed again) |
+
+It is real PostgreSQL, so the schema, full-text search and migrations behave as they will in
+production on the VPS or on Supabase. SQLite was considered and rejected: the schema depends on
+`tsvector` search, `pg_trgm`, JSONB and UUID types.
 
 ### Auth is off during development (`DEV_AUTH_BYPASS`)
 

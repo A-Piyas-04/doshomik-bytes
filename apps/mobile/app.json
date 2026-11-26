@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "slug": "doshomik-bytes",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "doshomikbytes",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/images/icon.png",
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0B0F",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B0B0F",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 120
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

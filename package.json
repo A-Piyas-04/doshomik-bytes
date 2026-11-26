@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm --filter @doshomik/api dev",
     "worker": "pnpm --filter @doshomik/api worker",
+    "mobile": "pnpm --filter @doshomik/mobile start",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck"
   }
