@@ -1,6 +1,12 @@
 {
   "version": 2,
   "skills": {
+    "athenyx": {
+      "source": "A-Piyas-04/athenyx-plugin",
+      "sourceType": "github",
+      "skillPath": "skills/athenyx/SKILL.md",
+      "computedHash": "85c49ac21347e6e3200cee3b783cc7f8ddc4d9f64f8fc356c4bcfad9382e95bb"
+    },
     "banner-design": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
       "commit": "a0d04109f4193a04ec6959549cd735d95ecaa90a",

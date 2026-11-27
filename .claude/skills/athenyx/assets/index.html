@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<title>Athenyx reports</title>
+<style>
+:root{--background:#fcfbf8;--foreground:#21170a;--card:#fff;--muted:#f3f0e8;--muted-foreground:#6e624f;--subtle:#9a8f7c;--border:#e7e2d6;--border-strong:#cfc7b5;--link:#806800;--primary:#e1c802;
+--sev-critical:#a5160c;--sev-high:#dc4a1f;--sev-medium:#c28f00;--sev-low:#3f6aa6;--ok:#2f7d4f;--warn:#a87400;--bad:#b42318;
+--font-display:"Bricolage Grotesque","Segoe UI Variable Display","SF Pro Display",ui-sans-serif,system-ui,sans-serif;--font-body:"Instrument Sans","Segoe UI Variable Text",ui-sans-serif,system-ui,sans-serif;--font-mono:"JetBrains Mono","Cascadia Code",ui-monospace,Consolas,monospace;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--background:#14100a;--foreground:#f2ede1;--card:#1c170f;--muted:#221c13;--muted-foreground:#a99d87;--subtle:#7a6f5c;--border:#2f2719;--border-strong:#463a26;--link:#e1c802;--sev-critical:#ff6a55;--sev-high:#ff9257;--sev-medium:#e1c802;--sev-low:#85a8de;--ok:#6bc68f;--warn:#e8b931;--bad:#ff6a55;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--background);color:var(--foreground);font:15px/1.55 var(--font-body)}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1000px;margin:0 auto;padding:36px 24px 80px}
+.brand{display:flex;align-items:center;gap:10px;font:700 17px var(--font-display)}
+h1{font:700 30px/1.15 var(--font-display);letter-spacing:-.02em;margin:28px 0 6px}
+.muted{color:var(--muted-foreground)}.mono{font-family:var(--font-mono);font-size:.88em}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}
+.stat{border:1px solid var(--border);border-radius:6px;background:var(--card);padding:12px 16px;min-width:120px}
+.stat b{display:block;font:700 24px var(--font-display)}.stat span{font-size:12px;color:var(--muted-foreground)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font:600 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-strong)}
+td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+.chip{display:inline-block;padding:1px 7px;border-radius:3px;font-size:12px;font-weight:600;border:1px solid var(--border)}
+.GO{color:var(--ok)}.CONDITIONAL_GO{color:var(--warn)}.NO_GO{color:var(--bad)}
+.sev{display:inline-block;min-width:18px;text-align:center;border-radius:3px;color:#fff;font-size:12px;font-weight:700;padding:0 4px;margin-right:3px}
+.c{background:var(--sev-critical)}.h{background:var(--sev-high)}.m{background:var(--sev-medium);color:#241600}.l{background:var(--sev-low)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><svg viewBox="0 0 28 28" width="28" height="28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="4" fill="#412201"/><rect x="6" y="7" width="16" height="3.4" rx="0.8" fill="#E1C802"/><rect x="6" y="12.3" width="11.5" height="3.4" rx="0.8" fill="#A28900"/><rect x="6" y="17.6" width="7" height="3.4" rx="0.8" fill="#806800"/></svg>Athenyx</div>
+  <h1 id="title"></h1>
+  <p class="muted">Every Athenyx review of this project, newest first. Each report is a separate file and is never overwritten.</p>
+  <div class="stats" id="stats"></div>
+  <div style="overflow-x:auto"><table><thead><tr><th>Report</th><th>Review</th><th>Commit</th><th>Findings</th><th>Verdict</th></tr></thead><tbody id="rows"></tbody></table></div>
+  <p class="muted" style="font-size:12.5px;margin-top:28px">Advisory only. Athenyx may miss defects or raise false alarms, and never runs your code.</p>
+</div>
+<script id="athenyx-data" type="application/json">__ATHENYX_DATA__</script>
+<script>
+"use strict";
+(function () {
+  const D = JSON.parse(document.getElementById("athenyx-data").textContent);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  document.getElementById("title").textContent = D.project;
+  document.title = "Athenyx · " + D.project + " · reports";
+  const stats = document.getElementById("stats");
+  const stat = (n, label) => { const s = el("div", "stat"); s.append(el("b", null, String(n)), el("span", null, label)); stats.append(s); };
+  stat((D.counts.OPEN || 0) + (D.counts.IN_PROGRESS || 0), "open findings");
+  stat(D.counts.RESOLVED || 0, "resolved");
+  stat(D.counts.ACCEPTED_RISK || 0, "accepted risks");
+  stat(D.decisions, "decisions");
+  stat(D.runs.length, "reports");
+  const rows = document.getElementById("rows");
+  for (const r of D.runs) {
+    const tr = el("tr");
+    const a = el("td");
+    if (r.exists) { const link = el("a", "mono", r.file); link.href = encodeURI(r.file); a.append(link); } else a.append(el("span", "mono muted", r.file + " (deleted)"));
+    const when = el("div", "muted"); when.style.fontSize = "12px"; when.textContent = new Date(r.at).toLocaleString(); a.append(when);
+    const review = el("td", null, r.modeLabel); if (r.text) { const t = el("div", "muted", "“" + r.text + "”"); t.style.fontSize = "12px"; review.append(t); }
+    const commit = el("td", "mono", (r.branch ? r.branch + " @ " : "") + (r.shortSha || "no git") + (r.dirty ? " +" + r.dirty : ""));
+    const counts = el("td");
+    const c = r.counts || {};
+    [["CRITICAL", "c"], ["HIGH", "h"], ["MEDIUM", "m"], ["LOW", "l"]].forEach(([k, cls]) => { if (c[k]) counts.append(el("span", "sev " + cls, String(c[k]))); });
+    if (!counts.childNodes.length) counts.append(el("span", "muted", String(r.kept || 0)));
+    const verdict = el("td"); if (r.verdict) verdict.append(el("span", "chip " + r.verdict, r.verdict.replace("_", " ")));
+    tr.append(a, review, commit, counts, verdict);
+    rows.append(tr);
+  }
+})();
+</script>
+</body>
+</html>

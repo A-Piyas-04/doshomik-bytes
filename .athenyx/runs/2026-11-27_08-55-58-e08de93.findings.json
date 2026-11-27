@@ -1,0 +1,343 @@
+{
+  "summary": "The reviewed slice of this codebase is in good shape: the API client has real timeouts, the media worker shells out with execFile plus explicit timeouts rather than a shell, the error handler never leaks stack traces, and env is validated with zod and refuses DEV_AUTH_BYPASS in production. The board's concerns are concentrated at the edges of the production story rather than in the application logic: a seed script that creates hard-coded-password accounts behind a guard weaker than the rest of the codebase uses, an outbox whose side effects are fire-and-forget after the event is already marked processed, a web upload path with no timeout, and a repository that defines test and typecheck scripts but has nothing configured to run them. Nothing found looks like a bug in normal user-facing flows.",
+  "answer": null,
+  "specialists": [
+    {
+      "persona": "algorithms",
+      "statement": "Almost every linear-scan hotspot in the plan turned out to be over a handful of UI items (field chips, roadmap steps, picked papers, three-post mosaic blocks) where a Map would be slower, not faster. The one place where input size is set by a third party rather than by the UI is the citation-edge builder in the papers worker, which nests a find over our matched papers inside a loop over a paper's references. Everything else I read chose the right structure for its real size.",
+      "noSignificantIssues": false
+    },
+    {
+      "persona": "reliability",
+      "statement": "The mobile API client is the model to copy: one AbortController, a 15 second budget that covers the body, and an ApiError with status 0 so screens can show Retry. Two paths fall short of it: the web upload uses XMLHttpRequest with no timeout at all, so a stalled PUT leaves the upload banner mid-progress forever, and the outbox marks an event processed before its side effects run, then only logs their failure. Retry loops flagged in the scan (the username search, the throttled provider) are bounded and idempotent.",
+      "noSignificantIssues": false
+    },
+    {
+      "persona": "security",
+      "statement": "I found no injection path in what I read: the media worker uses execFile with a fixed argument vector and no shell, queries go through Kysely's builder with bound parameters, and the error handler returns codes rather than internals. My one concern is the seed script, which creates accounts with a password literal in the repository and gates that on a bare NODE_ENV check that is weaker than the env validation the server itself uses. Authentication is deliberately unfinished in this project, so I could not assess ownership checks beyond the trail editor, which does check the creator.",
+      "noSignificantIssues": false
+    },
+    {
+      "persona": "code_quality",
+      "statement": "The code I read is unusually easy to follow: file-level comments state intent, the error handler and API client are single-purpose, and the large files flagged by the scan (seed data, the two i18n dictionaries) are long because they are data, not because they mix responsibilities. The only maintenance smell I can evidence is a uri-to-Blob conversion repeated in three places across the create and upload paths. No duplicated business rules.",
+      "noSignificantIssues": false
+    },
+    {
+      "persona": "devops",
+      "statement": "Configuration handling is genuinely good: a zod schema with defaults, a refusal to run DEV_AUTH_BYPASS in production, and checked-in .env.example files for both apps. What is missing is the other half of the loop. The repository defines test and typecheck scripts but has no CI configuration at all, so 32 test files and the whole typecheck gate depend on someone remembering to run them locally before a push.",
+      "noSignificantIssues": false
+    }
+  ],
+  "findings": [
+    {
+      "persona": "security",
+      "existingId": null,
+      "title": "Seed creates accounts with a repository-literal password behind a bare NODE_ENV check",
+      "evidence": [
+        {
+          "path": "apps/api/src/scripts/seed.ts",
+          "startLine": 401,
+          "endLine": 402,
+          "symbol": "DEV_USER_PASSWORD",
+          "quote": "const DEV_USERS = ['learner1', 'learner2'];\nconst DEV_USER_PASSWORD = 'devpassword';"
+        },
+        {
+          "path": "apps/api/src/scripts/seed.ts",
+          "startLine": 19,
+          "endLine": 19,
+          "symbol": "isProduction",
+          "quote": "const isProduction = process.env.NODE_ENV === 'production';"
+        },
+        {
+          "path": "apps/api/src/config/env.ts",
+          "startLine": 9,
+          "endLine": 9,
+          "symbol": "EnvSchema",
+          "quote": "  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),"
+        }
+      ],
+      "observation": "seedDevUsers inserts two accounts whose argon2 hash is derived from the string literal 'devpassword', and the only thing standing between that and a live database is `process.env.NODE_ENV === 'production'` read directly from the environment. The server's own env module treats NODE_ENV as optional and defaults it to 'development', so the codebase already assumes the variable may be unset. A seed run from a deploy shell, a container entrypoint, or a one-off `pnpm db:seed` that does not export NODE_ENV therefore takes the non-production branch.",
+      "impact": "If the variable is missing on the production host, the live database gains two confirmed accounts (email_verified_at is set) with a password published in the repository, which is enough for anyone reading the source to sign in as a real user once auth is wired up. The failure is silent: the script prints the password and exits successfully.",
+      "classification": "POTENTIAL_RISK",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "userPremise": null,
+      "options": [
+        {
+          "title": "Gate on the validated env module and require an explicit opt-in",
+          "description": "Import the same validated `env` the server uses instead of reading process.env directly, and additionally require an explicit flag (for example SEED_DEV_USERS=true) before seedDevUsers does anything. Default to doing nothing when either signal is absent.",
+          "pros": ["Fails closed when the environment is incomplete", "Uses one source of truth for configuration", "Makes dev-user creation a deliberate act"],
+          "cons": ["Local developers must set one more variable once"],
+          "effort": "SMALL"
+        },
+        {
+          "title": "Generate a random password and print it",
+          "description": "Replace the literal with a per-run random password, hash that, and print it once so the developer can copy it. Nothing reusable stays in the repository.",
+          "pros": ["No credential in version control at all", "Still convenient locally"],
+          "cons": ["The password changes every seed run, which breaks saved logins and any scripted dev sign-in"],
+          "effort": "SMALL"
+        },
+        {
+          "title": "Move dev users out of the production-capable script",
+          "description": "Split seedDevUsers into a separate script that is not part of `pnpm db:seed`, so the path that can legitimately run against production cannot create them.",
+          "pros": ["Structural separation rather than a runtime check", "Production seeding becomes strictly admin plus starter content"],
+          "cons": ["Two commands to remember when setting up a machine", "Does not by itself remove the literal password"],
+          "effort": "MEDIUM"
+        }
+      ],
+      "recommendation": {
+        "optionIndex": 0,
+        "rationale": "The defect is that the guard is weaker than the one the rest of the codebase already uses; routing it through the validated env module and an explicit opt-in fixes the actual weakness and keeps the local workflow unchanged. Combining it with option 1 later is cheap, but the guard is what matters."
+      },
+      "verification": "Run the seed against a scratch database with NODE_ENV unset and confirm no learner1/learner2 rows are created and no password is printed; run it with the explicit opt-in set and confirm both rows appear; grep the repository for 'devpassword' and confirm no literal password remains on a production-reachable path."
+    },
+    {
+      "persona": "reliability",
+      "existingId": null,
+      "title": "Outbox marks events processed before side effects run, then only logs their failure",
+      "evidence": [
+        {
+          "path": "apps/api/src/worker/outbox.ts",
+          "startLine": 216,
+          "endLine": 217,
+          "symbol": "processOutboxBatch",
+          "quote": "          .updateTable('outbox_events')\n          .set({ processed_at: new Date(), attempts: sql`attempts + 1` })"
+        },
+        {
+          "path": "apps/api/src/worker/outbox.ts",
+          "startLine": 225,
+          "endLine": 227,
+          "symbol": "processOutboxBatch",
+          "quote": "      for (const effect of effects) {\n        if (effect) await effect().catch((error: unknown) => log.warn({ err: error, eventId: event.id }, 'Side effect failed'));\n      }"
+        }
+      ],
+      "observation": "The claim transaction sets processed_at before the handler's returned effects are invoked, and the effects themselves run outside any transaction with their rejection swallowed into a log.warn. Once the transaction commits, the event will never be selected again, because processOutboxBatch only reads rows where processed_at is null. There is no record on the row that an effect failed and no path that re-runs it.",
+      "impact": "Every external side effect carried by the outbox (the pattern is normally used for email, push and similar) is at-most-once and silently lossy. A transient SMTP or push-provider failure, or a worker crash in the window between commit and the effect, drops that notification permanently; the only trace is a warn line, so nobody notices until a user reports a missing email.",
+      "classification": "DESIGN_CONCERN",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "userPremise": null,
+      "options": [
+        {
+          "title": "Claim without completing, and mark processed only after effects succeed",
+          "description": "Split the row's lifecycle: the transaction takes a lease (attempts + 1, claimed_at) and commits the database effects, then processed_at is set in a second update only once every effect resolved. A failed effect leaves processed_at null so the next batch retries it, bounded by MAX_ATTEMPTS.",
+          "pros": ["At-least-once delivery for effects, which is what the outbox pattern is for", "Reuses the existing MAX_ATTEMPTS bound", "No new infrastructure"],
+          "cons": ["Effects must be idempotent, since a retry can repeat one that already succeeded", "Needs a claimed_at column or similar to avoid two workers leasing the same row"],
+          "effort": "MEDIUM"
+        },
+        {
+          "title": "Record the failure on the row and alert on it",
+          "description": "Keep the current at-most-once flow but store the effect error on the event (last_error) and raise the log level to error so the failure is visible in monitoring, with a manual replay command for operators.",
+          "pros": ["Small change", "Makes the loss visible instead of silent"],
+          "cons": ["Still loses the notification until a human replays it", "Adds an operational chore"],
+          "effort": "SMALL"
+        }
+      ],
+      "recommendation": {
+        "optionIndex": 0,
+        "rationale": "The table, the attempts counter and the MAX_ATTEMPTS bound are already a retry mechanism; the only reason side effects do not benefit from it is the ordering of the processed_at write. Fixing the ordering turns existing machinery into real delivery guarantees, which option 1 cannot do."
+      },
+      "verification": "Add a test where a handler returns an effect that rejects once and then succeeds, run two batches, and assert the effect ran twice and processed_at is set only after the success. Separately assert that an effect rejecting MAX_ATTEMPTS times stops being retried and leaves the recorded error."
+    },
+    {
+      "persona": "reliability",
+      "existingId": null,
+      "title": "Web upload uses XMLHttpRequest with no timeout, so a stalled PUT never resolves",
+      "evidence": [
+        {
+          "path": "apps/mobile/src/lib/upload.web.ts",
+          "startLine": 16,
+          "endLine": 18,
+          "symbol": "putFile",
+          "quote": "    const xhr = new XMLHttpRequest();\n    xhr.open('PUT', slot.url);\n    for (const [name, value] of Object.entries(slot.headers)) xhr.setRequestHeader(name, value);"
+        },
+        {
+          "path": "apps/mobile/src/api/client.ts",
+          "startLine": 51,
+          "endLine": 52,
+          "symbol": "request",
+          "quote": "  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TIMEOUT_MS);"
+        }
+      ],
+      "observation": "putFile sets xhr.timeout to nothing and registers only onload and onerror. XMLHttpRequest's default timeout is 0, meaning no limit, and ontimeout and onabort are unhandled, so a connection that opens and then stalls mid-body leaves the wrapping Promise pending with no rejection path. The same app's HTTP client, two files away, deliberately bounds every request including the body.",
+      "impact": "On a flaky mobile network the web upload path can hang indefinitely: uploadMedia never reaches the complete call, so the upload banner stays on its last progress value with no error, no Retry and no way to recover other than reloading. This contradicts the banner's own failed state, which exists precisely so the user can retry.",
+      "classification": "POTENTIAL_RISK",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "userPremise": null,
+      "options": [
+        {
+          "title": "Set a stall-based timeout and handle ontimeout and onabort",
+          "description": "Give the request an xhr.timeout generous enough for large files, reject in ontimeout and onabort with the same Error shape onerror uses, and optionally reset the deadline on each progress event so a slow-but-moving upload is not killed while a stalled one is.",
+          "pros": ["Keeps the progress reporting XHR is used for", "Small, local change", "Produces the failed state the banner already renders"],
+          "cons": ["A progress-reset deadline needs a little care to get right"],
+          "effort": "SMALL"
+        },
+        {
+          "title": "Accept an AbortSignal and let the caller own cancellation",
+          "description": "Thread a signal from the upload store into putFile, call xhr.abort() on it, and have the store apply its own timeout and user-initiated cancel.",
+          "pros": ["Also gives the user a real Cancel for an in-flight upload", "Puts the policy where the retry logic already lives"],
+          "cons": ["Touches the upload store and the native upload path too, for signature symmetry"],
+          "effort": "MEDIUM"
+        }
+      ],
+      "recommendation": {
+        "optionIndex": 0,
+        "rationale": "The missing piece is purely that nothing ever rejects; a timeout plus the two unhandled handlers closes the hang with a few lines and immediately routes into the existing failed/Retry UI. Option 1 is a worthwhile follow-up for user-initiated cancel, not a prerequisite."
+      },
+      "verification": "In a web build, throttle the network to offline after the PUT starts (or point slot.url at an endpoint that accepts headers then never responds) and confirm the banner reaches its failed state with a message and a working Retry rather than sitting at a fixed percentage."
+    },
+    {
+      "persona": "devops",
+      "existingId": null,
+      "title": "No CI configuration: 32 test files and typecheck run only if someone remembers",
+      "evidence": [
+        {
+          "path": "package.json",
+          "startLine": 9,
+          "endLine": 10,
+          "symbol": "scripts",
+          "quote": "    \"test\": \"pnpm -r test\",\n    \"typecheck\": \"pnpm -r typecheck\""
+        }
+      ],
+      "observation": "The workspace root exposes recursive test and typecheck scripts, and the repository contains 32 test files, but there is no CI configuration anywhere in the repository (no .github directory, and the scan's project-level sweep found no CI config of any kind). Nothing automatically runs these scripts on a push, a branch or a tag.",
+      "impact": "For an app headed to Google Play and a VPS, the only thing preventing a broken build or a failing test from reaching a release is developer discipline. Regressions in the API's 32 test files and type errors across the workspace can be committed and deployed unnoticed, and there is no shared artifact to point at when deciding whether a commit is releasable.",
+      "classification": "DESIGN_CONCERN",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "userPremise": null,
+      "options": [
+        {
+          "title": "One GitHub Actions workflow running typecheck and tests on push and PR",
+          "description": "Add a single workflow that sets up pnpm with a lockfile-keyed cache, runs pnpm install --frozen-lockfile, then pnpm typecheck and pnpm test. Start the Postgres-dependent API tests against a service container matching the local trust-auth cluster.",
+          "pros": ["Smallest change that closes the gap", "Matches the scripts that already exist", "Gives every future PR a pass/fail signal"],
+          "cons": ["Needs a Postgres service container configured to match the test setup", "Adds minutes to each push"],
+          "effort": "SMALL"
+        },
+        {
+          "title": "A pre-push git hook as a local gate",
+          "description": "Run typecheck and tests from a pre-push hook so nothing leaves the machine broken.",
+          "pros": ["No CI provider involved", "Immediate feedback"],
+          "cons": ["Bypassable with --no-verify and not installed for new clones by default", "No shared record of what passed", "Slow pushes"],
+          "effort": "SMALL"
+        }
+      ],
+      "recommendation": {
+        "optionIndex": 0,
+        "rationale": "A production app needs a verifiable, non-bypassable signal that a commit typechecks and passes its tests, and the scripts to produce it already exist; a local hook gives none of the shared record that release decisions need. The hook is a fine addition on top, not a substitute."
+      },
+      "verification": "Open a pull request that deliberately introduces a type error and confirm the workflow fails on it; revert and confirm a green run that reports the API test count. Check the workflow actually executes the Postgres-backed tests rather than skipping them."
+    },
+    {
+      "persona": "algorithms",
+      "existingId": null,
+      "title": "Citation edge builder nests a linear find inside the reference loop",
+      "evidence": [
+        {
+          "path": "apps/api/src/worker/papers.ts",
+          "startLine": 166,
+          "endLine": 167,
+          "symbol": null,
+          "quote": "  for (const r of references) {\n    const match = ours.find((p) => (r.s2Id && p.s2_id === r.s2Id) || (r.doi && p.doi === r.doi) || (r.arxivId && p.arxiv_id === r.arxivId));"
+        },
+        {
+          "path": "apps/api/src/worker/papers.ts",
+          "startLine": 172,
+          "endLine": 173,
+          "symbol": null,
+          "quote": "  for (const work of openalexWorks) {\n    const match = ours.find((p) => p.openalex_id === work);"
+        }
+      ],
+      "observation": "Both loops rescan the whole `ours` array per iteration. Unlike the UI scans elsewhere in this codebase, neither side of this product is bounded by a screen: `references` is whatever Semantic Scholar returns for a paper (routinely hundreds, and over a thousand for a survey), and `ours` is every local paper matching any of those identifiers. I assume low hundreds on each side today, growing with the paper corpus, so roughly 10^5 to 10^6 comparisons per paper processed rather than the few dozen the other flagged scans perform.",
+      "impact": "Wasted worker CPU that scales with the square of the corpus for survey papers; at today's sizes this is tens of milliseconds, not a user-visible problem, but it is the one place in what I read where the input size is set by a third-party API rather than by a list on screen, so it will quietly get worse as the paper library grows.",
+      "classification": "DESIGN_CONCERN",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "userPremise": null,
+      "options": [
+        {
+          "title": "Index `ours` once into per-identifier Maps",
+          "description": "Before the loops, build three Maps (by s2_id, doi, arxiv_id) and one by openalex_id from `ours`, then look each reference up by whichever identifier it carries. Linear in both inputs.",
+          "pros": ["Removes the nesting entirely", "Reads more clearly than the three-way or-expression", "A few lines, no behaviour change"],
+          "cons": ["Four small maps to keep in step if an identifier is added later"],
+          "effort": "SMALL"
+        },
+        {
+          "title": "Leave as is and revisit when the corpus grows",
+          "description": "Record the complexity in a comment with the assumed input sizes and a threshold at which to index.",
+          "pros": ["No code churn now", "Honest about the real size today"],
+          "cons": ["Relies on someone noticing the threshold later"],
+          "effort": "SMALL"
+        }
+      ],
+      "recommendation": {
+        "optionIndex": 0,
+        "rationale": "The fix is a handful of lines in a function that already builds a Map for its output, so the cost of doing it now is lower than the cost of tracking a threshold. It also makes the matching rule easier to read than the chained or-expression."
+      },
+      "verification": "Keep the existing expectations for a paper whose references match on each identifier kind in turn (s2_id, doi, arxiv_id, openalex_id) and confirm the resulting paper_edges rows, including the openalex fallback that must not overwrite a semantic_scholar edge, are unchanged after the rewrite."
+    },
+    {
+      "persona": "code_quality",
+      "existingId": null,
+      "title": "uri-to-Blob conversion repeated across three files in the upload path",
+      "evidence": [
+        {
+          "path": "apps/mobile/src/features/create/CreatePostScreen.tsx",
+          "startLine": 40,
+          "endLine": 40,
+          "symbol": "sizeOf",
+          "quote": "  const blob = await (await fetch(uri)).blob();"
+        },
+        {
+          "path": "apps/mobile/src/features/create/CreatePostScreen.tsx",
+          "startLine": 106,
+          "endLine": 106,
+          "symbol": "CreatePostScreen",
+          "quote": "    if (Platform.OS === 'web' && !blob) blob = await (await fetch(uri)).blob();"
+        },
+        {
+          "path": "apps/mobile/src/lib/upload.web.ts",
+          "startLine": 14,
+          "endLine": 14,
+          "symbol": "putFile",
+          "quote": "  const body = file.file ?? (await (await fetch(file.uri)).blob());"
+        }
+      ],
+      "observation": "The same web-only idiom, turning a local uri into a Blob by fetching it, appears three times across two files: once to measure size, once to populate the picked file, and once as a fallback inside the uploader. The screen already guards one copy with a Platform.OS check while the uploader's copy is unguarded, so the three are not quite the same rule even though they exist for the same reason.",
+      "impact": "Any change to how a local uri becomes bytes (an added revokeObjectURL, a size cap before reading the blob into memory, a different source for native) has to be found in three places, and the drift between the guarded and unguarded copies means a reader cannot tell from any one of them whether the fallback is expected to run. This is maintenance friction rather than a defect.",
+      "classification": "DESIGN_CONCERN",
+      "severity": "LOW",
+      "confidence": "MEDIUM",
+      "userPremise": null,
+      "options": [
+        {
+          "title": "One blobFromUri helper next to the upload code",
+          "description": "Export a single helper (platform-aware, in the lib/upload module family) that returns the Blob for a uri, and call it from sizeOf, the picker and putFile.",
+          "pros": ["One place to change the rule", "Makes the platform guard explicit and uniform", "Small and mechanical"],
+          "cons": ["One more exported function in the upload surface"],
+          "effort": "SMALL"
+        },
+        {
+          "title": "Have the picker always produce the Blob, so the uploader needs no fallback",
+          "description": "Make PickedFile.file non-optional on web at the point of picking, and drop the fallback in putFile.",
+          "pros": ["Removes a branch entirely rather than extracting it", "Makes the invariant a type, not a runtime check"],
+          "cons": ["Requires confidence that no other caller constructs a PickedFile without a Blob on web", "A slightly larger change to the picking flow"],
+          "effort": "MEDIUM"
+        }
+      ],
+      "recommendation": {
+        "optionIndex": 0,
+        "rationale": "Extracting the helper is the change that cannot break anything and still collapses the three copies to one; tightening the type is the better end state but needs a survey of PickedFile construction sites I did not read."
+      },
+      "verification": "After extracting, pick an oversized image, an image needing re-encoding and a video on a web build and confirm size checks, preview and upload all still work; confirm the native build's upload path is untouched."
+    }
+  ],
+  "limitations": [
+    "I read only the 38 ranges in the scan's reading plan, about 2200 lines of a 568-file repository, so most of the API's route handlers, services and migrations were never opened.",
+    "Authentication and authorization are deliberately unfinished in this project (the mobile client documents DEV_AUTH_BYPASS and an x-dev-user header), so I could not meaningfully review ownership checks; the only one in my ranges was the trail editor's creator check, which is correct.",
+    "I did not run anything: no tests, no typecheck, no seed, no worker. Every claim about runtime behaviour is inferred from the quoted code.",
+    "For the outbox finding I read only lines 200-240, so I did not see the handler implementations and cannot say which concrete side effects (email, push, something else) are at risk, only that the ordering makes any of them at-most-once.",
+    "The scan's hotspot list included several vendored files under .claude/skills (a Python design-system toolkit, the Athenyx scripts themselves). I read a few to discharge the security flags and found nothing attacker-reachable, but I treated them as tooling rather than product code and did not review them in depth.",
+    "No CI exists, so there is no build or test history to tell me whether the test suite currently passes."
+  ]
+}

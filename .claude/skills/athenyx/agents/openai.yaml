@@ -1,0 +1,6 @@
+interface:
+  display_name: "Athenyx"
+  short_description: "Evidence-checked engineering review board with an HTML report"
+
+policy:
+  allow_implicit_invocation: false

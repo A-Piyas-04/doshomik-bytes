@@ -1,0 +1,1751 @@
+{
+  "version": 1,
+  "runId": "2026-11-27_08-55-58-e08de93",
+  "createdAt": "2026-11-27T02:55:58.566Z",
+  "cli": "1.0.0",
+  "root": "E:/Projects/money/doshomik-bytes",
+  "project": "doshomik-bytes",
+  "mode": "health",
+  "modeLabel": "Project Health",
+  "text": "",
+  "depth": "standard",
+  "all": false,
+  "git": {
+    "isRepo": true,
+    "branch": "test-athenyx-plugin",
+    "sha": "e08de938e341bc245a46bd727d916743cb4dbcf8",
+    "shortSha": "e08de93",
+    "dirty": 22,
+    "base": null
+  },
+  "seated": [
+    {
+      "key": "algorithms",
+      "reason": "84 hotspot points"
+    },
+    {
+      "key": "reliability",
+      "reason": "64 hotspot points"
+    },
+    {
+      "key": "security",
+      "reason": "29 hotspot points, Project Health default seat"
+    },
+    {
+      "key": "code_quality",
+      "reason": "21 hotspot points, large codebase"
+    },
+    {
+      "key": "devops",
+      "reason": "12 hotspot points"
+    }
+  ],
+  "plan": [
+    {
+      "path": "apps/api/src/scripts/seed.ts",
+      "ranges": [
+        [
+          1,
+          21
+        ],
+        [
+          390,
+          422
+        ]
+      ],
+      "lines": 54,
+      "total": 438,
+      "reasons": [
+        "Security: Hard-coded credential (L402)",
+        "Code quality: Large module (438 lines) (L1)"
+      ]
+    },
+    {
+      "path": ".claude/skills/athenyx/scripts/lib/render.mjs",
+      "ranges": [
+        [
+          1,
+          64
+        ]
+      ],
+      "lines": 64,
+      "total": 64,
+      "reasons": [
+        "Security: Shell command execution (L2)",
+        "Security: Hard-coded credential (L9)",
+        "DevOps: ATHENYX_NO_OPEN is read here but missing from .env.example (L50)"
+      ]
+    },
+    {
+      "path": ".claude/skills/ui-ux-pro-max/scripts/design_system.py",
+      "ranges": [
+        [
+          1,
+          21
+        ],
+        [
+          663,
+          695
+        ],
+        [
+          970,
+          1002
+        ]
+      ],
+      "lines": 87,
+      "total": 1921,
+      "reasons": [
+        "Security: Hard-coded credential (L982)",
+        "Code quality: Large module (1921 lines) (L1)",
+        "DevOps: COLORTERM is read here but missing from .env.example (L675)"
+      ]
+    },
+    {
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "ranges": [
+        [
+          11,
+          151
+        ]
+      ],
+      "lines": 141,
+      "total": 231,
+      "reasons": [
+        "Security: Raw HTML injection point (L23)",
+        "Security: SQL built from interpolated input (L26)",
+        "Security: Signature or TLS verification disabled (L30)",
+        "Reliability: Retry loop — is the retried call idempotent? (L39)",
+        "Reliability: Unbounded loop or timer (L43)",
+        "DevOps: Schema changes applied at startup (L53)"
+      ]
+    },
+    {
+      "path": ".claude/skills/ui-ux-pro-max/scripts/validate_data.py",
+      "ranges": [
+        [
+          1,
+          21
+        ]
+      ],
+      "lines": 21,
+      "total": 1104,
+      "reasons": [
+        "Code quality: Large module (1104 lines) (L1)"
+      ]
+    },
+    {
+      "path": "apps/api/src/scripts/seed-data.ts",
+      "ranges": [
+        [
+          1,
+          21
+        ]
+      ],
+      "lines": 21,
+      "total": 914,
+      "reasons": [
+        "Code quality: Large module (914 lines) (L1)"
+      ]
+    },
+    {
+      "path": "apps/api/src/worker/media.ts",
+      "ranges": [
+        [
+          1,
+          21
+        ]
+      ],
+      "lines": 21,
+      "total": 231,
+      "reasons": [
+        "Security: Shell command execution (L1)"
+      ]
+    },
+    {
+      "path": "apps/api/src/modules/auth/auth.service.ts",
+      "ranges": [
+        [
+          326,
+          348
+        ]
+      ],
+      "lines": 23,
+      "total": 348,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L338)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/i18n/bn.ts",
+      "ranges": [
+        [
+          1,
+          26
+        ]
+      ],
+      "lines": 26,
+      "total": 503,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L6)",
+        "Code quality: Large module (503 lines) (L1)"
+      ]
+    },
+    {
+      "path": ".api-guide/run.mjs",
+      "ranges": [
+        [
+          1,
+          27
+        ]
+      ],
+      "lines": 27,
+      "total": 27,
+      "reasons": [
+        "Security: Shell command execution (L3)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/i18n/en.ts",
+      "ranges": [
+        [
+          1,
+          27
+        ]
+      ],
+      "lines": 27,
+      "total": 507,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L7)",
+        "Code quality: Large module (507 lines) (L1)"
+      ]
+    },
+    {
+      "path": "apps/api/src/worker/outbox.ts",
+      "ranges": [
+        [
+          205,
+          235
+        ]
+      ],
+      "lines": 31,
+      "total": 235,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L217)",
+        "Reliability: Retry loop — is the retried call idempotent? (L230)"
+      ]
+    },
+    {
+      "path": ".claude/skills/ui-ux-pro-max/scripts/search.py",
+      "ranges": [
+        [
+          83,
+          115
+        ]
+      ],
+      "lines": 33,
+      "total": 258,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L95)"
+      ]
+    },
+    {
+      "path": "apps/api/src/modules/trails/trails.service.ts",
+      "ranges": [
+        [
+          89,
+          121
+        ]
+      ],
+      "lines": 33,
+      "total": 201,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L101)"
+      ]
+    },
+    {
+      "path": "apps/api/src/providers/scholarly.ts",
+      "ranges": [
+        [
+          98,
+          130
+        ]
+      ],
+      "lines": 33,
+      "total": 209,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L110)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/features/fields.tsx",
+      "ranges": [
+        [
+          123,
+          155
+        ]
+      ],
+      "lines": 33,
+      "total": 173,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L135)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/features/learn/PracticeScreens.tsx",
+      "ranges": [
+        [
+          59,
+          91
+        ]
+      ],
+      "lines": 33,
+      "total": 330,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L71)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/features/research/TrailEditorScreen.tsx",
+      "ranges": [
+        [
+          294,
+          326
+        ]
+      ],
+      "lines": 33,
+      "total": 360,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L306)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/lib/upload.web.ts",
+      "ranges": [
+        [
+          1,
+          36
+        ]
+      ],
+      "lines": 36,
+      "total": 36,
+      "reasons": [
+        "Reliability: Network call without a timeout (L14)"
+      ]
+    },
+    {
+      "path": "apps/api/src/worker/papers.ts",
+      "ranges": [
+        [
+          155,
+          193
+        ]
+      ],
+      "lines": 39,
+      "total": 279,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L167)",
+        "Algorithms: Linear lookup inside a loop (L173)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/features/explore/ExploreScreen.tsx",
+      "ranges": [
+        [
+          1,
+          21
+        ],
+        [
+          159,
+          192
+        ]
+      ],
+      "lines": 55,
+      "total": 553,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L171)",
+        "Algorithms: Linear lookup inside a loop (L172)",
+        "Code quality: Large module (553 lines) (L1)"
+      ]
+    },
+    {
+      "path": ".claude/skills/athenyx/scripts/lib/files.mjs",
+      "ranges": [
+        [
+          1,
+          23
+        ],
+        [
+          137,
+          169
+        ]
+      ],
+      "lines": 56,
+      "total": 183,
+      "reasons": [
+        "Security: Shell command execution (L3)",
+        "Algorithms: Sort inside a loop (L149)"
+      ]
+    },
+    {
+      "path": "apps/api/src/lib/totp.ts",
+      "ranges": [
+        [
+          1,
+          56
+        ]
+      ],
+      "lines": 56,
+      "total": 56,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L48)"
+      ]
+    },
+    {
+      "path": "apps/api/src/lib/error-handler.ts",
+      "ranges": [
+        [
+          1,
+          59
+        ]
+      ],
+      "lines": 59,
+      "total": 59,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L29)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/features/create/UploadBanner.tsx",
+      "ranges": [
+        [
+          1,
+          62
+        ]
+      ],
+      "lines": 62,
+      "total": 62,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L17)",
+        "Reliability: Retry loop — is the retried call idempotent? (L49)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/ui/States.tsx",
+      "ranges": [
+        [
+          1,
+          62
+        ]
+      ],
+      "lines": 62,
+      "total": 62,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L40)",
+        "Reliability: Retry loop — is the retried call idempotent? (L53)"
+      ]
+    },
+    {
+      "path": ".claude/skills/athenyx/scripts/lib/ledger.mjs",
+      "ranges": [
+        [
+          126,
+          189
+        ]
+      ],
+      "lines": 64,
+      "total": 234,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L138)",
+        "Algorithms: Linear lookup inside a loop (L169)"
+      ]
+    },
+    {
+      "path": ".claude/skills/athenyx/scripts/lib/map.mjs",
+      "ranges": [
+        [
+          115,
+          161
+        ],
+        [
+          174,
+          191
+        ]
+      ],
+      "lines": 65,
+      "total": 191,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L127)",
+        "Algorithms: Linear lookup inside a loop (L128)",
+        "Algorithms: Linear lookup inside a loop (L129)",
+        "Algorithms: Sort inside a loop (L141)",
+        "Algorithms: Sort inside a loop (L186)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/features/create/CreatePostScreen.tsx",
+      "ranges": [
+        [
+          28,
+          60
+        ],
+        [
+          94,
+          126
+        ]
+      ],
+      "lines": 66,
+      "total": 222,
+      "reasons": [
+        "Reliability: Network call without a timeout (L40)",
+        "Reliability: Network call without a timeout (L106)"
+      ]
+    },
+    {
+      "path": ".claude/skills/athenyx/scripts/lib/arbiter.mjs",
+      "ranges": [
+        [
+          16,
+          54
+        ],
+        [
+          125,
+          157
+        ]
+      ],
+      "lines": 72,
+      "total": 290,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L28)",
+        "Algorithms: Linear lookup inside a loop (L34)",
+        "Algorithms: Linear lookup inside a loop (L137)"
+      ]
+    },
+    {
+      "path": ".claude/skills/ui-ux-pro-max/scripts/core.py",
+      "ranges": [
+        [
+          1,
+          21
+        ],
+        [
+          548,
+          600
+        ]
+      ],
+      "lines": 74,
+      "total": 1112,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L560)",
+        "Reliability: Retry loop — is the retried call idempotent? (L580)",
+        "Code quality: Large module (1112 lines) (L1)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/features/reels/ReelsScreens.tsx",
+      "ranges": [
+        [
+          1,
+          87
+        ]
+      ],
+      "lines": 87,
+      "total": 87,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L45)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/features/research/RoadmapsScreen.tsx",
+      "ranges": [
+        [
+          1,
+          89
+        ]
+      ],
+      "lines": 89,
+      "total": 89,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L40)"
+      ]
+    },
+    {
+      "path": ".claude/skills/athenyx/scripts/lib/install.mjs",
+      "ranges": [
+        [
+          1,
+          95
+        ]
+      ],
+      "lines": 95,
+      "total": 95,
+      "reasons": [
+        "Algorithms: Linear lookup inside a loop (L88)"
+      ]
+    },
+    {
+      "path": ".claude/skills/athenyx/scripts/lib/personas.mjs",
+      "ranges": [
+        [
+          33,
+          66
+        ],
+        [
+          77,
+          142
+        ]
+      ],
+      "lines": 100,
+      "total": 210,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L45)",
+        "Reliability: Retry loop — is the retried call idempotent? (L46)",
+        "Reliability: Retry loop — is the retried call idempotent? (L89)",
+        "Algorithms: Linear lookup inside a loop (L122)"
+      ]
+    },
+    {
+      "path": "apps/mobile/src/api/client.ts",
+      "ranges": [
+        [
+          1,
+          101
+        ]
+      ],
+      "lines": 101,
+      "total": 101,
+      "reasons": [
+        "Reliability: Retry loop — is the retried call idempotent? (L84)"
+      ]
+    },
+    {
+      "path": ".claude/skills/athenyx/scripts/lib/git.mjs",
+      "ranges": [
+        [
+          1,
+          102
+        ]
+      ],
+      "lines": 102,
+      "total": 102,
+      "reasons": [
+        "Security: Shell command execution (L2)",
+        "Algorithms: Linear lookup inside a loop (L75)",
+        "Algorithms: Linear lookup inside a loop (L76)"
+      ]
+    },
+    {
+      "path": ".claude/skills/eas-workflows/scripts/fetch.js",
+      "ranges": [
+        [
+          1,
+          110
+        ]
+      ],
+      "lines": 110,
+      "total": 110,
+      "reasons": [
+        "Reliability: Network call without a timeout (L22)"
+      ]
+    }
+  ],
+  "plannedLines": 2191,
+  "budget": 2200,
+  "map": {
+    "fileCount": 568,
+    "languages": {
+      "JavaScript": 20,
+      "TypeScript": 221,
+      "HTML": 3,
+      "Shell": 8,
+      "Python": 27,
+      "SQL": 8
+    },
+    "stack": [
+      "expo",
+      "fastify",
+      "postgres",
+      "react",
+      "react-native",
+      "typescript",
+      "vitest",
+      "zod"
+    ],
+    "testFiles": 32,
+    "ciFiles": [],
+    "configFiles": 6,
+    "entryPoints": 0,
+    "usesAI": false,
+    "primarySupported": true
+  },
+  "hasTests": true,
+  "hasCiConfig": false,
+  "excluded": {
+    "too_large": 6,
+    "ignored": 22
+  },
+  "hotspots": [
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".api-guide/extract.mts",
+      "line": 167,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".api-guide/extract.mts",
+      "line": 432,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".api-guide/extract.mts",
+      "line": 445,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".api-guide/extract.mts",
+      "line": 600,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".api-guide/extract.mts",
+      "line": 603,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".api-guide/extract.mts",
+      "line": 604,
+      "weight": 1
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (1029 lines)",
+      "path": ".api-guide/extract.mts",
+      "line": 1,
+      "weight": 2
+    },
+    {
+      "persona": "security",
+      "rule": "exec",
+      "label": "Shell command execution",
+      "path": ".api-guide/run.mjs",
+      "line": 3,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/athenyx.mjs",
+      "line": 105,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".claude/skills/athenyx/scripts/athenyx.mjs",
+      "line": 118,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/athenyx.mjs",
+      "line": 128,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/athenyx.mjs",
+      "line": 130,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".claude/skills/athenyx/scripts/athenyx.mjs",
+      "line": 167,
+      "weight": 1
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (639 lines)",
+      "path": ".claude/skills/athenyx/scripts/athenyx.mjs",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/arbiter.mjs",
+      "line": 28,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/arbiter.mjs",
+      "line": 34,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/arbiter.mjs",
+      "line": 137,
+      "weight": 2
+    },
+    {
+      "persona": "security",
+      "rule": "exec",
+      "label": "Shell command execution",
+      "path": ".claude/skills/athenyx/scripts/lib/files.mjs",
+      "line": 3,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/files.mjs",
+      "line": 149,
+      "weight": 1
+    },
+    {
+      "persona": "security",
+      "rule": "exec",
+      "label": "Shell command execution",
+      "path": ".claude/skills/athenyx/scripts/lib/git.mjs",
+      "line": 2,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/git.mjs",
+      "line": 75,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/git.mjs",
+      "line": 76,
+      "weight": 2
+    },
+    {
+      "persona": "security",
+      "rule": "raw-html",
+      "label": "Raw HTML injection point",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 23,
+      "weight": 2
+    },
+    {
+      "persona": "security",
+      "rule": "sql-interp",
+      "label": "SQL built from interpolated input",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 26,
+      "weight": 3
+    },
+    {
+      "persona": "security",
+      "rule": "tls-off",
+      "label": "Signature or TLS verification disabled",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 30,
+      "weight": 3
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 39,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "unbounded-loop",
+      "label": "Unbounded loop or timer",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 43,
+      "weight": 1
+    },
+    {
+      "persona": "quality",
+      "rule": "todo",
+      "label": "Unfinished-work marker",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 45,
+      "weight": 1
+    },
+    {
+      "persona": "product_ux",
+      "rule": "img-no-alt",
+      "label": "Image without alt text",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 48,
+      "weight": 1
+    },
+    {
+      "persona": "devops",
+      "rule": "migrate-at-startup",
+      "label": "Schema changes applied at startup",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 53,
+      "weight": 2
+    },
+    {
+      "persona": "ai_ml",
+      "rule": "model-call",
+      "label": "Model call",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 59,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 90,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 130,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": ".claude/skills/athenyx/scripts/lib/hotspots.mjs",
+      "line": 131,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/install.mjs",
+      "line": 88,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/ledger.mjs",
+      "line": 138,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/ledger.mjs",
+      "line": 169,
+      "weight": 2
+    },
+    {
+      "persona": "ai_ml",
+      "rule": "model-output-parse",
+      "label": "Model output parsed without validation",
+      "path": ".claude/skills/athenyx/scripts/lib/map.mjs",
+      "line": 72,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/map.mjs",
+      "line": 127,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/map.mjs",
+      "line": 128,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/map.mjs",
+      "line": 129,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/map.mjs",
+      "line": 141,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/map.mjs",
+      "line": 186,
+      "weight": 1
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": ".claude/skills/athenyx/scripts/lib/personas.mjs",
+      "line": 45,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": ".claude/skills/athenyx/scripts/lib/personas.mjs",
+      "line": 46,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": ".claude/skills/athenyx/scripts/lib/personas.mjs",
+      "line": 89,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/personas.mjs",
+      "line": 122,
+      "weight": 2
+    },
+    {
+      "persona": "data_integrity",
+      "rule": "rmw-counter",
+      "label": "Read-modify-write on a shared counter",
+      "path": ".claude/skills/athenyx/scripts/lib/redact.mjs",
+      "line": 33,
+      "weight": 2
+    },
+    {
+      "persona": "security",
+      "rule": "exec",
+      "label": "Shell command execution",
+      "path": ".claude/skills/athenyx/scripts/lib/render.mjs",
+      "line": 2,
+      "weight": 2
+    },
+    {
+      "persona": "security",
+      "rule": "hardcoded-secret",
+      "label": "Hard-coded credential",
+      "path": ".claude/skills/athenyx/scripts/lib/render.mjs",
+      "line": 9,
+      "weight": 3
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/route.mjs",
+      "line": 32,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/route.mjs",
+      "line": 47,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/route.mjs",
+      "line": 48,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/route.mjs",
+      "line": 168,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/route.mjs",
+      "line": 193,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/route.mjs",
+      "line": 216,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/util.mjs",
+      "line": 59,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": ".claude/skills/athenyx/scripts/lib/util.mjs",
+      "line": 103,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "net-no-timeout",
+      "label": "Network call without a timeout",
+      "path": ".claude/skills/eas-workflows/scripts/fetch.js",
+      "line": 22,
+      "weight": 2
+    },
+    {
+      "persona": "product_ux",
+      "rule": "img-no-alt",
+      "label": "Image without alt text",
+      "path": ".claude/skills/expo-skill-eval/scripts/generate_viewer.py",
+      "line": 136,
+      "weight": 1
+    },
+    {
+      "persona": "product_ux",
+      "rule": "img-no-alt",
+      "label": "Image without alt text",
+      "path": ".claude/skills/expo-skill-eval/scripts/generate_viewer.py",
+      "line": 203,
+      "weight": 1
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (451 lines)",
+      "path": ".claude/skills/expo-skill-eval/scripts/generate_viewer.py",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "reliability",
+      "rule": "swallowed-error",
+      "label": "Error swallowed silently",
+      "path": ".claude/skills/expo-ui/scripts/list-components.js",
+      "line": 38,
+      "weight": 1
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": ".claude/skills/ui-ux-pro-max/scripts/core.py",
+      "line": 560,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": ".claude/skills/ui-ux-pro-max/scripts/core.py",
+      "line": 580,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (1112 lines)",
+      "path": ".claude/skills/ui-ux-pro-max/scripts/core.py",
+      "line": 1,
+      "weight": 2
+    },
+    {
+      "persona": "security",
+      "rule": "hardcoded-secret",
+      "label": "Hard-coded credential",
+      "path": ".claude/skills/ui-ux-pro-max/scripts/design_system.py",
+      "line": 982,
+      "weight": 3
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (1921 lines)",
+      "path": ".claude/skills/ui-ux-pro-max/scripts/design_system.py",
+      "line": 1,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (558 lines)",
+      "path": ".claude/skills/ui-ux-pro-max/scripts/preview.py",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": ".claude/skills/ui-ux-pro-max/scripts/search.py",
+      "line": 95,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (1104 lines)",
+      "path": ".claude/skills/ui-ux-pro-max/scripts/validate_data.py",
+      "line": 1,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (527 lines)",
+      "path": "apps/api/src/db/types.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/api/src/lib/error-handler.ts",
+      "line": 29,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/api/src/lib/totp.ts",
+      "line": 48,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (545 lines)",
+      "path": "apps/api/src/modules/admin/research.routes.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/api/src/modules/auth/auth.service.ts",
+      "line": 338,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (551 lines)",
+      "path": "apps/api/src/modules/research/research.service.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/api/src/modules/trails/trails.service.ts",
+      "line": 101,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/api/src/providers/scholarly.ts",
+      "line": 110,
+      "weight": 2
+    },
+    {
+      "persona": "security",
+      "rule": "exec",
+      "label": "Shell command execution",
+      "path": "apps/api/src/scripts/local-db.ts",
+      "line": 17,
+      "weight": 2
+    },
+    {
+      "persona": "devops",
+      "rule": "log-secret",
+      "label": "Sensitive value may be logged",
+      "path": "apps/api/src/scripts/local-db.ts",
+      "line": 60,
+      "weight": 2
+    },
+    {
+      "persona": "devops",
+      "rule": "log-secret",
+      "label": "Sensitive value may be logged",
+      "path": "apps/api/src/scripts/local-db.ts",
+      "line": 104,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (914 lines)",
+      "path": "apps/api/src/scripts/seed-data.ts",
+      "line": 1,
+      "weight": 2
+    },
+    {
+      "persona": "security",
+      "rule": "hardcoded-secret",
+      "label": "Hard-coded credential",
+      "path": "apps/api/src/scripts/seed.ts",
+      "line": 402,
+      "weight": 3
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (438 lines)",
+      "path": "apps/api/src/scripts/seed.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "security",
+      "rule": "exec",
+      "label": "Shell command execution",
+      "path": "apps/api/src/worker/media.ts",
+      "line": 1,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/api/src/worker/outbox.ts",
+      "line": 217,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/api/src/worker/outbox.ts",
+      "line": 230,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/api/src/worker/papers.ts",
+      "line": 167,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/api/src/worker/papers.ts",
+      "line": 173,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/api/client.ts",
+      "line": 84,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/api/query.ts",
+      "line": 12,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/api/query.ts",
+      "line": 19,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/api/query.ts",
+      "line": 25,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (408 lines)",
+      "path": "apps/mobile/src/api/types.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "reliability",
+      "rule": "net-no-timeout",
+      "label": "Network call without a timeout",
+      "path": "apps/mobile/src/features/create/CreatePostScreen.tsx",
+      "line": 40,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "net-no-timeout",
+      "label": "Network call without a timeout",
+      "path": "apps/mobile/src/features/create/CreatePostScreen.tsx",
+      "line": 106,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/features/create/UploadBanner.tsx",
+      "line": 17,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/features/create/UploadBanner.tsx",
+      "line": 49,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/features/create/uploads.ts",
+      "line": 19,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/features/create/uploads.ts",
+      "line": 21,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/features/create/uploads.ts",
+      "line": 24,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/mobile/src/features/explore/ExploreScreen.tsx",
+      "line": 171,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/mobile/src/features/explore/ExploreScreen.tsx",
+      "line": 172,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (553 lines)",
+      "path": "apps/mobile/src/features/explore/ExploreScreen.tsx",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/mobile/src/features/fields.tsx",
+      "line": 135,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "sort-in-loop",
+      "label": "Sort inside a loop",
+      "path": "apps/mobile/src/features/learn/LearnHome.tsx",
+      "line": 50,
+      "weight": 1
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/mobile/src/features/learn/PracticeScreens.tsx",
+      "line": 71,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "net-no-timeout",
+      "label": "Network call without a timeout",
+      "path": "apps/mobile/src/features/profile/EditProfileScreen.tsx",
+      "line": 55,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/features/reels/ReelsScreens.tsx",
+      "line": 45,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/mobile/src/features/research/RoadmapsScreen.tsx",
+      "line": 40,
+      "weight": 2
+    },
+    {
+      "persona": "algorithms",
+      "rule": "lookup-in-loop",
+      "label": "Linear lookup inside a loop",
+      "path": "apps/mobile/src/features/research/TrailEditorScreen.tsx",
+      "line": 306,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/i18n/bn.ts",
+      "line": 6,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (503 lines)",
+      "path": "apps/mobile/src/i18n/bn.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/i18n/en.ts",
+      "line": 7,
+      "weight": 2
+    },
+    {
+      "persona": "code_quality",
+      "rule": "large-file",
+      "label": "Large module (507 lines)",
+      "path": "apps/mobile/src/i18n/en.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "reliability",
+      "rule": "net-no-timeout",
+      "label": "Network call without a timeout",
+      "path": "apps/mobile/src/lib/upload.web.ts",
+      "line": 14,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/ui/States.tsx",
+      "line": 40,
+      "weight": 2
+    },
+    {
+      "persona": "reliability",
+      "rule": "retry",
+      "label": "Retry loop — is the retried call idempotent?",
+      "path": "apps/mobile/src/ui/States.tsx",
+      "line": 53,
+      "weight": 2
+    },
+    {
+      "persona": "devops",
+      "rule": "env-undocumented",
+      "label": "ATHENYX_NO_OPEN is read here but missing from .env.example",
+      "path": ".claude/skills/athenyx/scripts/lib/render.mjs",
+      "line": 50,
+      "weight": 1
+    },
+    {
+      "persona": "devops",
+      "rule": "env-undocumented",
+      "label": "COLORTERM is read here but missing from .env.example",
+      "path": ".claude/skills/ui-ux-pro-max/scripts/design_system.py",
+      "line": 675,
+      "weight": 1
+    },
+    {
+      "persona": "devops",
+      "rule": "env-undocumented",
+      "label": "PG_BIN is read here but missing from .env.example",
+      "path": "apps/api/src/scripts/local-db.ts",
+      "line": 25,
+      "weight": 1
+    },
+    {
+      "persona": "devops",
+      "rule": "env-undocumented",
+      "label": "LOCAL_PG_DATA is read here but missing from .env.example",
+      "path": "apps/api/src/scripts/local-db.ts",
+      "line": 30,
+      "weight": 1
+    },
+    {
+      "persona": "devops",
+      "rule": "env-undocumented",
+      "label": "LOCAL_PG_PORT is read here but missing from .env.example",
+      "path": "apps/api/src/scripts/local-db.ts",
+      "line": 31,
+      "weight": 1
+    },
+    {
+      "persona": "devops",
+      "rule": "no-ci",
+      "label": "No CI configuration found",
+      "path": null,
+      "line": null,
+      "weight": 1
+    },
+    {
+      "persona": "quality",
+      "rule": "untested",
+      "label": "No test file covers this module",
+      "path": "apps/api/src/lib/audit.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "quality",
+      "rule": "untested",
+      "label": "No test file covers this module",
+      "path": "apps/api/src/lib/crypto.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "quality",
+      "rule": "untested",
+      "label": "No test file covers this module",
+      "path": "apps/api/src/lib/error-handler.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "quality",
+      "rule": "untested",
+      "label": "No test file covers this module",
+      "path": "apps/api/src/lib/errors.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "quality",
+      "rule": "untested",
+      "label": "No test file covers this module",
+      "path": "apps/api/src/lib/outbox.ts",
+      "line": 1,
+      "weight": 1
+    },
+    {
+      "persona": "quality",
+      "rule": "untested",
+      "label": "No test file covers this module",
+      "path": "apps/api/src/lib/pagination.ts",
+      "line": 1,
+      "weight": 1
+    }
+  ],
+  "projectSignals": [
+    {
+      "persona": "devops",
+      "label": "No CI configuration found"
+    }
+  ],
+  "changes": null,
+  "recheck": [],
+  "priorIds": [],
+  "limitations": [
+    "18 more candidate files did not fit the standard reading budget (use --depth deep).",
+    "Includes 22 uncommitted changes: the review covers HEAD e08de93 plus your working tree."
+  ],
+  "builds": 0,
+  "builtFile": "athenyx-health-2026-11-27_09-00-48-e08de93.html"
+}

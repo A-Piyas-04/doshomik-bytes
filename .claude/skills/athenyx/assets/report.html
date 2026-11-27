@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;">
+<title>Athenyx report</title>
+<style>
+:root{
+  --radius:4px;
+  --background:#fcfbf8;--foreground:#21170a;--card:#ffffff;--muted:#f3f0e8;--muted-foreground:#6e624f;--subtle:#9a8f7c;
+  --secondary:#f2efe6;--accent:#f6eebb;--accent-foreground:#4a3600;--border:#e7e2d6;--border-strong:#cfc7b5;--link:#806800;
+  --primary:#e1c802;--primary-foreground:#241600;--ring:#a28900;
+  --sev-critical:#a5160c;--sev-high:#dc4a1f;--sev-medium:#c28f00;--sev-low:#3f6aa6;--sev-info:#8f8778;
+  --ok:#2f7d4f;--warn:#a87400;--bad:#b42318;
+  --gold-500:#e1c802;--gold-700:#a28900;--gold-800:#806800;--umber-800:#614501;--umber-900:#412201;
+  --font-display:"Bricolage Grotesque","Segoe UI Variable Display","SF Pro Display",ui-sans-serif,system-ui,sans-serif;
+  --font-body:"Instrument Sans","Segoe UI Variable Text","SF Pro Text",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"JetBrains Mono","Cascadia Code",ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;
+  color-scheme:light;
+}
+.dark{
+  --background:#14100a;--foreground:#f2ede1;--card:#1c170f;--muted:#221c13;--muted-foreground:#a99d87;--subtle:#7a6f5c;
+  --secondary:#261f14;--accent:#2e2711;--accent-foreground:#f0dc5a;--border:#2f2719;--border-strong:#463a26;--link:#e1c802;
+  --primary:#e1c802;--primary-foreground:#1a1203;--ring:#e1c802;
+  --sev-critical:#ff6a55;--sev-high:#ff9257;--sev-medium:#e1c802;--sev-low:#85a8de;--sev-info:#8c8371;
+  --ok:#6bc68f;--warn:#e8b931;--bad:#ff6a55;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--background);color:var(--foreground)}
+body{font:15px/1.55 var(--font-body);-webkit-font-smoothing:antialiased}
+a{color:var(--link);text-decoration:none;text-underline-offset:3px}
+a:hover{text-decoration:underline}
+button{font:inherit;color:inherit}
+code,pre,.mono{font-family:var(--font-mono);font-size:.86em;font-feature-settings:"liga" 0}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+header.top{border-bottom:1px solid var(--border);background:var(--background);position:sticky;top:0;z-index:20}
+.top-row{display:flex;align-items:center;justify-content:space-between;gap:16px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;font:700 17px var(--font-display);letter-spacing:-.01em}
+.brand .proj{font-weight:500;color:var(--muted-foreground);font-family:var(--font-body);font-size:14px}
+.fresh{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;color:var(--muted-foreground);padding:0 0 10px}
+.fresh b{color:var(--foreground);font-weight:600}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs a{display:flex;align-items:baseline;gap:7px;padding:10px 12px 11px;color:var(--muted-foreground);font-weight:500;font-size:14px;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs a .n{font:500 11px var(--font-mono);color:var(--subtle)}
+.tabs a:hover{color:var(--foreground);text-decoration:none}
+.tabs a.on{color:var(--foreground);border-bottom-color:var(--primary)}
+.icon-btn{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);cursor:pointer}
+.icon-btn:hover{border-color:var(--border-strong)}
+main{padding:36px 0 80px}
+.eyebrow{font:600 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground)}
+h1,h2,h3{font-family:var(--font-display);letter-spacing:-.02em;margin:0}
+h1{font-size:30px;line-height:1.15;font-weight:700}
+h2{font-size:20px;font-weight:700;margin-bottom:14px}
+h3{font-size:16px;font-weight:650}
+.lead{color:var(--muted-foreground);max-width:70ch;margin:8px 0 0}
+.page-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;flex-wrap:wrap;margin-bottom:28px}
+section.block{margin-top:40px}
+.muted{color:var(--muted-foreground)}.subtle{color:var(--subtle)}.small{font-size:13px}.tiny{font-size:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:18px}
+.hair{border-top:1px solid var(--border)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:3px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--secondary);white-space:nowrap}
+.chip.sev{color:#fff;border:0}
+.sev-CRITICAL{background:var(--sev-critical)}.sev-HIGH{background:var(--sev-high)}.sev-MEDIUM{background:var(--sev-medium);color:#241600!important}.sev-LOW{background:var(--sev-low)}.sev-INFO{background:var(--sev-info)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.t-serious{color:var(--bad)}.t-concerns{color:var(--warn)}.t-clear{color:var(--ok)}.t-absent{color:var(--subtle)}
+.st-OPEN{color:var(--bad)}.st-IN_PROGRESS{color:var(--warn)}.st-RESOLVED{color:var(--ok)}.st-ACCEPTED_RISK{color:var(--link)}.st-DISMISSED{color:var(--subtle)}
+.mark{display:inline-grid;place-items:center;border-radius:4px;border:1px solid var(--foreground);background:var(--foreground);color:var(--background);flex:none}
+.mark.idle{background:var(--card);color:var(--foreground);border-color:var(--border-strong)}
+.mark.dim{background:transparent;color:var(--subtle);border-color:var(--border)}
+.mark.gold{background:var(--gold-500);color:var(--umber-900);border-color:var(--umber-800)}
+.stat{padding:14px 16px;border:1px solid var(--border);border-radius:6px;background:var(--card);min-width:0}
+.stat .v{font:700 26px var(--font-display);letter-spacing:-.02em}
+.stat .k{font-size:12px;color:var(--muted-foreground)}
+a.stat:hover{border-color:var(--border-strong);text-decoration:none}
+.board-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.seat{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--card);text-align:left;cursor:pointer;min-width:0}
+.seat:hover{border-color:var(--border-strong)}
+.seat.absent{background:transparent;cursor:default}
+.seat.sel{border-color:var(--primary);box-shadow:inset 0 0 0 1px var(--primary)}
+.seat .nm{font-size:13px;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seat .sub{font-size:11.5px}
+.flow{display:grid;grid-template-columns:1.1fr auto .9fr auto 1.1fr;gap:12px;align-items:stretch}
+.flow .arrow{display:grid;place-items:center;color:var(--subtle)}
+.tally{display:grid;grid-template-columns:1fr auto;gap:4px 14px;font-size:13px}
+.tally .num{font:600 13px var(--font-mono);text-align:right}
+.finding{border:1px solid var(--border);border-radius:6px;background:var(--card);margin-bottom:10px}
+.finding>summary{list-style:none;cursor:pointer;padding:14px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start}
+.finding>summary::-webkit-details-marker{display:none}
+.finding[open]>summary{border-bottom:1px solid var(--border)}
+.finding .body{padding:16px}
+.ftitle{font-weight:650;line-height:1.35}
+.meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12.5px;color:var(--muted-foreground);margin-top:4px}
+dl.kv{display:grid;grid-template-columns:140px 1fr;gap:8px 16px;margin:0}
+dl.kv dt{color:var(--muted-foreground);font-size:13px}
+dl.kv dd{margin:0}
+.code{border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:10px 0;background:var(--muted)}
+.code .hd{display:flex;justify-content:space-between;gap:10px;padding:7px 12px;border-bottom:1px solid var(--border);font-size:12.5px;background:var(--card)}
+.code pre{margin:0;padding:10px 0;overflow-x:auto;font-size:12.5px;line-height:1.6}
+.code .ln{display:flex}
+.code .ln .no{width:48px;flex:none;text-align:right;padding-right:14px;color:var(--subtle);user-select:none}
+.code .ln .tx{white-space:pre;padding-right:14px}
+.options{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.opt{border:1px solid var(--border);border-radius:6px;padding:16px;background:var(--card);display:flex;flex-direction:column;gap:10px}
+.opt.rec{border-color:var(--primary);box-shadow:inset 0 0 0 1px var(--primary)}
+.opt ul{margin:0;padding-left:0;list-style:none;font-size:13.5px}
+.opt li{display:flex;gap:6px;margin:3px 0}
+.opt li .i{flex:none;margin-top:3px}
+.pro .i{color:var(--ok)}.con .i{color:var(--bad)}
+.effort{display:inline-flex;gap:3px;align-items:center}
+.effort i{width:14px;height:6px;border-radius:2px;background:var(--border-strong)}
+.effort i.on{background:var(--gold-700)}
+.cmd{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:4px;background:var(--muted);padding:6px 8px 6px 10px;font:12.5px var(--font-mono);overflow:hidden}
+.cmd span{flex:1;overflow-x:auto;white-space:nowrap}
+.cmd button{border:1px solid var(--border);background:var(--card);border-radius:3px;cursor:pointer;display:inline-grid;place-items:center;width:26px;height:24px;flex:none}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font:600 11px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-strong)}
+td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--muted)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:transparent;padding:6px 11px;font-size:13px;cursor:pointer;color:var(--muted-foreground)}
+.seg button.on{background:var(--foreground);color:var(--background)}
+input.search,select{height:32px;border:1px solid var(--border);border-radius:4px;background:var(--card);padding:0 10px;font:inherit;font-size:13px;color:var(--foreground)}
+input.search{min-width:220px}
+.toggle{border:1px solid var(--border);background:var(--card);border-radius:3px;padding:3px 8px;font-size:12px;cursor:pointer}
+.toggle.on{border-color:var(--sev-high);background:var(--sev-high);color:#fff}
+.notice{border:1px solid var(--border-strong);border-radius:6px;padding:12px 14px;background:var(--accent);color:var(--accent-foreground);font-size:14px;display:flex;gap:10px}
+.empty{border:1px dashed var(--border-strong);border-radius:6px;padding:32px;text-align:center;color:var(--muted-foreground)}
+.md p{margin:0 0 .8em}.md p:last-child{margin-bottom:0}
+.md ul,.md ol{margin:0 0 .8em;padding-left:1.3em}
+.md pre{background:var(--muted);border:1px solid var(--border);border-radius:4px;padding:10px;overflow-x:auto}
+.md code{background:var(--muted);padding:1px 4px;border-radius:3px}
+.md pre code{background:none;padding:0}
+.md h4{font:650 15px var(--font-display);margin:1em 0 .4em}
+.timeline{list-style:none;margin:0;padding:0;border-left:1px solid var(--border-strong)}
+.timeline li{position:relative;padding:0 0 12px 16px;font-size:13.5px}
+.timeline li::before{content:"";position:absolute;left:-4px;top:7px;width:7px;height:7px;border-radius:50%;background:var(--gold-700)}
+.split{display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:start}
+.picker{border:1px solid var(--border);border-radius:6px;background:var(--card);overflow:hidden;position:sticky;top:150px;max-height:calc(100vh - 170px);overflow-y:auto}
+.picker a{display:block;padding:10px 12px;border-bottom:1px solid var(--border);color:var(--foreground);font-size:13.5px}
+.picker a:hover{background:var(--muted);text-decoration:none}
+.picker a.on{background:var(--accent)}
+.verdict{display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+.verdict .big{font:800 34px var(--font-display);letter-spacing:-.03em}
+.v-GO{color:var(--ok)}.v-CONDITIONAL_GO{color:var(--warn)}.v-NO_GO{color:var(--bad)}
+footer{border-top:1px solid var(--border);padding:22px 0 40px;font-size:12.5px;color:var(--muted-foreground)}
+@media (max-width:860px){.flow{grid-template-columns:1fr}.flow .arrow{transform:rotate(90deg)}.split{grid-template-columns:1fr}.picker{position:static;max-height:280px}dl.kv{grid-template-columns:1fr}}
+@media print{header.top{position:static}.tabs,.icon-btn,.cmd button{display:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <div class="brand">
+        <svg viewBox="0 0 28 28" width="28" height="28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="4" fill="#412201"/><rect x="6" y="7" width="16" height="3.4" rx="0.8" fill="#E1C802"/><rect x="6" y="12.3" width="11.5" height="3.4" rx="0.8" fill="#A28900"/><rect x="6" y="17.6" width="7" height="3.4" rx="0.8" fill="#806800"/></svg>
+        <span>Athenyx</span><span class="proj" id="proj"></span>
+      </div>
+      <button class="icon-btn" id="theme" type="button" aria-label="Toggle dark mode"></button>
+    </div>
+    <div class="fresh" id="fresh"></div>
+    <nav class="tabs" id="tabs" aria-label="Report sections"></nav>
+  </div>
+</header>
+<main><div class="wrap" id="app"></div></main>
+<footer><div class="wrap" id="foot"></div></footer>
+<script id="athenyx-data" type="application/json">__ATHENYX_DATA__</script>
+<script>
+"use strict";
+(function () {
+const DATA = JSON.parse(document.getElementById("athenyx-data").textContent);
+const ICONS = {
+  "building-2":'<path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/>',
+  "shield-half":'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 22V2"/>',
+  "database":'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+  "gauge":'<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+  "flask-conical":'<path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/>',
+  "mouse-pointer-click":'<path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/>',
+  "server-cog":'<path d="m10.852 14.772-.383.923"/><path d="M13.148 14.772a3 3 0 1 0-2.296-5.544l-.383-.923"/><path d="m13.148 9.228.383-.923"/><path d="m13.53 15.696-.382-.924a3 3 0 1 1-2.296-5.544"/><path d="m14.772 10.852.923-.383"/><path d="m14.772 13.148.923.383"/><path d="M4.5 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-.5"/><path d="M4.5 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-.5"/><path d="M6 18h.01"/><path d="M6 6h.01"/><path d="m9.228 10.852-.923-.383"/><path d="m9.228 13.148-.923.383"/>',
+  "sigma":'<path d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2"/>',
+  "braces":'<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>',
+  "brain-circuit":'<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M9 13a4.5 4.5 0 0 0 3-4"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M12 13h4"/><path d="M12 18h6a2 2 0 0 1 2 2v1"/><path d="M12 8h8"/><path d="M16 8V5a2 2 0 0 1 2-2"/><circle cx="16" cy="13" r=".5"/><circle cx="18" cy="3" r=".5"/><circle cx="20" cy="21" r=".5"/><circle cx="20" cy="8" r=".5"/>',
+  "scale":'<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>',
+  "sun":'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  "moon":'<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>',
+  "copy":'<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  "check":'<path d="M20 6 9 17l-5-5"/>',
+  "x":'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  "triangle-alert":'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  "circle-check":'<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  "file-code":'<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/>',
+  "commit":'<circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/>',
+  "arrow-right":'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  "search":'<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+  "info":'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  "user-round":'<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>'
+};
+const PERSONA_ICON = { architecture:"building-2", security:"shield-half", data_integrity:"database", reliability:"gauge", quality:"flask-conical", product_ux:"mouse-pointer-click", devops:"server-cog", algorithms:"sigma", code_quality:"braces", ai_ml:"brain-circuit", evidence_arbiter:"scale" };
+const SEV = ["CRITICAL","HIGH","MEDIUM","LOW","INFO"];
+const SEV_LABEL = { CRITICAL:"Critical", HIGH:"High", MEDIUM:"Medium", LOW:"Low", INFO:"Info" };
+const STATUS_LABEL = { OPEN:"Open", IN_PROGRESS:"In progress", ACCEPTED_RISK:"Accepted risk", DISMISSED:"Dismissed", RESOLVED:"Resolved" };
+const CLASS_LABEL = { VERIFIED_DEFECT:"Verified defect", POTENTIAL_RISK:"Potential risk", DESIGN_CONCERN:"Design concern" };
+const STANCE_LABEL = { serious:"Flags serious issues", concerns:"Has concerns", clear:"Signs off", absent:"Not seated", arbiter:"Checks the evidence" };
+const VERDICT_LABEL = { GO:"Go", CONDITIONAL_GO:"Conditional Go", NO_GO:"No-Go" };
+const meta = DATA.meta;
+const seats = DATA.board.seats;
+const seatOf = (k) => seats.find((s) => s.key === k) || { key:k, name:k, short:k, focus:"" };
+const ledger = DATA.ledger.findings;
+const byId = new Map(ledger.map((f) => [f.id, f]));
+DATA.findings.forEach((f) => { if (!byId.has(f.id)) byId.set(f.id, f); });
+const live = (f) => byId.get(f.id) || f;
+const runIds = new Set(DATA.findings.map((f) => f.id));
+const active = (f) => f.status === "OPEN" || f.status === "IN_PROGRESS";
+const sevRank = (s) => SEV.indexOf(s);
+
+// ---------- DOM helpers (repository text only ever goes through textContent) ----------
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "style") el.setAttribute("style", v);
+    else el.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+function icon(name, size) {
+  const s = size || 16;
+  const span = h("span", { class: "i", "aria-hidden": "true", style: "display:inline-grid;width:" + s + "px;height:" + s + "px" });
+  span.innerHTML = '<svg viewBox="0 0 24 24" width="' + s + '" height="' + s + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || ICONS.info) + "</svg>";
+  return span;
+}
+function mark(key, tone, size) {
+  const s = size || 28;
+  const m = h("span", { class: "mark " + (tone || ""), style: "width:" + s + "px;height:" + s + "px", title: seatOf(key).name });
+  m.append(icon(PERSONA_ICON[key] || "user-round", Math.round(s * 0.55)));
+  return m;
+}
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+/** Markdown-lite: escapes everything first, then adds a few safe formats. */
+function md(text) {
+  const box = h("div", { class: "md" });
+  if (!text) return box;
+  const blocks = [];
+  let src = String(text).replace(/\r\n?/g, "\n").replace(/```[\w-]*\n([\s\S]*?)```/g, (_, code) => { blocks.push(code); return "\u0000" + (blocks.length - 1) + "\u0000"; });
+  const inline = (s) => esc(s)
+    .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  const out = [];
+  let list = null;
+  const closeList = () => { if (list) { out.push("</" + list + ">"); list = null; } };
+  for (const line of src.split("\n")) {
+    const code = /^\u0000(\d+)\u0000$/.exec(line.trim());
+    if (code) { closeList(); out.push("<pre><code>" + esc(blocks[Number(code[1])]) + "</code></pre>"); continue; }
+    const ul = /^\s*[-*]\s+(.*)$/.exec(line);
+    const ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+    const hd = /^#{1,4}\s+(.*)$/.exec(line);
+    if (ul || ol) {
+      const want = ul ? "ul" : "ol";
+      if (list !== want) { closeList(); out.push("<" + want + ">"); list = want; }
+      out.push("<li>" + inline((ul || ol)[1]) + "</li>");
+    } else if (hd) { closeList(); out.push("<h4>" + inline(hd[1]) + "</h4>"); }
+    else if (line.trim() === "") { closeList(); out.push(""); }
+    else { closeList(); out.push("<p>" + inline(line) + "</p>"); }
+  }
+  closeList();
+  box.innerHTML = out.join("\n").replace(/<\/p>\n<p>/g, "<br>");
+  box.querySelectorAll("p").forEach((p) => { if (!p.textContent.trim()) p.remove(); });
+  return box;
+}
+function copyBtn(text) {
+  const b = h("button", { type: "button", title: "Copy", "aria-label": "Copy command" }, icon("copy", 14));
+  b.addEventListener("click", () => {
+    const done = () => { b.replaceChildren(icon("check", 14)); setTimeout(() => b.replaceChildren(icon("copy", 14)), 1400); };
+    if (navigator.clipboard && window.isSecureContext !== false) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+    function fallback() { const t = h("textarea", { style: "position:fixed;opacity:0" }); t.value = text; document.body.append(t); t.select(); try { document.execCommand("copy"); done(); } catch (e) {} t.remove(); }
+  });
+  return b;
+}
+const cmd = (text) => h("div", { class: "cmd" }, h("span", null, text), copyBtn(text));
+const sevChip = (s) => h("span", { class: "chip sev sev-" + s }, SEV_LABEL[s] || s);
+const statusChip = (s) => h("span", { class: "chip st-" + s }, h("span", { class: "dot", style: "background:currentColor" }), STATUS_LABEL[s] || s);
+const classChip = (c) => h("span", { class: "chip" }, CLASS_LABEL[c] || c);
+const shortSha = (sha) => (sha ? String(sha).slice(0, 7) : "working tree");
+const when = (iso) => { try { const d = new Date(iso); return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); } catch (e) { return iso; } };
+const loc = (f) => (f.evidence && f.evidence[0] ? f.evidence[0].path + ":" + f.evidence[0].startLine : "developer premise");
+const quoteArg = (s) => '"' + String(s).replace(/"/g, "'") + '"';
+const route = (r) => "#" + r;
+
+// ---------- visuals ----------
+function severityRing(counts, size) {
+  const S = size || 132, C = S / 2, R = S / 2 - 10, W = 12, circ = 2 * Math.PI * R, gap = 3;
+  const total = SEV.reduce((n, s) => n + (counts[s] || 0), 0);
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 " + S + " " + S); svg.setAttribute("width", S); svg.setAttribute("height", S);
+  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", total + " open findings by severity");
+  const ring = (stroke, dash, offset) => { const c = document.createElementNS(ns, "circle"); c.setAttribute("cx", C); c.setAttribute("cy", C); c.setAttribute("r", R); c.setAttribute("fill", "none"); c.setAttribute("stroke-width", W); c.setAttribute("stroke", stroke); if (dash) { c.setAttribute("stroke-dasharray", dash); c.setAttribute("stroke-dashoffset", offset); c.setAttribute("transform", "rotate(-90 " + C + " " + C + ")"); } svg.append(c); };
+  ring("var(--muted)");
+  let acc = 0;
+  if (total > 0) for (const s of SEV) {
+    const n = counts[s] || 0; if (!n) continue;
+    const len = (n / total) * circ;
+    const seg = Math.max(0, len - (total > 1 ? gap : 0));
+    ring("var(--sev-" + s.toLowerCase() + ")", seg + " " + (circ - seg), -acc);
+    acc += len;
+  }
+  const t = document.createElementNS(ns, "text"); t.setAttribute("x", C); t.setAttribute("y", C + 2); t.setAttribute("text-anchor", "middle"); t.setAttribute("dominant-baseline", "middle");
+  t.setAttribute("style", "font:700 30px var(--font-display);fill:var(--foreground)"); t.textContent = total; svg.append(t);
+  const l = document.createElementNS(ns, "text"); l.setAttribute("x", C); l.setAttribute("y", C + 24); l.setAttribute("text-anchor", "middle");
+  l.setAttribute("style", "font:500 10px var(--font-mono);fill:var(--muted-foreground);letter-spacing:.08em"); l.textContent = "OPEN"; svg.append(l);
+  return svg;
+}
+function verdictGauge(verdict) {
+  const ns = "http://www.w3.org/2000/svg", cx = 100, cy = 100, r = 82;
+  const polar = (deg, rr) => [cx + rr * Math.cos((deg * Math.PI) / 180), cy - rr * Math.sin((deg * Math.PI) / 180)];
+  const arc = (from, to) => { const a = polar(from, r), b = polar(to, r); return "M " + a[0].toFixed(2) + " " + a[1].toFixed(2) + " A " + r + " " + r + " 0 0 1 " + b[0].toFixed(2) + " " + b[1].toFixed(2); };
+  const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", "0 0 200 116"); svg.setAttribute("width", "220");
+  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Release verdict: " + (VERDICT_LABEL[verdict] || verdict));
+  [["NO_GO", 180, 122, "var(--bad)"], ["CONDITIONAL_GO", 118, 62, "var(--warn)"], ["GO", 58, 0, "var(--ok)"]].forEach(([v, a, b, col]) => {
+    const p = document.createElementNS(ns, "path"); p.setAttribute("d", arc(a, b)); p.setAttribute("fill", "none"); p.setAttribute("stroke-width", v === verdict ? 14 : 9);
+    p.setAttribute("stroke", col); p.setAttribute("stroke-linecap", "butt"); p.setAttribute("opacity", v === verdict ? 1 : 0.28); svg.append(p);
+  });
+  const deg = { NO_GO: 150, CONDITIONAL_GO: 90, GO: 30 }[verdict] || 90;
+  const tip = polar(deg, r - 20);
+  const n = document.createElementNS(ns, "line"); n.setAttribute("x1", cx); n.setAttribute("y1", cy); n.setAttribute("x2", tip[0].toFixed(2)); n.setAttribute("y2", tip[1].toFixed(2));
+  n.setAttribute("stroke", "var(--foreground)"); n.setAttribute("stroke-width", 3); n.setAttribute("stroke-linecap", "round"); svg.append(n);
+  const hub = document.createElementNS(ns, "circle"); hub.setAttribute("cx", cx); hub.setAttribute("cy", cy); hub.setAttribute("r", 6); hub.setAttribute("fill", "var(--foreground)"); svg.append(hub);
+  return svg;
+}
+function effort(level) {
+  const n = { SMALL: 1, MEDIUM: 2, LARGE: 3 }[level] || 0;
+  if (!n) return null;
+  return h("span", { class: "effort", title: "Effort: " + level.toLowerCase() }, [1, 2, 3].map((i) => h("i", { class: i <= n ? "on" : "" })), h("span", { class: "tiny muted", style: "margin-left:4px" }, level.toLowerCase() + " effort"));
+}
+
+// ---------- shared blocks ----------
+function evidenceBlock(e) {
+  const lines = String(e.snippet || "").split("\n");
+  return h("div", { class: "code" },
+    h("div", { class: "hd" }, h("span", { class: "mono" }, e.path + ":" + e.startLine + (e.endLine !== e.startLine ? "-" + e.endLine : "")), h("span", { class: "subtle" }, (e.symbol ? e.symbol + " · " : "") + shortSha(e.commitSha))),
+    h("pre", null, lines.map((t, i) => h("div", { class: "ln" }, h("span", { class: "no" }, e.startLine + i), h("span", { class: "tx" }, t)))));
+}
+function findingCard(f0, opts) {
+  const f = live(f0);
+  const seat = seatOf(f.persona);
+  const d = h("details", { class: "finding", id: "f-" + f.id, open: opts && opts.open ? true : null });
+  d.append(h("summary", null,
+    mark(f.persona, "", 28),
+    h("div", null,
+      h("div", { class: "ftitle" }, f.title),
+      h("div", { class: "meta" }, h("span", { class: "mono" }, f.id), h("span", null, seat.short || seat.name), h("span", { class: "mono" }, loc(f)), f0.isNew === false ? h("span", null, "seen before") : f0.isNew ? h("span", null, "new") : null)),
+    h("div", { class: "row", style: "justify-content:flex-end" }, sevChip(f.severity), statusChip(f.status))));
+  d.append(findingBody(f));
+  return d;
+}
+function findingBody(f, opts) {
+  const body = h("div", { class: "body" });
+  if (!(opts && opts.noChips)) body.append(h("div", { class: "row", style: "margin-bottom:12px" }, classChip(f.classification), h("span", { class: "chip" }, "Confidence: " + String(f.confidence).toLowerCase()),
+    f.alsoRaisedBy && f.alsoRaisedBy.length ? h("span", { class: "chip" }, "Also raised by " + f.alsoRaisedBy.map((k) => seatOf(k).short).join(", ")) : null));
+  body.append(h("dl", { class: "kv" },
+    h("dt", null, "Observation"), h("dd", null, md(f.observation)),
+    h("dt", null, "Impact"), h("dd", null, md(f.impact)),
+    f.userPremise ? [h("dt", null, "Your premise"), h("dd", null, h("div", { class: "notice" }, icon("info"), h("div", null, h("b", null, "Based on what you described, not on repository code: "), f.userPremise)))] : null));
+  for (const e of f.evidence || []) body.append(evidenceBlock(e));
+  if (f.options && f.options.length) {
+    const rec = f.recommendation && f.recommendation.optionIndex !== null && f.recommendation.optionIndex !== undefined ? f.recommendation.optionIndex : -1;
+    body.append(h("div", { class: "row", style: "margin:14px 0 6px;justify-content:space-between" }, h("b", null, f.options.length + " fix option" + (f.options.length === 1 ? "" : "s") + (rec >= 0 ? " · recommended: " + f.options[rec].title : "")), h("a", { href: route("solutions/" + f.id) }, "Compare in Solution Lab →")));
+  }
+  if (f.verification) body.append(h("div", { style: "margin-top:12px" }, h("b", null, "How to verify the fix"), md(f.verification)));
+  return body;
+}
+
+// ---------- tabs ----------
+const TABS = [["overview", "Overview"], ["review", "Review Lab"], ["risks", "Risk Center"], ["solutions", "Solution Lab"], ["decisions", "Decision Ledger"], ["release", "Release Gate"]];
+const app = document.getElementById("app");
+function pageHead(eyebrow, title, lead, right) {
+  return h("div", { class: "page-head" }, h("div", null, h("div", { class: "eyebrow" }, eyebrow), h("h1", { style: "margin-top:6px" }, title), lead ? h("p", { class: "lead" }, lead) : null), right || null);
+}
+
+function renderOverview() {
+  const open = ledger.filter(active);
+  const counts = {}; SEV.forEach((s) => (counts[s] = open.filter((f) => f.severity === s).length));
+  app.append(pageHead("01 · Overview", meta.project, "Current known health from every Athenyx review of this project. Findings stay tied to the commit they were found at."));
+  app.append(h("div", { class: "card", style: "display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center" },
+    severityRing(counts),
+    h("div", { class: "grid", style: "grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px" },
+      SEV.map((s) => h("a", { class: "stat", href: route("risks?sev=" + s) }, h("div", { class: "v", style: "color:var(--sev-" + s.toLowerCase() + ")" }, counts[s]), h("div", { class: "k" }, SEV_LABEL[s] + " open"))),
+      h("a", { class: "stat", href: route("risks?status=ACCEPTED_RISK") }, h("div", { class: "v" }, ledger.filter((f) => f.status === "ACCEPTED_RISK").length), h("div", { class: "k" }, "Accepted risks")),
+      h("a", { class: "stat", href: route("risks?status=RESOLVED") }, h("div", { class: "v" }, ledger.filter((f) => f.status === "RESOLVED").length), h("div", { class: "k" }, "Resolved")))));
+
+  const s = h("section", { class: "block" }, h("h2", null, "This review"));
+  s.append(h("div", { class: "card" },
+    h("div", { class: "row", style: "justify-content:space-between" }, h("div", { class: "row" }, h("span", { class: "chip" }, meta.modeLabel), h("span", { class: "mono small muted" }, shortSha(meta.sha) + (meta.dirty ? " + working tree" : "")), h("span", { class: "small muted" }, when(meta.at))),
+      DATA.release ? h("span", { class: "chip v-" + DATA.release.verdict, style: "font-size:13px" }, "Release: " + VERDICT_LABEL[DATA.release.verdict]) : h("span", { class: "small muted" }, DATA.findings.length + " finding" + (DATA.findings.length === 1 ? "" : "s") + " kept")),
+    h("div", { style: "margin-top:12px" }, md(DATA.summary)),
+    h("div", { style: "margin-top:12px" }, h("a", { href: route("review") }, "Open the full review →"))));
+  app.append(s);
+
+  const board = h("section", { class: "block" }, h("div", { class: "row", style: "justify-content:space-between;margin-bottom:14px" }, h("h2", { style: "margin:0" }, "The board"), h("span", { class: "small muted" }, "Open findings per specialist")));
+  const strip = h("div", { class: "board-strip" });
+  for (const seat of seats) {
+    const n = open.filter((f) => f.persona === seat.key).length;
+    strip.append(h("a", { class: "seat" + (seat.seated ? "" : " absent"), href: seat.key === "evidence_arbiter" ? route("review") : route("risks?persona=" + seat.key), style: "text-decoration:none;color:inherit" },
+      mark(seat.key, seat.key === "evidence_arbiter" ? "gold" : seat.seated ? "" : "dim", 30),
+      h("div", { style: "min-width:0" }, h("div", { class: "nm" }, seat.short), h("div", { class: "sub " + (seat.key === "evidence_arbiter" ? "muted" : "t-" + (seat.stance || "absent")) }, seat.key === "evidence_arbiter" ? "Checks every quote" : seat.seated ? STANCE_LABEL[seat.stance] : n ? n + " open" : "Not seated this run"))));
+  }
+  board.append(strip);
+  app.append(board);
+
+  const top = open.slice().sort((a, b) => sevRank(a.severity) - sevRank(b.severity)).slice(0, 5);
+  const risks = h("section", { class: "block" }, h("h2", null, "Top open risks"));
+  if (!top.length) risks.append(h("div", { class: "empty" }, "No open risks. That is what the board could see in the code it read — not a guarantee."));
+  else risks.append(table(["", "Finding", "Specialist", "Location"], top.map((f) => ({ href: route("risks/" + f.id), cells: [sevChip(f.severity), h("div", null, h("div", { style: "font-weight:600" }, f.title), h("div", { class: "tiny mono muted" }, f.id)), seatOf(f.persona).short, h("span", { class: "mono small" }, loc(f))] }))));
+  app.append(risks);
+
+  const decs = DATA.ledger.decisions.slice(-3).reverse();
+  if (decs.length) {
+    const sec = h("section", { class: "block" }, h("h2", null, "Recent decisions"));
+    decs.forEach((d) => sec.append(h("a", { class: "card", href: route("decisions"), style: "display:block;margin-bottom:8px;color:inherit;text-decoration:none" }, h("div", { class: "row", style: "justify-content:space-between" }, h("b", null, d.title), h("span", { class: "mono tiny muted" }, d.id)), h("div", { class: "small muted" }, "Chose: " + d.chosenOption))));
+    app.append(sec);
+  }
+}
+
+function table(head, rows) {
+  const t = h("table", null, h("thead", null, h("tr", null, head.map((x) => h("th", null, x)))));
+  const tb = h("tbody");
+  rows.forEach((r) => { const tr = h("tr", { class: r.href ? "click" : "" }, r.cells.map((c) => h("td", null, c))); if (r.href) tr.addEventListener("click", () => (location.hash = r.href)); tb.append(tr); });
+  t.append(tb);
+  return h("div", { style: "overflow-x:auto" }, t);
+}
+
+let selectedSeat = null;
+const minus = (n) => (n ? "−" + n : "0");
+function renderReview() {
+  const seated = seats.filter((s) => s.seated && s.key !== "evidence_arbiter");
+  const absent = seats.filter((s) => !s.seated);
+  const tally = DATA.board.tally;
+  app.append(pageHead("02 · Review Lab", meta.modeLabel, null, h("div", { class: "small muted", style: "text-align:right" }, h("div", { class: "mono" }, (meta.branch || "") + " @ " + shortSha(meta.sha) + (meta.dirty ? " + " + meta.dirty + " uncommitted" : "")), h("div", null, "Reviewed " + when(meta.at) + " · depth " + meta.depth))));
+  if (meta.text) app.append(h("div", { class: "notice", style: "margin-bottom:20px" }, icon("info"), h("div", null, h("b", null, "Your request: "), meta.text)));
+  app.append(h("div", { class: "card" }, h("div", { class: "eyebrow", style: "margin-bottom:8px" }, "Summary"), md(DATA.summary)));
+  if (DATA.answer) {
+    app.append(h("section", { class: "block" }, h("h2", null, meta.mode === "issue" ? "Investigation" : meta.mode === "proposal" ? "Assessment" : "Answer"),
+      meta.mode === "issue" ? h("div", { class: "notice", style: "margin-bottom:12px" }, icon("triangle-alert"), "Plausible causes from reading the code — not a reproduction. Use each finding's checks to confirm.") : null,
+      h("div", { class: "card" }, md(DATA.answer))));
+  }
+
+  // Board flow: seated specialists → Evidence Arbiter → kept findings.
+  const sec = h("section", { class: "block" }, h("h2", null, "Review board"));
+  const left = h("div", { class: "grid", style: "gap:8px;align-content:start" });
+  seated.forEach((s) => left.append(h("button", { type: "button", class: "seat" + (selectedSeat === s.key ? " sel" : ""), onclick: () => { selectedSeat = selectedSeat === s.key ? null : s.key; render(); } },
+    mark(s.key, "", 32), h("div", { style: "min-width:0" }, h("div", { class: "nm" }, s.name), h("div", { class: "sub t-" + s.stance }, STANCE_LABEL[s.stance] + " · " + s.kept + " kept" + (s.coRaised ? " + " + s.coRaised + " shared" : ""))))));
+  const arb = h("div", { class: "card", style: "align-self:center" },
+    h("div", { class: "row", style: "margin-bottom:10px" }, mark("evidence_arbiter", "gold", 32), h("div", null, h("b", null, "Evidence Arbiter"), h("div", { class: "tiny muted" }, "Code, not AI"))),
+    h("div", { class: "tally" },
+      h("span", null, "Proposed"), h("span", { class: "num" }, tally.proposed),
+      h("span", null, "No matching code"), h("span", { class: "num" + (tally.unsupportedRemoved ? " t-serious" : "") }, minus(tally.unsupportedRemoved)),
+      h("span", null, "Citations dropped"), h("span", { class: "num" }, tally.citationsDropped),
+      h("span", null, "Duplicates merged"), h("span", { class: "num" }, minus(tally.duplicatesMerged)),
+      tally.overCap || tally.cutByCap ? [h("span", null, "Cut by caps"), h("span", { class: "num" }, minus(tally.overCap + tally.cutByCap))] : null,
+      h("span", { style: "font-weight:700" }, "Kept"), h("span", { class: "num", style: "font-weight:700" }, tally.kept)));
+  const right = h("div", { class: "grid", style: "gap:6px;align-content:start" });
+  DATA.findings.slice(0, 12).forEach((f) => right.append(h("a", { class: "seat", href: "#review", onclick: (e) => { e.preventDefault(); const el = document.getElementById("f-" + f.id); if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "start" }); } }, style: "color:inherit;text-decoration:none" },
+    h("span", { class: "dot", style: "background:var(--sev-" + f.severity.toLowerCase() + ");width:10px;height:10px;flex:none" }), h("div", { style: "min-width:0" }, h("div", { class: "nm" }, f.title), h("div", { class: "sub muted mono" }, f.id + " · " + seatOf(f.persona).short)))));
+  if (!DATA.findings.length) right.append(h("div", { class: "empty", style: "padding:18px" }, "No findings survived — the seated specialists signed off."));
+  sec.append(h("div", { class: "flow" }, left, h("div", { class: "arrow" }, icon("arrow-right", 20)), arb, h("div", { class: "arrow" }, icon("arrow-right", 20)), right));
+  sec.append(h("p", { class: "tiny muted", style: "margin-top:10px" }, "Specialists don't vote. A stance is derived from the specialist's findings that passed the evidence checks, so it is always backed by cited code."));
+  if (selectedSeat) {
+    const s = seatOf(selectedSeat);
+    const mine = DATA.findings.filter((f) => f.persona === s.key);
+    sec.append(h("div", { class: "card", style: "margin-top:14px" },
+      h("div", { class: "row", style: "justify-content:space-between" }, h("div", { class: "row" }, mark(s.key, "", 36), h("div", null, h("h3", null, s.name), h("div", { class: "small muted" }, s.focus))), h("span", { class: "chip t-" + s.stance }, STANCE_LABEL[s.stance])),
+      h("div", { style: "margin-top:12px" }, s.statement ? md(s.statement) : h("p", { class: "muted" }, "No statement was recorded.")),
+      h("div", { class: "row small muted", style: "margin-top:8px" }, "Raised " + s.raised, "· kept " + s.kept, "· unsupported " + s.unsupported, "· citations dropped " + s.citationsDropped, s.reason ? "· seated because: " + s.reason : ""),
+      mine.length ? h("ul", { style: "margin:10px 0 0;padding-left:18px" }, mine.map((f) => h("li", null, h("a", { href: route("risks/" + f.id) }, f.id + " " + f.title)))) : null));
+  }
+  if (absent.length) sec.append(h("p", { class: "small muted", style: "margin-top:12px" }, "Not seated this run: " + absent.map((s) => s.short).join(", ") + ". Run with --all to seat the whole board."));
+  if (DATA.board.agreements.length) sec.append(h("div", { class: "small", style: "margin-top:8px" }, h("b", null, "Independent agreement: "), DATA.board.agreements.map((a) => a.id + " (" + a.personas.map((k) => seatOf(k).short).join(" + ") + ")").join(" · ")));
+  app.append(sec);
+
+  if (DATA.rechecks.length) {
+    const rc = h("section", { class: "block" }, h("h2", null, "Re-check results"));
+    DATA.rechecks.forEach((r) => rc.append(h("div", { class: "card", style: "margin-bottom:10px" },
+      h("div", { class: "row", style: "justify-content:space-between" }, h("a", { href: route("risks/" + r.id) }, h("b", null, r.id + " " + r.title)), h("span", { class: "chip " + (r.result === "RESOLVED" ? "t-clear" : r.result === "STILL_PRESENT" ? "t-serious" : "t-concerns") }, r.result.replace(/_/g, " ").toLowerCase())),
+      r.proposed !== r.result ? h("div", { class: "tiny muted" }, "The specialist proposed " + r.proposed.replace(/_/g, " ").toLowerCase() + "; the re-check rules changed it.") : null,
+      md(r.reasoning), (r.evidence || []).map(evidenceBlock))));
+    app.append(rc);
+  }
+
+  const list = h("section", { class: "block" }, h("h2", null, "Findings (" + DATA.findings.length + ")"));
+  if (!DATA.findings.length) list.append(h("div", { class: "empty" }, "No significant, evidence-backed issues in the code the board read."));
+  DATA.findings.forEach((f) => list.append(findingCard(f)));
+  app.append(list);
+
+  if (DATA.notRaised.length) {
+    const nr = h("section", { class: "block" }, h("h2", null, "Open findings not raised again"),
+      h("p", { class: "small muted" }, "The board read this code again and did not raise these. They stay open until a re-check confirms them: /athenyx recheck"));
+    nr.append(table(["Finding", "Cited code", ""], DATA.notRaised.map((n) => ({ href: route("risks/" + n.id), cells: [h("span", null, h("span", { class: "mono" }, n.id + " "), n.title), n.codeChanged ? h("span", { class: "t-clear" }, "changed since") : h("span", { class: "muted" }, "unchanged"), sevChip(n.severity)] }))));
+    app.append(nr);
+  }
+
+  const cov = DATA.coverage;
+  const c = h("section", { class: "block" }, h("h2", null, "Coverage and limitations"));
+  c.append(h("p", { class: "small muted" }, "The board read " + cov.plannedLines + " of a " + cov.budget + "-line budget across " + cov.plan.length + " files, chosen in code from " + cov.hotspots + " hotspots, the developer's request and the project map. " + cov.fileCount + " readable files in total." + (Object.keys(cov.excluded || {}).length ? " Excluded: " + Object.entries(cov.excluded).map(([k, v]) => v + " " + k.replace("_", " ")).join(", ") + "." : "")));
+  if (cov.limitations.length) c.append(h("ul", null, cov.limitations.map((l) => h("li", { class: "small" }, l))));
+  const files = h("details", null, h("summary", { class: "small", style: "cursor:pointer" }, "Files read (" + cov.plan.length + ")"));
+  files.append(table(["File", "Lines", "Why"], cov.plan.map((p) => ({ cells: [h("span", { class: "mono small" }, p.path), h("span", { class: "mono small" }, p.ranges.map((r) => r[0] + "-" + r[1]).join(", ")), h("span", { class: "small muted" }, p.reasons.join(" · "))] }))));
+  c.append(files);
+  app.append(c);
+}
+
+const filters = { status: "active", sev: new Set(), persona: "", cls: "", q: "" };
+function renderRisks(id, query) {
+  if (id) return renderRiskDetail(id);
+  if (query) { const p = new URLSearchParams(query); if (p.get("sev")) { filters.sev = new Set([p.get("sev")]); filters.status = "active"; } if (p.get("status")) filters.status = p.get("status"); if (p.get("persona")) filters.persona = p.get("persona"); history.replaceState(null, "", "#risks"); }
+  app.append(pageHead("03 · Risk Center", "Every tracked finding", "Across all Athenyx runs of this project. Open one to see its evidence, history and commands."));
+  const bar = h("div", { class: "filters" });
+  const seg = h("div", { class: "seg" });
+  [["active", "Open + in progress"], ["all", "All"], ["ACCEPTED_RISK", "Accepted"], ["DISMISSED", "Dismissed"], ["RESOLVED", "Resolved"]].forEach(([k, l]) => seg.append(h("button", { type: "button", class: filters.status === k ? "on" : "", onclick: () => { filters.status = k; render(); } }, l)));
+  bar.append(seg);
+  SEV.forEach((s) => bar.append(h("button", { type: "button", class: "toggle" + (filters.sev.has(s) ? " on" : ""), onclick: () => { filters.sev.has(s) ? filters.sev.delete(s) : filters.sev.add(s); render(); } }, SEV_LABEL[s])));
+  const ps = h("select", { "aria-label": "Specialist", onchange: (e) => { filters.persona = e.target.value; render(); } }, h("option", { value: "" }, "All specialists"), seats.filter((s) => s.key !== "evidence_arbiter").map((s) => h("option", { value: s.key, selected: filters.persona === s.key ? true : null }, s.short)));
+  const cs = h("select", { "aria-label": "Classification", onchange: (e) => { filters.cls = e.target.value; render(); } }, h("option", { value: "" }, "All classifications"), Object.entries(CLASS_LABEL).map(([k, v]) => h("option", { value: k, selected: filters.cls === k ? true : null }, v)));
+  const q = h("input", { class: "search", type: "search", placeholder: "Search title or observation", value: filters.q, oninput: (e) => { filters.q = e.target.value; renderRows(); } });
+  bar.append(ps, cs, q);
+  app.append(bar);
+  const holder = h("div");
+  app.append(holder);
+  function renderRows() {
+    const needle = filters.q.trim().toLowerCase();
+    const rows = ledger.filter((f) => (filters.status === "all" || (filters.status === "active" ? active(f) : f.status === filters.status))
+      && (!filters.sev.size || filters.sev.has(f.severity)) && (!filters.persona || f.persona === filters.persona) && (!filters.cls || f.classification === filters.cls)
+      && (!needle || (f.title + " " + f.observation).toLowerCase().includes(needle)))
+      .sort((a, b) => sevRank(a.severity) - sevRank(b.severity) || a.id.localeCompare(b.id));
+    holder.replaceChildren(rows.length ? table(["", "Finding", "Specialist", "Status", "Location", "Last seen"], rows.map((f) => ({ href: route("risks/" + f.id), cells: [sevChip(f.severity), h("div", null, h("div", { style: "font-weight:600" }, f.title), h("div", { class: "tiny mono muted" }, f.id + (runIds.has(f.id) ? " · in this run" : ""))), seatOf(f.persona).short, statusChip(f.status), h("span", { class: "mono small" }, loc(f)), h("span", { class: "mono small muted" }, shortSha(f.lastSeen && f.lastSeen.sha))] }))) : h("div", { class: "empty" }, "No findings match these filters."));
+  }
+  renderRows();
+}
+
+function renderRiskDetail(id) {
+  const f = byId.get(id);
+  app.append(h("p", null, h("a", { href: route("risks") }, "← Risk Center")));
+  if (!f) { app.append(h("div", { class: "empty" }, "No finding " + id + " in this report.")); return; }
+  const seat = seatOf(f.persona);
+  app.append(h("div", { class: "page-head" }, h("div", null, h("div", { class: "eyebrow" }, "03 · Risk Center · " + f.id), h("h1", { style: "margin-top:6px;max-width:30ch" }, f.title),
+    h("div", { class: "row", style: "margin-top:12px" }, sevChip(f.severity), statusChip(f.status), classChip(f.classification), h("span", { class: "chip" }, "Confidence: " + f.confidence.toLowerCase()))),
+    h("div", { class: "row" }, mark(f.persona, "", 40), h("div", null, h("b", null, seat.name), h("div", { class: "small muted" }, "First seen " + shortSha(f.firstSeen && f.firstSeen.sha) + " · last seen " + shortSha(f.lastSeen && f.lastSeen.sha))))));
+  if (f.statusNote) app.append(h("div", { class: "notice", style: "margin-bottom:18px" }, icon("info"), h("div", null, String(f.statusNote).startsWith("[manual]") ? h("b", null, "Resolved by you (not verified): ") : null, String(f.statusNote).replace(/^\[manual\]\s*/, ""))));
+  if (f.alsoRaisedBy && f.alsoRaisedBy.length) app.append(h("p", { class: "small muted" }, "Also raised by " + f.alsoRaisedBy.map((k) => seatOf(k).short).join(", ")));
+  app.append(h("div", { class: "card" }, findingBody(f, { noChips: true })));
+  const actions = h("section", { class: "block" }, h("h2", null, "Next steps"), h("p", { class: "small muted" }, "Run these in your AI tool (type them as you would /athenyx):"));
+  actions.append(h("div", { class: "grid", style: "gap:8px;max-width:760px" },
+    f.options && f.options.length ? cmd("/athenyx decide " + f.id + " " + ((f.recommendation && f.recommendation.optionIndex !== null && f.recommendation.optionIndex !== undefined ? f.recommendation.optionIndex : 0) + 1) + ' "why this fix"') : null,
+    cmd("/athenyx recheck " + f.id),
+    cmd("/athenyx status " + f.id + ' accepted "why the risk is acceptable"'),
+    cmd("/athenyx status " + f.id + ' dismissed "why this is a false positive"')));
+  app.append(actions);
+  const decs = DATA.ledger.decisions.filter((d) => d.findingIds.includes(f.id));
+  if ((f.checks && f.checks.length) || (f.history && f.history.length) || decs.length) {
+    const hist = h("section", { class: "block" }, h("h2", null, "History"));
+    const tl = h("ul", { class: "timeline" });
+    (f.history || []).slice().reverse().forEach((e) => tl.append(h("li", null, h("span", { class: "mono tiny muted" }, when(e.at) + " "), e.detail || e.event)));
+    hist.append(tl);
+    (f.checks || []).slice().reverse().forEach((c) => hist.append(h("div", { class: "card", style: "margin-top:10px" }, h("div", { class: "row", style: "justify-content:space-between" }, h("b", null, "Re-check: " + c.result.replace(/_/g, " ").toLowerCase()), h("span", { class: "mono tiny muted" }, shortSha(c.sha) + " · " + when(c.at))), md(c.reasoning))));
+    decs.forEach((d) => hist.append(h("p", { class: "small" }, h("a", { href: route("decisions") }, d.id), " — chose “" + d.chosenOption + "”")));
+    app.append(hist);
+  }
+}
+
+function renderSolutions(id) {
+  const candidates = ledger.filter((f) => f.options && f.options.length && f.status !== "DISMISSED").sort((a, b) => Number(!active(a)) - Number(!active(b)) || sevRank(a.severity) - sevRank(b.severity));
+  app.append(pageHead("04 · Solution Lab", "Compare ways to fix a risk", "Each option's pros, cons and effort, with the board's recommendation. Pick one by running its command — Athenyx records it in the Decision Ledger."));
+  if (!candidates.length) { app.append(h("div", { class: "empty" }, "No findings with fix options yet.")); return; }
+  const current = byId.get(id) || candidates[0];
+  const picker = h("div", { class: "picker" }, candidates.map((f) => h("a", { href: route("solutions/" + f.id), class: f.id === current.id ? "on" : "" }, h("div", { class: "row", style: "gap:6px" }, h("span", { class: "dot", style: "background:var(--sev-" + f.severity.toLowerCase() + ")" }), h("span", { class: "mono tiny muted" }, f.id)), h("div", null, f.title))));
+  const pane = h("div");
+  const rec = current.recommendation && current.recommendation.optionIndex !== null && current.recommendation.optionIndex !== undefined ? current.recommendation.optionIndex : -1;
+  pane.append(h("div", { class: "row", style: "justify-content:space-between;margin-bottom:12px" }, h("div", null, h("h2", { style: "margin:0" }, current.title), h("div", { class: "small muted" }, current.id + " · " + seatOf(current.persona).short + " · " + loc(current))), h("div", { class: "row" }, sevChip(current.severity), statusChip(current.status))));
+  pane.append(h("div", { style: "margin-bottom:14px" }, md(current.observation)));
+  const grid = h("div", { class: "options" });
+  current.options.forEach((o, i) => grid.append(h("div", { class: "opt" + (i === rec ? " rec" : "") },
+    h("div", { class: "row", style: "justify-content:space-between" }, h("span", { class: "eyebrow" }, "Option " + (i + 1)), i === rec ? h("span", { class: "chip", style: "background:var(--primary);color:var(--primary-foreground);border:0" }, "Recommended") : null, current.chosenOptionIndex === i ? h("span", { class: "chip t-clear" }, icon("check", 12), "Chosen") : null),
+    h("h3", null, o.title), o.description ? md(o.description) : null,
+    o.pros.length ? h("ul", { class: "pro" }, o.pros.map((p) => h("li", null, icon("check", 14), h("span", null, p)))) : null,
+    o.cons.length ? h("ul", { class: "con" }, o.cons.map((p) => h("li", null, icon("x", 14), h("span", null, p)))) : null,
+    effort(o.effort),
+    h("div", { style: "margin-top:auto" }, cmd("/athenyx decide " + current.id + " " + (i + 1) + ' "why"')))));
+  pane.append(grid);
+  if (current.recommendation && current.recommendation.rationale) pane.append(h("div", { class: "card", style: "margin-top:14px" }, h("b", null, "Why the board recommends " + (rec >= 0 ? "option " + (rec + 1) : "this")), md(current.recommendation.rationale)));
+  if (current.verification) pane.append(h("div", { class: "card", style: "margin-top:12px" }, h("b", null, "Verify the fix"), md(current.verification), h("div", { style: "margin-top:10px" }, cmd("/athenyx recheck " + current.id))));
+  app.append(h("div", { class: "split" }, picker, pane));
+}
+
+function renderDecisions() {
+  const decs = DATA.ledger.decisions.slice().reverse();
+  app.append(pageHead("05 · Decision Ledger", "Engineering decisions", "What you chose, why, and what you ruled out — kept with the findings they settle."));
+  if (!decs.length) { app.append(h("div", { class: "empty" }, h("p", null, "No decisions recorded yet."), h("p", { class: "small" }, "In Solution Lab, pick an option and run the command it shows, e.g. /athenyx decide ATX-001 1 \"why\"."))); return; }
+  decs.forEach((d) => app.append(h("div", { class: "card", style: "margin-bottom:12px" },
+    h("div", { class: "row", style: "justify-content:space-between" }, h("h3", null, d.title), h("span", { class: "row small muted" }, h("span", { class: "mono" }, d.id), h("span", { class: "chip t-clear" }, d.status.toLowerCase()))),
+    h("dl", { class: "kv", style: "margin-top:12px" },
+      h("dt", null, "Chosen option"), h("dd", null, h("b", null, d.chosenOption)),
+      h("dt", null, "Rationale"), h("dd", null, d.rationale ? md(d.rationale) : h("span", { class: "muted" }, "—")),
+      d.alternatives.length ? [h("dt", null, "Ruled out"), h("dd", null, h("ul", { style: "margin:0;padding-left:18px" }, d.alternatives.map((a) => h("li", null, h("b", null, a.title), a.whyNot ? " — " + a.whyNot : ""))))] : null,
+      h("dt", null, "Findings"), h("dd", null, d.findingIds.map((id) => h("a", { href: route("risks/" + id), style: "margin-right:10px" }, id))),
+      d.relatedFiles.length ? [h("dt", null, "Files"), h("dd", { class: "mono small" }, d.relatedFiles.join(", "))] : null,
+      h("dt", null, "Recorded"), h("dd", { class: "small muted" }, when(d.at) + " at " + shortSha(d.sha))))));
+}
+
+function renderRelease() {
+  app.append(pageHead("06 · Release Gate", "Release readiness", "An advisory Go / Conditional Go / No-Go for this code version. Fixed rules cap the board's verdict: an open critical finding is always No-Go."));
+  const r = DATA.release;
+  if (!r) {
+    const last = (DATA.ledger.runs || []).slice().reverse().find((x) => x.verdict);
+    const openSerious = ledger.filter((f) => active(f) && (f.severity === "CRITICAL" || f.severity === "HIGH"));
+    app.append(h("div", { class: "empty" }, h("p", null, "This report is a " + meta.modeLabel + " review, not a release assessment."), cmd("/athenyx release"),
+      last ? h("p", { class: "small", style: "margin-top:12px" }, "Latest assessment: " + VERDICT_LABEL[last.verdict] + " (" + when(last.at) + ", " + shortSha(last.sha) + ") — athenyx-reports/" + last.file) : null));
+    if (openSerious.length) app.append(h("section", { class: "block" }, h("h2", null, "Would block a release today"), table(["", "Finding", "Status"], openSerious.map((f) => ({ href: route("risks/" + f.id), cells: [sevChip(f.severity), f.id + " " + f.title, statusChip(f.status)] })))));
+    return;
+  }
+  app.append(h("div", { class: "card verdict" }, verdictGauge(r.verdict),
+    h("div", null, h("div", { class: "eyebrow" }, "Advisory verdict for " + shortSha(meta.sha) + (meta.dirty ? " + working tree" : "")), h("div", { class: "big v-" + r.verdict }, VERDICT_LABEL[r.verdict]),
+      r.capped ? h("div", { class: "small muted" }, "The board said " + VERDICT_LABEL[r.aiVerdict] + "; the release rules capped it.") : null,
+      h("div", { class: "small", style: "margin-top:8px" }, r.disclaimer))));
+  const g = h("div", { class: "grid g2", style: "margin-top:16px" });
+  g.append(h("div", { class: "card" }, h("h3", null, "Conditions"), r.conditions.length ? h("ul", { style: "margin:10px 0 0;padding-left:18px" }, r.conditions.map((c) => h("li", { class: "small", style: "margin:4px 0" }, c))) : h("p", { class: "small muted" }, "None.")));
+  g.append(h("div", { class: "card" }, h("h3", null, "Evidence"),
+    h("dl", { class: "kv", style: "margin-top:10px;grid-template-columns:120px 1fr" },
+      h("dt", null, "Tests"), h("dd", { class: r.testsPresent ? "t-clear" : "t-serious" }, r.testsPresent ? r.testFiles + " test file" + (r.testFiles === 1 ? "" : "s") + " found" : "No test files found"),
+      h("dt", null, "CI config"), h("dd", null, r.ciFiles.length ? h("span", { class: "mono small" }, r.ciFiles.join(", ")) : h("span", { class: "t-concerns" }, "None found")),
+      h("dt", null, "CI results"), h("dd", { class: "muted small" }, "Not available locally (Athenyx never runs your pipeline)"),
+      h("dt", null, "Accepted risks"), h("dd", null, String(r.acceptedRisks)))));
+  app.append(g);
+  if (r.blockingFindingIds.length) app.append(h("section", { class: "block" }, h("h2", null, "Blocking findings"), table(["", "Finding", "Status"], r.blockingFindingIds.map((id) => byId.get(id)).filter(Boolean).map((f) => ({ href: route("risks/" + f.id), cells: [sevChip(f.severity), f.id + " " + f.title, statusChip(f.status)] })))));
+  app.append(h("section", { class: "block" }, h("h2", null, "Assessed by"), h("div", { class: "board-strip" }, seats.filter((s) => s.seated && s.key !== "evidence_arbiter").map((s) => h("div", { class: "seat" }, mark(s.key, "", 30), h("div", null, h("div", { class: "nm" }, s.short), h("div", { class: "sub t-" + s.stance }, STANCE_LABEL[s.stance])))))));
+  if (r.limitations.length) app.append(h("section", { class: "block" }, h("h2", null, "Limitations"), h("ul", null, r.limitations.map((l) => h("li", { class: "small" }, l)))));
+}
+
+// ---------- shell ----------
+function render() {
+  const raw = location.hash.replace(/^#/, "") || "overview";
+  const [pathPart, query] = raw.split("?");
+  const [tab, id] = pathPart.split("/");
+  const known = TABS.some((t) => t[0] === tab) ? tab : "overview";
+  document.querySelectorAll("#tabs a").forEach((a) => a.classList.toggle("on", a.dataset.tab === known));
+  const y = window.scrollY;
+  app.replaceChildren();
+  ({ overview: renderOverview, review: renderReview, risks: () => renderRisks(id, query), solutions: () => renderSolutions(id), decisions: renderDecisions, release: renderRelease })[known]();
+  document.title = "Athenyx · " + meta.project + " · " + (TABS.find((t) => t[0] === known) || TABS[0])[1];
+  if (render.last === raw) window.scrollTo(0, y); else window.scrollTo(0, 0);
+  render.last = raw;
+}
+document.getElementById("proj").textContent = "/ " + meta.project;
+document.getElementById("tabs").append(...TABS.map(([k, l], i) => h("a", { href: "#" + k, "data-tab": k }, h("span", { class: "n" }, "0" + (i + 1)), l)));
+document.getElementById("fresh").append(...[
+  h("span", null, h("b", null, meta.modeLabel)),
+  h("span", { class: "row", style: "gap:5px" }, icon("commit", 14), meta.isRepo ? h("span", null, h("span", { class: "mono" }, (meta.branch || "detached") + " @ " + shortSha(meta.sha)), meta.dirty ? " + " + meta.dirty + " uncommitted" : "") : "not a git repository"),
+  h("span", null, "Reviewed " + when(meta.at)),
+  meta.updatedAt ? h("span", null, "Ledger updated " + when(meta.updatedAt)) : null,
+  h("span", null, "Depth: " + meta.depth + (meta.all ? " · full board" : ""))].filter(Boolean));
+document.getElementById("foot").append(h("div", null, meta.generator + " · run " + meta.runId + " · advisory only — Athenyx may miss defects or raise false alarms; it never ran your code. Every quoted line was checked against the files by the Evidence Arbiter. Icons: Lucide (ISC)."));
+const themeBtn = document.getElementById("theme");
+const setTheme = (dark) => { document.documentElement.classList.toggle("dark", dark); themeBtn.replaceChildren(icon(dark ? "sun" : "moon", 16)); try { localStorage.setItem("athenyx-theme", dark ? "dark" : "light"); } catch (e) {} };
+let stored = null; try { stored = localStorage.getItem("athenyx-theme"); } catch (e) {}
+setTheme(stored ? stored === "dark" : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+themeBtn.addEventListener("click", () => setTheme(!document.documentElement.classList.contains("dark")));
+window.addEventListener("hashchange", render);
+render();
+})();
+</script>
+</body>
+</html>
