@@ -1,7 +1,7 @@
 {
   "project": {
     "name": "Doshomik",
-    "source": "the SQL migrations in `apps/api/migrations/` (read from a database migrated with all seven)",
+    "source": "the SQL migrations in `apps/api/migrations/` (read from a database migrated with all eight)",
     "code": ["sql", "kysely"]
   },
   "areas": [
@@ -205,7 +205,10 @@
     },
     "topics": {
       "purpose": "One row per concept: the unit that links lessons, quizzes, reels and paper prerequisites.",
-      "columns": { "summary": "Shown in Learn first when the topic has no learn items yet" }
+      "columns": {
+        "summary": "Shown in Learn first when the topic has no learn items yet",
+        "field_id": "The learn area the concept sits in. Learn items, questions, quizzes and tagged posts reach their area through it; `NULL` leaves the topic unfiled"
+      }
     },
     "learn_items": {
       "purpose": "One row per short video, figure or text explanation.",
@@ -220,7 +223,8 @@
       "purpose": "One row per course: an ordered set of learn items, or a card linking to a free outside course.",
       "columns": {
         "external_url": "Set for an outside course, which has no items",
-        "status": "draft → published → archived"
+        "status": "draft → published → archived",
+        "field_id": "The course's learn area, set here because an outside course has no items to derive it from. `NULL` leaves the course unfiled"
       }
     },
     "course_items": {
@@ -262,7 +266,7 @@
       "purpose": "One row per question in a quiz, at its position."
     },
     "fields": {
-      "purpose": "One row per research field, shown as a chip on the Research tab.",
+      "purpose": "One row per subject area, shown as a chip on Research, and on Learn and Practice through a [[topics]] or [[courses]] row.",
       "columns": { "position": "Chip order, smallest first" },
       "notes": ["Can't be deleted while it has papers."]
     },
@@ -466,8 +470,10 @@
     "learn_items_topic_id_idx": "Learn items by topic",
     "learn_items_to_tsvector_idx": "Full-text search on title and body",
     "courses_to_tsvector_idx": "Full-text search on title and description",
+    "courses_field_idx": "Courses in one learn area (the chip filter)",
     "questions_topic_id_idx": "Questions by topic",
     "topics_name_idx": "Fuzzy (trigram) topic search",
+    "topics_field_idx": "Topics in one learn area (the chip filter)",
     "paper_edges_cited_idx": "\"Built on by\": papers citing this one",
     "paper_saves_user_idx": "Saved papers and Up next",
     "reading_passes_read_idx": "The Read list",
@@ -511,19 +517,20 @@
   "joinExample": ["users", "papers"],
   "highlight": {
     "label": "new",
-    "short": "added in migration 005 or 006",
-    "note": "Added for the Research tab (Group A) in migration `…005`, or by the database refactoring in `…006`.",
+    "short": "added in migration 005, 006 or 007",
+    "note": "Added for the Research tab (Group A) in migration `…005`, by the database refactoring in `…006`, or by learn areas in `…007`.",
     "tables": ["paper_cards", "paper_edges", "paper_saves", "reading_passes", "research_outputs", "trails", "trail_items", "user_known_topics", "learn_item_completions", "paper_metadata", "paper_metrics", "paper_sync"],
     "columns": [
       "fields.position",
       "posts.topic_id",
+      "topics.field_id", "courses.field_id",
       "papers.abstract", "papers.venue", "papers.published_on", "papers.pdf_url", "papers.code_url", "papers.search_vector",
       "blocks.is_active", "blocks.updated_at",
       "paper_cards.extra_questions", "paper_cards.data_source", "paper_cards.evaluation", "paper_cards.figures",
       "paper_prerequisites.label", "paper_prerequisites.why", "paper_prerequisites.learn_item_id", "paper_prerequisites.quiz_id",
       "paper_prerequisites.reel_post_id", "paper_prerequisites.suggested_by"
     ],
-    "indexes": ["paper_metrics_trend_idx", "papers_search_idx", "paper_sync_due_idx", "posts_topic_idx", "paper_edges_cited_idx", "paper_saves_user_idx", "reading_passes_read_idx", "research_outputs_user_idx", "trails_creator_idx", "trails_published_idx", "trail_items_paper_idx"]
+    "indexes": ["paper_metrics_trend_idx", "papers_search_idx", "paper_sync_due_idx", "posts_topic_idx", "paper_edges_cited_idx", "paper_saves_user_idx", "reading_passes_read_idx", "research_outputs_user_idx", "trails_creator_idx", "trails_published_idx", "trail_items_paper_idx", "topics_field_idx", "courses_field_idx"]
   },
   "tour": [
     {
@@ -600,9 +607,10 @@
       "title": "Topics tie Learn, Practice and Research together",
       "text": [
         "A topic is a concept. Learn items, questions and quizzes are tagged with one.",
-        "A paper's Learn first list is a set of topics, so a new video for a topic shows up in every paper that needs it."
+        "A paper's Learn first list is a set of topics, so a new video for a topic shows up in every paper that needs it.",
+        "A topic also names a learn area ([[fields]]), so one set of chips filters every tab."
       ],
-      "tables": ["topics", "learn_items", "questions", "paper_prerequisites", "papers"]
+      "tables": ["topics", "learn_items", "questions", "paper_prerequisites", "papers", "fields"]
     },
     {
       "title": "The research collection",
@@ -700,7 +708,7 @@
     {
       "id": "migrations",
       "title": "Migrations",
-      "desc": "The seven SQL files and the rules for adding more",
+      "desc": "The eight SQL files and the rules for adding more",
       "sections": [
         {
           "table": {
@@ -712,7 +720,8 @@
               ["`…003_sessions-public-id-and-2fa.sql`", "Session public ids, two-factor columns, four indexes"],
               ["`…004_toggles-and-stored-counts.sql`", "Toggle rows for likes and follows, stored follow counts"],
               ["`…005_research-collection.sql`", "Research tab Group A: 9 new tables, paper metadata and search"],
-              ["`…006_papers-split-and-block-toggle.sql`", "Block toggle rows; papers split into `paper_metadata`, `paper_metrics` and `paper_sync`; the old summary moved into `paper_cards`; search rebuilt from the cards"]
+              ["`…006_papers-split-and-block-toggle.sql`", "Block toggle rows; papers split into `paper_metadata`, `paper_metrics` and `paper_sync`; the old summary moved into `paper_cards`; search rebuilt from the cards"],
+              ["`…007_learn-areas.sql`", "A learn area on `topics` and `courses`, so the same chips filter Learn, Practice, Explore and Research"]
             ],
             "prose": [1]
           }

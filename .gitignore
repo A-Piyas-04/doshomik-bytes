@@ -3,3 +3,4 @@ node_modules/
 apps/api/media/
 apps/api/.dev-mail/
 coverage/
+.schema-guide/facts.prev.json

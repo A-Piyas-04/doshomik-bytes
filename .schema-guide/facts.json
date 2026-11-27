@@ -4,7 +4,7 @@
     "kind": "postgres",
     "name": "doshomik_guide",
     "server": "PostgreSQL 18.1",
-    "readAt": "2026-11-26T06:47:26.591Z"
+    "readAt": "2026-11-27T17:44:29.757Z"
   },
   "tables": [
     {
@@ -617,6 +617,10 @@
           "type": "timestamptz",
           "notNull": true,
           "default": "now()"
+        },
+        {
+          "name": "field_id",
+          "type": "bigint"
         }
       ],
       "primaryKey": [
@@ -640,6 +644,17 @@
           "onDelete": "setnull"
         },
         {
+          "name": "courses_field_id_fkey",
+          "columns": [
+            "field_id"
+          ],
+          "table": "fields",
+          "refColumns": [
+            "id"
+          ],
+          "onDelete": "setnull"
+        },
+        {
           "name": "courses_updated_by_fkey",
           "columns": [
             "updated_by"
@@ -652,6 +667,13 @@
         }
       ],
       "indexes": [
+        {
+          "name": "courses_field_idx",
+          "columns": [
+            "field_id"
+          ],
+          "where": "field_id IS NOT NULL"
+        },
         {
           "name": "courses_to_tsvector_idx",
           "columns": [
@@ -3433,6 +3455,10 @@
           "name": "slug",
           "type": "text",
           "notNull": true
+        },
+        {
+          "name": "field_id",
+          "type": "bigint"
         }
       ],
       "primaryKey": [
@@ -3446,8 +3472,27 @@
           "slug"
         ]
       ],
-      "foreignKeys": [],
+      "foreignKeys": [
+        {
+          "name": "topics_field_id_fkey",
+          "columns": [
+            "field_id"
+          ],
+          "table": "fields",
+          "refColumns": [
+            "id"
+          ],
+          "onDelete": "setnull"
+        }
+      ],
       "indexes": [
+        {
+          "name": "topics_field_idx",
+          "columns": [
+            "field_id"
+          ],
+          "where": "field_id IS NOT NULL"
+        },
         {
           "name": "topics_name_idx",
           "columns": [
